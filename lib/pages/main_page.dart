@@ -1,9 +1,23 @@
-// lib/pages/main_page.dart
 import 'package:flutter/material.dart';
-import '../../../../utils/styles.dart'; // keep your path to styles.dart
+import '../../../../utils/styles.dart';
 import 'map_page.dart';
-import 'food_page.dart';
+import 'blind_box.dart';
 import 'grocery_page.dart';
+import 'profile_page.dart';
+
+// Placeholder for Browse page
+class BrowsePage extends StatelessWidget {
+  const BrowsePage({super.key});
+  @override
+  Widget build(BuildContext context) => const Scaffold(body: Center(child: Text('Browse Page')));
+}
+
+// Placeholder for Orders page
+class OrdersPage extends StatelessWidget {
+  const OrdersPage({super.key});
+  @override
+  Widget build(BuildContext context) => const Scaffold(body: Center(child: Text('Orders Page')));
+}
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -13,10 +27,9 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPageState extends State<MainPage> {
-  // Keep the original map logic
   String _currentAddress = "Select Location";
+  final int _selectedIndex = 0; // Home tab index
 
-  // Keep your existing map navigation logic unchanged
   Future<void> _navigateToMapPage() async {
     final selectedLocation = await Navigator.push(
       context,
@@ -30,33 +43,63 @@ class _MainPageState extends State<MainPage> {
     }
   }
 
+  void _onTabTapped(int index) {
+    if (index == _selectedIndex) return;
+
+    Widget target;
+    switch (index) {
+      case 0:
+        target = const MainPage(); // 🏠 Home
+        break;
+      case 1:
+        target = const BlindBox(); // 🎁 BlindBox
+        break;
+      case 2:
+        target = const GroceryPage(); // 🛒 Grocery
+        break;
+      case 3:
+        target = const BrowsePage(); // 🔍 Browse
+        break;
+      case 4:
+        target = const OrdersPage(); // 📦 Orders
+        break;
+      case 5:
+        target = const ProfilePage(); // 👤 Profile
+        break;
+      default:
+        target = const MainPage();
+    }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => target),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kCardColor, // clean white background
+      backgroundColor: kCardColor,
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            // --- 1. Top Bar & Location (Tappable) ---
+          children: [
+            // --- Top Bar & Location ---
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 50, 20, 10),
               child: Row(
                 children: [
-                  // LOCATION AREA - tap to open map
                   GestureDetector(
                     onTap: _navigateToMapPage,
                     child: Row(
                       children: [
                         const Icon(Icons.location_on, color: kTextColor),
                         const SizedBox(width: 4),
-                        // Constrain the width so long text is truncated
                         SizedBox(
-                          width:
-                              150, // adjust based on your layout (try 120–180)
+                          width: 150,
                           child: Text(
                             _currentAddress,
-                            overflow: TextOverflow.ellipsis, // adds "..."
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -67,30 +110,27 @@ class _MainPageState extends State<MainPage> {
                       ],
                     ),
                   ),
-
                   const Spacer(),
                   IconButton(
-                    icon:
-                        const Icon(Icons.notifications_none, color: kTextColor),
+                    icon: const Icon(Icons.notifications_none, color: kTextColor),
                     onPressed: () {},
                   ),
                   IconButton(
-                    icon: const Icon(Icons.shopping_cart_outlined,
-                        color: kTextColor),
+                    icon: const Icon(Icons.shopping_cart_outlined, color: kTextColor),
                     onPressed: () {},
                   ),
                 ],
               ),
             ),
 
-            // --- 2. Search Bar ---
+            // --- Search Bar ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: TextField(
                 decoration: InputDecoration(
                   hintText: 'Search for shops & products',
                   prefixIcon: const Icon(Icons.search),
-                  fillColor: kSecondaryAccentColor, // pale yellow
+                  fillColor: kSecondaryAccentColor,
                   filled: true,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -102,51 +142,44 @@ class _MainPageState extends State<MainPage> {
             ),
             const SizedBox(height: 15),
 
-            // --- 3. Main Categories ---
+            // --- Categories ---
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20.0, vertical: 15),
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 15),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildCategoryItem('Blindbox', Icons.archive, context),
-                  _buildCategoryItem('Food', Icons.lunch_dining, context),
-                  _buildCategoryItem('Grocery', Icons.shopping_bag, context),
+                  _buildCategoryItem('Food', Icons.archive), // Food = BlindBox
+                  _buildCategoryItem('Grocery', Icons.shopping_bag),
                 ],
               ),
             ),
             const SizedBox(height: 25),
 
-            // --- 4. Promotions Banner ---
+            // --- Promotions ---
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
               padding: const EdgeInsets.all(15),
               decoration: BoxDecoration(
-                color: kPrimaryActionColor, // pink
+                color: kPrimaryActionColor,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Promotions',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
+                  Text('Promotions',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white)),
                   SizedBox(height: 4),
-                  Text(
-                    'Check out the latest vouchers!',
-                    style: TextStyle(color: Color.fromARGB(179, 255, 255, 255)),
-                  ),
+                  Text('Check out the latest vouchers!',
+                      style: TextStyle(color: Color.fromARGB(179, 255, 255, 255))),
                 ],
               ),
             ),
             const SizedBox(height: 25),
 
-            // --- 5. "Order snacks from" Header ---
+            // --- Restaurant Info ---
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20.0),
               child: Align(
@@ -155,8 +188,6 @@ class _MainPageState extends State<MainPage> {
               ),
             ),
             const SizedBox(height: 10),
-
-            // --- 6. Restaurant Info Placeholder ---
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
               height: 150,
@@ -165,24 +196,39 @@ class _MainPageState extends State<MainPage> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Center(
-                child: Text(
-                  'Restaurant info (Filtered by user location)',
-                  style: TextStyle(color: kTextColor),
-                ),
+                child: Text('Restaurant info (Filtered by user location)',
+                    style: TextStyle(color: kTextColor)),
               ),
             ),
             const SizedBox(height: 20),
           ],
         ),
       ),
+
+      // --- Bottom Navigation ---
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onTabTapped,
+        backgroundColor: kCardColor,
+        selectedItemColor: kTextColor,
+        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.card_giftcard), label: 'BlindBox'),
+          BottomNavigationBarItem(icon: Icon(Icons.storefront), label: 'Grocery'),
+          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Browse'),
+          BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'Orders'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        ],
+      ),
     );
   }
 
-  // Category item UI builder (with navigation logic)
-  Widget _buildCategoryItem(String label, IconData icon, BuildContext context) {
+  Widget _buildCategoryItem(String label, IconData icon) {
     Widget? targetPage;
     if (label == 'Food') {
-      targetPage = const FoodPage();
+      targetPage = const BlindBox(); // Food = BlindBox
     } else if (label == 'Grocery') {
       targetPage = const GroceryPage();
     }
