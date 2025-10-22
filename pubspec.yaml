@@ -20,7 +20,7 @@ dependencies:
   google_maps_flutter: ^2.5.0
   geocoding: ^4.0.0
   geolocator: ^10.1.0
-  google_places_flutter: <last-version>
+  google_places_flutter: ^2.0.6
 
 
   

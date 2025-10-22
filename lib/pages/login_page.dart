@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:foodiebox/pages/constants.dart';
+import 'package:foodiebox/pages/Vendor_page/vendor_home_page.dart';
 import '../utils/styles.dart';
 import '../pages/main_page.dart';
 
@@ -13,6 +15,8 @@ class _LoginPageState extends State<LoginPage>
     with SingleTickerProviderStateMixin {
   // Using the path specified for your logo image
   static const String _logoPath = 'assets/images/FoodieBoxLogo.png';
+
+  String _selectedRole = 'Customer';
 
   late AnimationController _controller;
   late Animation<double> _animation;
@@ -38,6 +42,12 @@ class _LoginPageState extends State<LoginPage>
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  void _selectRole(String role) {
+    setState(() {
+      _selectedRole = role;
+    });
   }
 
   @override
@@ -66,20 +76,24 @@ class _LoginPageState extends State<LoginPage>
                 ),
               ),
 
-              // 2. Customer/Vendor Toggle
+              // 2. Customer/Vendor Toggle (MODIFIED)
               Row(
                 children: <Widget>[
                   Expanded(
                       child: _RoleButton(
                           label: 'Customer',
-                          isSelected: true,
-                          onPressed: () {})),
+                          isSelected: _selectedRole ==
+                              'Customer', // Check current state
+                          onPressed: () =>
+                              _selectRole('Customer'))), // Update state
                   const SizedBox(width: 15),
                   Expanded(
                       child: _RoleButton(
                           label: 'Vendor',
-                          isSelected: false,
-                          onPressed: () {})),
+                          isSelected:
+                              _selectedRole == 'Vendor', // Check current state
+                          onPressed: () =>
+                              _selectRole('Vendor'))), // Update state
                 ],
               ),
               const SizedBox(height: 30),
@@ -104,16 +118,29 @@ class _LoginPageState extends State<LoginPage>
               ),
               const SizedBox(height: 20),
 
-              // 4. Sign In Button (Light Green E8FFC9)
+              //4. Sign In Button (MODIFIED NAVIGATION LOGIC)
               ElevatedButton(
                 onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const MainPage()),
-                  );
+                  // --- NAVIGATION LOGIC START ---
+                  // Temporarily navigate based on the selected role
+                  if (_selectedRole == 'Vendor') {
+                    // Navigate to Vendor Dashboard (Your responsibility)
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const VendorHomePage()),
+                    );
+                  } else {
+                    // Navigate to Customer Main Page
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MainPage()),
+                    );
+                  }
+                  // --- NAVIGATION LOGIC END ---
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kCategoryColor,
+                  backgroundColor: kCategoryColor, // E8FFC9
                   foregroundColor: kTextColor,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30)),
@@ -134,10 +161,18 @@ class _LoginPageState extends State<LoginPage>
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const _SocialIcon(
-                      icon: Icons.g_mobiledata_outlined, label: 'G', size: 30),
+                  // Placeholder Icons (Icons were modified for better Flutter compatibility)
+                  _SocialIcon(
+                      icon: Icons.search_outlined,
+                      label: 'G',
+                      size: 30,
+                      useIcon: false),
                   const SizedBox(width: 40),
-                  const _SocialIcon(icon: Icons.facebook, label: 'f', size: 24),
+                  _SocialIcon(
+                      icon: Icons.facebook,
+                      label: 'f',
+                      size: 24,
+                      useIcon: true),
                 ],
               ),
               const SizedBox(height: 20),
@@ -181,9 +216,12 @@ class _RoleButton extends StatelessWidget {
     return OutlinedButton(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
-        backgroundColor: kCardColor,
+        // Background color changes based on selection
+        backgroundColor: isSelected ? kCategoryColor : AppColors.whiteBase,
         foregroundColor: kTextColor,
-        side: const BorderSide(color: Colors.grey, width: 1.0),
+        // Border color changes based on selection
+        side: BorderSide(
+            color: isSelected ? kTextColor : Colors.grey, width: 1.0),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
         padding: const EdgeInsets.symmetric(vertical: 12),
       ),
@@ -240,9 +278,13 @@ class _SocialIcon extends StatelessWidget {
   final IconData icon;
   final String label;
   final double size;
+  final bool useIcon; // Added flag to decide whether to use Text or Icon
 
   const _SocialIcon(
-      {required this.icon, required this.label, required this.size});
+      {required this.icon,
+      required this.label,
+      required this.size,
+      required this.useIcon});
 
   @override
   Widget build(BuildContext context) {
@@ -254,13 +296,14 @@ class _SocialIcon extends StatelessWidget {
         border: Border.all(color: kTextColor, width: 1.5),
       ),
       child: Center(
-        child: label == 'G'
-            ? Text(label,
+        // Use Text for 'G' and Icon for 'Facebook'
+        child: useIcon
+            ? Icon(icon, size: size, color: kTextColor)
+            : Text(label,
                 style: TextStyle(
                     fontSize: size,
                     fontWeight: FontWeight.bold,
-                    color: kTextColor))
-            : Icon(icon, size: size, color: kTextColor),
+                    color: kTextColor)),
       ),
     );
   }
