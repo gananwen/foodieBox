@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../utils/styles.dart';
+import '../../../../../utils/styles.dart';
 import 'map_page.dart';
 import 'blind_box.dart';
 import 'grocery_page.dart';

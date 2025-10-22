@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:foodiebox/pages/constants.dart';
 import 'package:foodiebox/pages/Vendor_page/vendor_home_page.dart';
 import '../utils/styles.dart';
-import '../pages/main_page.dart';
-import '../pages/register_page.dart';
+import 'user_page/main_page.dart';
+import 'user_page/register_page.dart';
 
 
 class LoginPage extends StatefulWidget {
