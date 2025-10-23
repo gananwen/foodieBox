@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import '../../../../../utils/styles.dart';
+import '../../util/styles.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -93,7 +93,7 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _onCameraIdle() {
-    if (_currentMapCenter != null) _getAddressFromLatLng(_currentMapCenter);
+    _getAddressFromLatLng(_currentMapCenter);
   }
 
   void _confirmLocation() {
@@ -135,7 +135,7 @@ class _MapPageState extends State<MapPage> {
               decoration: BoxDecoration(
                 color: kCardColor,
                 borderRadius: BorderRadius.circular(8),
-                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
               ),
               child: Text(
                 _currentAddress,

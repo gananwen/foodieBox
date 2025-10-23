@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../utils/styles.dart';
-import 'main_page.dart';
-import 'grocery_page.dart';
-import 'profile_page.dart';
-import 'browse_page.dart';
-import 'order_page.dart';
-import 'blind_box.dart';
+import '../util/styles.dart';
+import '../screens/users/main_page.dart';
+import '../screens/users/grocery_page.dart';
+import '../screens/users/profile_page.dart';
+import '../screens/users/blind_box.dart';
+import '../screens/users/browse_page.dart';
+import '../screens/users/order_page.dart';
 
 class BasePage extends StatefulWidget {
   final int currentIndex;
@@ -54,7 +54,7 @@ class _BasePageState extends State<BasePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kAppBackgroundColor,
+      backgroundColor: kCardColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: widget.child,

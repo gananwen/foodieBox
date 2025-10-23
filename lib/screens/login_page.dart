@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:foodiebox/pages/constants.dart';
-import 'package:foodiebox/pages/Vendor_page/vendor_home_page.dart';
-import '../utils/styles.dart';
-import 'user_page/main_page.dart';
-import 'user_page/register_page.dart';
-
+import 'package:foodiebox/screens/Vendor_page/vendor_home_page.dart';
+import '../util/styles.dart';
+import '../screens/users/main_page.dart';
+import 'users/signup_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -220,7 +218,7 @@ class _RoleButton extends StatelessWidget {
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
         // Background color changes based on selection
-        backgroundColor: isSelected ? kCategoryColor : AppColors.whiteBase,
+        backgroundColor: isSelected ? kCategoryColor : kCardColor,
         foregroundColor: kTextColor,
         // Border color changes based on selection
         side: BorderSide(
@@ -228,7 +226,10 @@ class _RoleButton extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
         padding: const EdgeInsets.symmetric(vertical: 12),
       ),
-      child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+      child: Text(
+        label,
+        style: kLabelTextStyle.copyWith(fontWeight: FontWeight.bold),
+      ),
     );
   }
 }
