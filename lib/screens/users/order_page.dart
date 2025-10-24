@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../util/styles.dart';
+import '../../util/styles.dart';
 import '../../../widgets/base_page.dart';
 
 class OrdersPage extends StatelessWidget {

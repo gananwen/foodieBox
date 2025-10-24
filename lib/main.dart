@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart'; 
-import 'screens/users/login_page.dart';
+import 'screens/auth_wrapper.dart';
+import 'util/styles.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize Firebase before running the app
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -22,15 +21,27 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'FoodieBox',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: kPrimaryActionColor,
+          background: kAppBackgroundColor,
+          primary: kPrimaryActionColor,
+        ),
+        scaffoldBackgroundColor: kAppBackgroundColor,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: kAppBackgroundColor,
+          elevation: 0,
+          centerTitle: true,
+          iconTheme: IconThemeData(color: kTextColor),
+          titleTextStyle: TextStyle(
+            color: kTextColor,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
-      home: const LoginPage(),
+      home: const AuthWrapper(),
       debugShowCheckedModeBanner: false,
     );
   }
-
 }
-
-
-

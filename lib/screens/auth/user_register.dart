@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../util/styles.dart';
-import 'main_page.dart';
+import '../users/main_page.dart';
 import '../../repositories/auth_repository.dart';
-import '../../repositories/user_repository.dart';
-import '../../models/user.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -28,7 +26,6 @@ class _RegisterPageState extends State<RegisterPage>
   final _confirmPasswordController = TextEditingController();
 
   final AuthRepository _authRepo = AuthRepository();
-  final UserRepository _userRepo = UserRepository();
 
   bool _isLoading = false;
 
@@ -65,22 +62,21 @@ class _RegisterPageState extends State<RegisterPage>
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
-    if ([firstName, lastName, username, email, password, confirmPassword]
-        .any((e) => e.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Please fill in all fields")));
+    if ([firstName, lastName, username, email, password, confirmPassword].any((e) => e.isEmpty)) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Please fill in all fields")));
       return;
     }
 
     if (password != confirmPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Passwords do not match")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Passwords do not match")));
       return;
     }
 
     if (password.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text("Password must be at least 6 characters")));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Password must be at least 6 characters")));
       return;
     }
 
@@ -88,22 +84,20 @@ class _RegisterPageState extends State<RegisterPage>
 
     try {
       final fullName = '$firstName $lastName';
-      final user = await _authRepo.signUpWithEmail(
-          email, password, fullName, 'customer');
+      final user = await _authRepo.signUpWithEmail(email, password, fullName, 'customer');
       if (user == null) throw Exception("Failed to create user");
 
       await user.sendEmailVerification();
 
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text("Sign up successful! Please verify your email.")));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Sign up successful! Please verify your email.")));
 
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const MainPage()),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -124,8 +118,7 @@ class _RegisterPageState extends State<RegisterPage>
                 scale: _animation,
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 30),
-                  child:
-                      Image.asset(_logoPath, height: 200, fit: BoxFit.contain),
+                  child: Image.asset(_logoPath, height: 200, fit: BoxFit.contain),
                 ),
               ),
               const Text("Let's Get Started",
@@ -137,26 +130,17 @@ class _RegisterPageState extends State<RegisterPage>
                 style: TextStyle(fontSize: 13, color: kTextColor),
               ),
               const SizedBox(height: 30),
-              _CustomInputField(
-                  label: 'First Name', controller: _firstNameController),
+              _CustomInputField(label: 'First Name', controller: _firstNameController),
               const SizedBox(height: 20),
-              _CustomInputField(
-                  label: 'Last Name', controller: _lastNameController),
+              _CustomInputField(label: 'Last Name', controller: _lastNameController),
               const SizedBox(height: 20),
-              _CustomInputField(
-                  label: 'Username', controller: _usernameController),
+              _CustomInputField(label: 'Username', controller: _usernameController),
               const SizedBox(height: 20),
               _CustomInputField(label: 'Email', controller: _emailController),
               const SizedBox(height: 20),
-              _CustomInputField(
-                  label: 'Password',
-                  obscureText: true,
-                  controller: _passwordController),
+              _CustomInputField(label: 'Password', obscureText: true, controller: _passwordController),
               const SizedBox(height: 20),
-              _CustomInputField(
-                  label: 'Confirm Password',
-                  obscureText: true,
-                  controller: _confirmPasswordController),
+              _CustomInputField(label: 'Confirm Password', obscureText: true, controller: _confirmPasswordController),
               const SizedBox(height: 30),
               _isLoading
                   ? const Center(child: CircularProgressIndicator())
@@ -170,16 +154,13 @@ class _RegisterPageState extends State<RegisterPage>
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         elevation: 0,
                       ),
-                      child: const Text('Sign Up',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 18)),
+                      child: const Text('Sign Up', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                     ),
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text("Already have an account? ",
-                      style: TextStyle(color: kTextColor)),
+                  const Text("Already have an account? ", style: TextStyle(color: kTextColor)),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
                     child: const Text('Login here', style: kLinkTextStyle),
@@ -200,10 +181,7 @@ class _CustomInputField extends StatelessWidget {
   final TextEditingController controller;
   final bool obscureText;
 
-  const _CustomInputField(
-      {required this.label,
-      required this.controller,
-      this.obscureText = false});
+  const _CustomInputField({required this.label, required this.controller, this.obscureText = false});
 
   @override
   Widget build(BuildContext context) {
@@ -212,8 +190,7 @@ class _CustomInputField extends StatelessWidget {
       children: [
         Padding(
             padding: const EdgeInsets.only(left: 12.0),
-            child: Text(label,
-                style: const TextStyle(fontSize: 12, color: kTextColor))),
+            child: Text(label, style: const TextStyle(fontSize: 12, color: kTextColor))),
         const SizedBox(height: 4),
         TextField(
           controller: controller,
@@ -222,21 +199,11 @@ class _CustomInputField extends StatelessWidget {
             hintText: 'Input',
             fillColor: kCardColor,
             filled: true,
-            suffixIcon: IconButton(
-                icon: const Icon(Icons.close, size: 18),
-                onPressed: () => controller.clear()),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(30),
-                borderSide: const BorderSide(color: Colors.grey)),
-            enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(30),
-                borderSide: const BorderSide(color: Colors.grey)),
-            focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(30),
-                borderSide:
-                    const BorderSide(color: kPrimaryActionColor, width: 2)),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            suffixIcon: IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => controller.clear()),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: const BorderSide(color: Colors.grey)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: const BorderSide(color: Colors.grey)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: const BorderSide(color: kPrimaryActionColor, width: 2)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             isDense: true,
           ),
         ),

@@ -1,18 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../util/styles.dart'; // your constants.dart
+import '../../util/styles.dart'; // Using your team's styles file
+import 'product_page.dart'; // Importing the REAL product page
+// TODO: Import your real promotions_page.dart when it's created
 
-// --- Dummy Pages for Navigation ---
-class ProductPage extends StatelessWidget {
-  const ProductPage({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Product Management')),
-      body: const Center(
-          child: Text('Product List Page (Figure 27) Placeholder')),
-    );
-  }
-}
+// --- Dummy Pages for Navigation (To be replaced with your actual pages later) ---
+// ProductPage is now real and imported.
 
 class OrdersPage extends StatelessWidget {
   const OrdersPage({super.key});
@@ -36,8 +28,9 @@ class SettingsPage extends StatelessWidget {
     );
   }
 }
+// ------------------------------------------------------------------------
 
-// --- Vendor Dashboard Page ---
+// --- Vendor Dashboard Page (Figure 25) ---
 class VendorHomePage extends StatefulWidget {
   const VendorHomePage({super.key});
 
@@ -46,27 +39,38 @@ class VendorHomePage extends StatefulWidget {
 }
 
 class _VendorHomePageState extends State<VendorHomePage> {
-  String vendorName = "Afsar Hossen";
-  String vendorId = "1234";
-  int todaysOrders = 25;
-  double todaysSales = 300.00;
+  // We keep track of the selected index for the BottomNavigationBar
+  int _currentIndex = 0;
 
+  // Handlers for Bottom Nav Bar
   void _onBottomBarTapped(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+
+    // Handle navigation
+    // We only navigate if the tapped index is *not* the dashboard (index 0)
     switch (index) {
       case 0:
+        // Already on Dashboard, do nothing
         break;
       case 1:
         Navigator.push(context,
             MaterialPageRoute(builder: (context) => const ProductPage()));
         break;
       case 2:
-        // TODO: Promotions Page
+        // TODO: Navigate to Promotions Page (Figure 32)
+        // Example: Navigator.push(context, MaterialPageRoute(builder: (context) => const PromotionsPage()));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Promotions Page not created yet')),
+        );
         break;
       case 3:
         Navigator.push(context,
             MaterialPageRoute(builder: (context) => const OrdersPage()));
         break;
       case 4:
+        // This 'More' button leads to the Settings Page (Figure 26)
         Navigator.push(context,
             MaterialPageRoute(builder: (context) => const SettingsPage()));
         break;
@@ -76,15 +80,19 @@ class _VendorHomePageState extends State<VendorHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kAppBackgroundColor,
-      body: const VendorHomePageContent(),
+      backgroundColor: kAppBackgroundColor, // FEFFE1
+      body: const VendorHomePageContent(), // The main content
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        currentIndex: 0,
-        backgroundColor: kCardColor,
-        selectedItemColor: kTextColor,
+        currentIndex: _currentIndex,
+        backgroundColor: kCardColor, // White
+
+        // This makes the selected item use your brand colors
+        selectedItemColor:
+            _currentIndex == 2 ? kPrimaryActionColor : kTextColor,
         unselectedItemColor: kTextColor.withOpacity(0.5),
-        selectedLabelStyle: kLabelTextStyle,
+
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
             icon: Icon(Icons.dashboard_outlined),
@@ -94,6 +102,7 @@ class _VendorHomePageState extends State<VendorHomePage> {
             icon: Icon(Icons.shopping_bag_outlined),
             label: 'Product',
           ),
+          // IMPORTANT: Promotions tab icon
           BottomNavigationBarItem(
             icon: Icon(Icons.volume_up_outlined),
             label: 'Promotions',
@@ -113,35 +122,42 @@ class _VendorHomePageState extends State<VendorHomePage> {
   }
 }
 
-// --- Dashboard Content Widget ---
+// --- Separate Widget for Dashboard Content (Figure 25) ---
 class VendorHomePageContent extends StatelessWidget {
   const VendorHomePageContent({super.key});
 
+  // Reusable widget to display a single quick stat card
   Widget _buildStatCard(String title, dynamic value) {
+    // Dummy data from parent state (would be passed in a real app)
+    int todaysOrders = 25;
+    double todaysSales = 300.00;
+
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: kSecondaryAccentColor,
+        color: kSecondaryAccentColor, // E8FFC9 for sections
         borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(color: kTextColor.withOpacity(0.1), width: 1.0),
+        border: Border.all(
+            color: kTextColor.withOpacity(0.1), width: 3.0), // Your 3.0 width
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
             title,
-            style: kLabelTextStyle.copyWith(
-              fontSize: 14,
+            style: TextStyle(
+              fontSize: 14.0,
               color: kTextColor.withOpacity(0.7),
             ),
           ),
           const SizedBox(height: 8.0),
           Text(
             title.contains("Sales")
-                ? 'RM${value.toStringAsFixed(2)}'
-                : value.toString(),
-            style: kLabelTextStyle.copyWith(
-              fontSize: 24,
+                ? 'RM${todaysSales.toStringAsFixed(2)}'
+                : todaysOrders.toString(),
+            style: const TextStyle(
+              fontSize: 24.0,
+              fontWeight: FontWeight.bold,
               color: kTextColor,
             ),
           ),
@@ -150,6 +166,7 @@ class VendorHomePageContent extends StatelessWidget {
     );
   }
 
+  // Reusable widget for action buttons (Product/Orders)
   Widget _buildActionBlock(String actionType, String description, IconData icon,
       VoidCallback onTap) {
     return GestureDetector(
@@ -158,9 +175,10 @@ class VendorHomePageContent extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         margin: const EdgeInsets.only(bottom: 16.0),
         decoration: BoxDecoration(
-          color: kSecondaryAccentColor,
+          color: kSecondaryAccentColor, // E8FFC9 for sections
           borderRadius: BorderRadius.circular(12.0),
-          border: Border.all(color: kTextColor.withOpacity(0.1), width: 1.0),
+          border: Border.all(
+              color: kTextColor.withOpacity(0.1), width: 3.0), // Your 3.0 width
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -171,21 +189,27 @@ class VendorHomePageContent extends StatelessWidget {
                 children: <Widget>[
                   Text(
                     'ADD NEW' == actionType ? 'ADD NEW' : 'VIEW',
-                    style: kLabelTextStyle.copyWith(
-                      fontSize: 12,
+                    style: TextStyle(
+                      fontSize: 12.0,
                       color: kTextColor.withOpacity(0.6),
                     ),
                   ),
                   const SizedBox(height: 4.0),
                   Text(
                     actionType,
-                    style: kLabelTextStyle.copyWith(fontSize: 18),
+                    style: const TextStyle(
+                      fontSize: 18.0,
+                      fontWeight: FontWeight.bold,
+                      color: kTextColor,
+                    ),
                   ),
                   const SizedBox(height: 4.0),
                   Text(
                     description,
-                    style: kLabelTextStyle.copyWith(
-                        fontSize: 14, color: kTextColor.withOpacity(0.8)),
+                    style: TextStyle(
+                      fontSize: 14.0,
+                      color: kTextColor.withOpacity(0.8),
+                    ),
                   ),
                 ],
               ),
@@ -203,10 +227,9 @@ class VendorHomePageContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Dummy data
     String vendorName = "Afsar Hossen";
     String vendorId = "1234";
-    int todaysOrders = 25;
-    double todaysSales = 300.00;
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -214,6 +237,7 @@ class VendorHomePageContent extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
+            // --- Header/Profile Section ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -221,9 +245,10 @@ class VendorHomePageContent extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 30,
-                      backgroundColor: kSecondaryAccentLight,
-                      child: const Icon(Icons.person,
-                          size: 40, color: kTextColor),
+                      // Using light green as the avatar BG
+                      backgroundColor: kSecondaryAccentColor,
+                      child:
+                          const Icon(Icons.person, size: 40, color: kTextColor),
                     ),
                     const SizedBox(width: 12.0),
                     Column(
@@ -233,7 +258,10 @@ class VendorHomePageContent extends StatelessWidget {
                           children: [
                             Text(
                               vendorName,
-                              style: kLabelTextStyle,
+                              style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: kTextColor),
                             ),
                             const SizedBox(width: 4),
                             Icon(Icons.edit_outlined,
@@ -242,17 +270,19 @@ class VendorHomePageContent extends StatelessWidget {
                         ),
                         Text(
                           'Vendor ID: $vendorId',
-                          style: kLabelTextStyle.copyWith(
+                          style: TextStyle(
                               fontSize: 14, color: kTextColor.withOpacity(0.6)),
                         ),
                       ],
                     ),
                   ],
                 ),
+                // Settings icon for the Settings Page (Figure 26)
                 IconButton(
-                  icon: const Icon(Icons.settings,
-                      size: 28.0, color: kTextColor),
+                  icon:
+                      const Icon(Icons.settings, size: 28.0, color: kTextColor),
                   onPressed: () {
+                    // Navigate to the Settings Page
                     Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -261,10 +291,14 @@ class VendorHomePageContent extends StatelessWidget {
                 ),
               ],
             ),
+
             const SizedBox(height: 30.0),
-            Text(
+
+            // --- Quick Stats Section ---
+            const Text(
               'Quick Stats',
-              style: kLabelTextStyle.copyWith(fontSize: 20),
+              style: TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.w600, color: kTextColor),
             ),
             const SizedBox(height: 16.0),
             GridView.count(
@@ -274,14 +308,20 @@ class VendorHomePageContent extends StatelessWidget {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               children: <Widget>[
-                _buildStatCard('Today\'s Orders', todaysOrders),
-                _buildStatCard('Today\'s Sales', todaysSales),
+                _buildStatCard(
+                    'Today\'s Orders', 0), // Passed 0, will be replaced
+                _buildStatCard(
+                    'Today\'s Sales', 0.0), // Passed 0.0, will be replaced
               ],
             ),
+
             const SizedBox(height: 30.0),
-            Text(
+
+            // --- Actions Section ---
+            const Text(
               'Actions',
-              style: kLabelTextStyle.copyWith(fontSize: 20),
+              style: TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.w600, color: kTextColor),
             ),
             const SizedBox(height: 16.0),
             _buildActionBlock(
@@ -289,8 +329,11 @@ class VendorHomePageContent extends StatelessWidget {
               'Expand your business',
               Icons.inventory_2_outlined,
               () {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (context) => const ProductPage()));
+                // Navigate to the Product Page
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const ProductPage()));
               },
             ),
             _buildActionBlock(
@@ -298,8 +341,11 @@ class VendorHomePageContent extends StatelessWidget {
               'Manage incoming requests',
               Icons.receipt_long_outlined,
               () {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (context) => const OrdersPage()));
+                // Navigate to the Active Orders Page
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const OrdersPage()));
               },
             ),
           ],

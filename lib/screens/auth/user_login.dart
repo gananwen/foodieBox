@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../util/styles.dart';
-import 'main_page.dart';
-import 'signup_page.dart';
+import '../users/main_page.dart';
+import 'user_register.dart';
+import '../../screens/auth/user_forgot_password.dart';
 import '../../repositories/auth_repository.dart';
 
 class LoginPage extends StatefulWidget {
@@ -47,7 +48,6 @@ class _LoginPageState extends State<LoginPage>
     super.dispose();
   }
 
-  // ✅ Email Sign-In
   Future<void> _signIn() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -93,7 +93,6 @@ class _LoginPageState extends State<LoginPage>
     }
   }
 
-  // ✅ Google Sign-In
   Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
     try {
@@ -142,14 +141,6 @@ class _LoginPageState extends State<LoginPage>
                   ),
                 ),
               ),
-              const Text(
-                "Customer Login",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: kTextColor,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold),
-              ),
               const SizedBox(height: 30),
               _CustomInputField(label: 'Email', controller: _emailController),
               const SizedBox(height: 20),
@@ -160,7 +151,14 @@ class _LoginPageState extends State<LoginPage>
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const UserForgotPasswordPage(),
+                      ),
+                    );
+                  },
                   style: TextButton.styleFrom(
                     padding: EdgeInsets.zero,
                     minimumSize: const Size(50, 20),
@@ -207,8 +205,7 @@ class _LoginPageState extends State<LoginPage>
                     ),
                   ),
                   const SizedBox(width: 40),
-                  const _SocialIcon(
-                      icon: Icons.facebook, label: 'f', size: 24),
+                  const _SocialIcon(icon: Icons.facebook, label: 'f', size: 24),
                 ],
               ),
               const SizedBox(height: 20),

@@ -36,7 +36,10 @@ class BlindBox extends StatelessWidget {
           Center(
             child: Text(
               'Coming soon...',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Colors.grey),
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey),
             ),
           ),
         ],
