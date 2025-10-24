@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../utils/styles.dart'; // Using your team's styles
+import '../../util/styles.dart'; // Using your team's styles
 import 'add_product_page.dart';
 import 'edit_product_page.dart';
 

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../utils/styles.dart';
+import '../../util/styles.dart';
 import 'widgets/product_form.dart'; // Import the reusable form
 
 // --- Add Product Page (Figure 28) ---

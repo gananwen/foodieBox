@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+<<<<<<< HEAD:lib/screens/users/signup_page.dart
 import '../../utils/styles.dart';
 import 'main_page.dart';
+=======
+import '../../util/styles.dart';
+import '../users/main_page.dart';
+>>>>>>> origin/main:lib/screens/auth/user_register.dart
 import '../../repositories/auth_repository.dart';
-import '../../repositories/user_repository.dart';
-import '../../models/user.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -28,7 +31,6 @@ class _RegisterPageState extends State<RegisterPage>
   final _confirmPasswordController = TextEditingController();
 
   final AuthRepository _authRepo = AuthRepository();
-  final UserRepository _userRepo = UserRepository();
 
   bool _isLoading = false;
 
@@ -87,16 +89,9 @@ class _RegisterPageState extends State<RegisterPage>
     setState(() => _isLoading = true);
 
     try {
-      final user = await _authRepo.signUp(email: email, password: password);
+      final fullName = '$firstName $lastName';
+      final user = await _authRepo.signUpWithEmail(email, password, fullName, 'customer');
       if (user == null) throw Exception("Failed to create user");
-
-      await _userRepo.createUserData(UserModel(
-        uid: user.uid,
-        firstName: firstName,
-        lastName: lastName,
-        username: username,
-        email: email,
-      ));
 
       await user.sendEmailVerification();
 
@@ -107,6 +102,7 @@ class _RegisterPageState extends State<RegisterPage>
         context,
         MaterialPageRoute(builder: (_) => const MainPage()),
       );
+<<<<<<< HEAD:lib/screens/users/signup_page.dart
     } on FirebaseAuthException catch (e) {
       String message = "Sign up failed";
       if (e.code == 'weak-password') message = "Password is too weak";
@@ -115,6 +111,8 @@ class _RegisterPageState extends State<RegisterPage>
 
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));
+=======
+>>>>>>> origin/main:lib/screens/auth/user_register.dart
     } catch (e) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text("Error: $e")));

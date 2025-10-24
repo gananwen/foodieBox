@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../utils/styles.dart';
-import 'main_page.dart';
-import 'signup_page.dart';
+import '../../util/styles.dart';
+import '../users/main_page.dart';
+import 'user_register.dart';
+import '../../screens/auth/user_forgot_password.dart';
+>>>>>>> origin/main:lib/screens/auth/user_login.dart
 import '../../repositories/auth_repository.dart';
 
 class LoginPage extends StatefulWidget {
@@ -18,9 +20,6 @@ class _LoginPageState extends State<LoginPage>
 
   late AnimationController _controller;
   late Animation<double> _animation;
-
-  // Role selection
-  String _selectedRole = '';
 
   // Text controllers
   final _emailController = TextEditingController();
@@ -54,26 +53,22 @@ class _LoginPageState extends State<LoginPage>
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
-    if (_selectedRole.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text("Please select a role")));
-      return;
-    }
-
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Please fill in email and password")));
+        const SnackBar(content: Text("Please fill in email and password")),
+      );
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      final user = await _authRepo.signIn(email: email, password: password);
+      final user = await _authRepo.signInWithEmail(email, password);
 
-      if (user == null)
+      if (user == null) {
         throw FirebaseAuthException(
             code: 'user-not-found', message: "No user found");
+      }
 
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text("Login successful")));
@@ -94,6 +89,32 @@ class _LoginPageState extends State<LoginPage>
     } catch (e) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text("Error: $e")));
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      final user = await _authRepo.signInWithGoogle();
+      if (user != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Google Sign-In successful")),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MainPage()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Google Sign-In canceled")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Google Sign-In failed: $e")),
+      );
     } finally {
       setState(() => _isLoading = false);
     }
@@ -121,33 +142,6 @@ class _LoginPageState extends State<LoginPage>
                   ),
                 ),
               ),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: _RoleButton(
-                      label: 'Customer',
-                      isSelected: _selectedRole == 'Customer',
-                      onPressed: () {
-                        setState(() {
-                          _selectedRole = 'Customer';
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: _RoleButton(
-                      label: 'Vendor',
-                      isSelected: _selectedRole == 'Vendor',
-                      onPressed: () {
-                        setState(() {
-                          _selectedRole = 'Vendor';
-                        });
-                      },
-                    ),
-                  ),
-                ],
-              ),
               const SizedBox(height: 30),
               _CustomInputField(label: 'Email', controller: _emailController),
               const SizedBox(height: 20),
@@ -158,7 +152,14 @@ class _LoginPageState extends State<LoginPage>
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const UserForgotPasswordPage(),
+                      ),
+                    );
+                  },
                   style: TextButton.styleFrom(
                     padding: EdgeInsets.zero,
                     minimumSize: const Size(50, 20),
@@ -193,13 +194,19 @@ class _LoginPageState extends State<LoginPage>
               const SizedBox(height: 20),
               const Divider(color: kTextColor),
               const SizedBox(height: 20),
-              const Row(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _SocialIcon(
-                      icon: Icons.g_mobiledata_outlined, label: 'G', size: 30),
-                  SizedBox(width: 40),
-                  _SocialIcon(icon: Icons.facebook, label: 'f', size: 24),
+                  GestureDetector(
+                    onTap: _signInWithGoogle,
+                    child: const _SocialIcon(
+                      icon: Icons.g_mobiledata_outlined,
+                      label: 'G',
+                      size: 30,
+                    ),
+                  ),
+                  const SizedBox(width: 40),
+                  const _SocialIcon(icon: Icons.facebook, label: 'f', size: 24),
                 ],
               ),
               const SizedBox(height: 20),
@@ -229,40 +236,16 @@ class _LoginPageState extends State<LoginPage>
   }
 }
 
-class _RoleButton extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onPressed;
-
-  const _RoleButton(
-      {required this.label, required this.isSelected, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        backgroundColor: isSelected ? kCategoryColor : kCardColor,
-        foregroundColor: isSelected ? kAppBackgroundColor : kTextColor,
-        side: BorderSide(
-            color: isSelected ? kPrimaryActionColor : Colors.grey, width: 1.5),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-      ),
-      child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-    );
-  }
-}
-
 class _CustomInputField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final bool obscureText;
 
-  const _CustomInputField(
-      {required this.label,
-      required this.controller,
-      this.obscureText = false});
+  const _CustomInputField({
+    required this.label,
+    required this.controller,
+    this.obscureText = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -270,9 +253,12 @@ class _CustomInputField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-            padding: const EdgeInsets.only(left: 12.0),
-            child: Text(label,
-                style: const TextStyle(fontSize: 12, color: kTextColor))),
+          padding: const EdgeInsets.only(left: 12.0),
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: kTextColor),
+          ),
+        ),
         const SizedBox(height: 4),
         TextField(
           controller: controller,
@@ -282,20 +268,24 @@ class _CustomInputField extends StatelessWidget {
             fillColor: kCardColor,
             filled: true,
             suffixIcon: IconButton(
-                icon: const Icon(Icons.close, size: 18),
-                onPressed: () {
-                  controller.clear();
-                }),
+              icon: const Icon(Icons.close, size: 18),
+              onPressed: () {
+                controller.clear();
+              },
+            ),
             border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(30),
-                borderSide: const BorderSide(color: Colors.grey)),
+              borderRadius: BorderRadius.circular(30),
+              borderSide: const BorderSide(color: Colors.grey),
+            ),
             enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(30),
-                borderSide: const BorderSide(color: Colors.grey)),
+              borderRadius: BorderRadius.circular(30),
+              borderSide: const BorderSide(color: Colors.grey),
+            ),
             focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(30),
-                borderSide:
-                    const BorderSide(color: kPrimaryActionColor, width: 2)),
+              borderRadius: BorderRadius.circular(30),
+              borderSide:
+                  const BorderSide(color: kPrimaryActionColor, width: 2),
+            ),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             isDense: true,
@@ -311,8 +301,11 @@ class _SocialIcon extends StatelessWidget {
   final String label;
   final double size;
 
-  const _SocialIcon(
-      {required this.icon, required this.label, required this.size});
+  const _SocialIcon({
+    required this.icon,
+    required this.label,
+    required this.size,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -325,11 +318,14 @@ class _SocialIcon extends StatelessWidget {
       ),
       child: Center(
         child: label == 'G'
-            ? Text(label,
+            ? Text(
+                label,
                 style: TextStyle(
-                    fontSize: size,
-                    fontWeight: FontWeight.bold,
-                    color: kTextColor))
+                  fontSize: size,
+                  fontWeight: FontWeight.bold,
+                  color: kTextColor,
+                ),
+              )
             : Icon(icon, size: size, color: kTextColor),
       ),
     );

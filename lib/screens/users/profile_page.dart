@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../utils/styles.dart';
 import '../../widgets/base_page.dart';
-import 'login_page.dart';
+import '../auth/user_login.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -9,41 +9,34 @@ class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BasePage(
-      currentIndex: 4,
+      currentIndex: 5,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 20),
-
-          // --- Header ---
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'Profile Page',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: kTextColor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 30),
-
-          // --- Profile Info ---
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Colors.grey,
-                  child: Icon(Icons.person, color: Colors.white, size: 30),
+          // --- Yellow Header with Profile Info ---
+          Stack(
+            children: [
+              ClipPath(
+                clipper: _HeaderClipper(),
+                child: Container(
+                  height: 200,
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    gradient: kProfileHeaderGradient,
+                  ),
                 ),
-                SizedBox(width: 15),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              ),
+              Positioned.fill(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
+                    const CircleAvatar(
+                      radius: 40,
+                      backgroundColor: Colors.grey,
+                      child: Icon(Icons.person, color: Colors.white, size: 40),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
                       'Afsar Hossen',
                       style: TextStyle(
                         fontSize: 16,
@@ -51,9 +44,10 @@ class ProfilePage extends StatelessWidget {
                         color: kTextColor,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Row(
-                      children: [
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
                         Text(
                           'lmshuvo97@gmail.com',
                           style: TextStyle(fontSize: 13, color: kTextColor),
@@ -64,8 +58,8 @@ class ProfilePage extends StatelessWidget {
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
 
           const SizedBox(height: 30),
@@ -125,8 +119,8 @@ class ProfilePage extends StatelessWidget {
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimaryActionColor,
-                  elevation: 3,
+                  backgroundColor: kYellowSoft,
+                  elevation: 2,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -160,4 +154,20 @@ class _ProfileItem extends StatelessWidget {
       },
     );
   }
+}
+
+class _HeaderClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    path.lineTo(0, size.height - 40);
+    path.quadraticBezierTo(
+        size.width / 2, size.height, size.width, size.height - 40);
+    path.lineTo(size.width, 0);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }

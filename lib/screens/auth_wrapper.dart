@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+<<<<<<< HEAD
 import 'login_page.dart';
 import 'package:foodiebox/screens/Vendor_page/vendor_home_page.dart';
+=======
+import 'package:foodiebox/screens/Vendor_page/vendor_home_page.dart';
+import 'auth/user_login.dart';
+>>>>>>> origin/main
 import '../screens/users/main_page.dart';
 
 class AuthWrapper extends StatelessWidget {

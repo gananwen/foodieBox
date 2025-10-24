@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../utils/styles.dart'; // Using your team's styles file
+import '../../util/styles.dart'; // Using your team's styles file
 import 'product_page.dart'; // Importing the REAL product page
 // TODO: Import your real promotions_page.dart when it's created
 

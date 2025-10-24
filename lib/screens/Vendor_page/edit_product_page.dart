@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../utils/styles.dart';
+import '../../util/styles.dart';
 import 'product_page.dart'; // Import the Product data model
 import 'modify_product_page.dart'; // Import the page we are navigating to
 

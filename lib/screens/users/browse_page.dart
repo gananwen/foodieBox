@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+<<<<<<< HEAD
 import '../../../utils/styles.dart';
+=======
+import '../../util/styles.dart';
+>>>>>>> origin/main
 import '../../../widgets/base_page.dart';
 
 class BrowsePage extends StatelessWidget {
