@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-<<<<<<< HEAD:lib/screens/users/signup_page.dart
-import '../../utils/styles.dart';
-import 'main_page.dart';
-=======
 import '../../util/styles.dart';
 import '../users/main_page.dart';
->>>>>>> origin/main:lib/screens/auth/user_register.dart
 import '../../repositories/auth_repository.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -90,7 +85,8 @@ class _RegisterPageState extends State<RegisterPage>
 
     try {
       final fullName = '$firstName $lastName';
-      final user = await _authRepo.signUpWithEmail(email, password, fullName, 'customer');
+      final user = await _authRepo.signUpWithEmail(
+          email, password, fullName, 'customer');
       if (user == null) throw Exception("Failed to create user");
 
       await user.sendEmailVerification();
@@ -102,17 +98,6 @@ class _RegisterPageState extends State<RegisterPage>
         context,
         MaterialPageRoute(builder: (_) => const MainPage()),
       );
-<<<<<<< HEAD:lib/screens/users/signup_page.dart
-    } on FirebaseAuthException catch (e) {
-      String message = "Sign up failed";
-      if (e.code == 'weak-password') message = "Password is too weak";
-      if (e.code == 'email-already-in-use') message = "Email already in use";
-      if (e.code == 'invalid-email') message = "Invalid email";
-
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
-=======
->>>>>>> origin/main:lib/screens/auth/user_register.dart
     } catch (e) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text("Error: $e")));

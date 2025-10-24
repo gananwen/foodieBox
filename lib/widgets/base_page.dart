@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../utils/styles.dart';
+import '../util/styles.dart';
 import '../screens/users/main_page.dart';
 import '../screens/users/grocery_page.dart';
 import '../screens/users/profile_page.dart';

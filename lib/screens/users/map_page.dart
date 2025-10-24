@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import '../../utils/styles.dart';
+import '../../util/styles.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});

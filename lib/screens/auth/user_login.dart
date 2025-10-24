@@ -4,7 +4,6 @@ import '../../util/styles.dart';
 import '../users/main_page.dart';
 import 'user_register.dart';
 import '../../screens/auth/user_forgot_password.dart';
->>>>>>> origin/main:lib/screens/auth/user_login.dart
 import '../../repositories/auth_repository.dart';
 
 class LoginPage extends StatefulWidget {
