@@ -1,7 +1,17 @@
 import 'package:flutter/material.dart';
 import 'pages/login_page.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'pages/auth_wrapper.dart';
 
-void main() {
+void main() async {
+  // Ensure Flutter is initialized
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
+  await Firebase.initializeApp(
+      // options: DefaultFirebaseOptions.currentPlatform, // This is added by flutterfire_cli
+      );
+
   runApp(const MyApp());
 }
 
@@ -16,7 +26,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: const LoginPage(),
+      home: const AuthWrapper(),
       debugShowCheckedModeBanner: false,
     );
   }

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-const Color kAppBackgroundColor = Color(0xFFFEFFE1);
+const Color kAppBackgroundColor = Color.fromARGB(255, 255, 255, 238);
 const Color kCardColor = Color(0xFFFFFFFF);
 const Color kTextColor = Color(0xFF000000);
-const Color kPrimaryActionColor = Color(0xFFFFA3AF);
-const Color kSecondaryAccentColor = Color(0xFFE8FFC9);
+const Color kPrimaryActionColor = Color.fromARGB(255, 120, 41, 51);
+const Color kSecondaryAccentColor = Color.fromARGB(255, 235, 255, 210);
 const Color kCategoryColor = Color(0xFFE8FFC9);
 
 const TextStyle kLabelTextStyle = TextStyle(

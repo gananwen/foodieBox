@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "551655012145",
+    "project_id": "mae-assignment-fbf6c",
+    "storage_bucket": "mae-assignment-fbf6c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:551655012145:android:b3cd6cd4e186605c6de210",
+        "android_client_info": {
+          "package_name": "com.example.foodiebox"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBoCEK_lBXteBAEB2gpWcD9jLm7EBLP83M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
