@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:foodiebox/screens/Vendor_page/vendor_home_page.dart';
-import '../util/styles.dart';
+import '../utils/styles.dart';
 import '../screens/users/main_page.dart';
 import 'users/signup_page.dart';
 

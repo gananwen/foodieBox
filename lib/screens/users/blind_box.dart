@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../util/styles.dart';
+import '../../utils/styles.dart';
 import '../../widgets/base_page.dart';
 
 class BlindBox extends StatelessWidget {
@@ -36,7 +36,10 @@ class BlindBox extends StatelessWidget {
           Center(
             child: Text(
               'Coming soon...',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Colors.grey),
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey),
             ),
           ),
         ],

@@ -17,3 +17,10 @@ const TextStyle kLinkTextStyle = TextStyle(
   color: kPrimaryActionColor,
   fontWeight: FontWeight.bold,
 );
+
+/// --- Gradient Constants ---
+const LinearGradient kPromotionGradient = LinearGradient(
+  colors: [Color(0xFFFFA3AF), Color(0xFFF48FB1)], // soft pink to deeper pink
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);

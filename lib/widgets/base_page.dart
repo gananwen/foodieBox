@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../util/styles.dart';
+import '../utils/styles.dart';
 import '../screens/users/main_page.dart';
 import '../screens/users/grocery_page.dart';
 import '../screens/users/profile_page.dart';
@@ -69,10 +69,13 @@ class _BasePageState extends State<BasePage> {
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.card_giftcard), label: 'BlindBox'),
-          BottomNavigationBarItem(icon: Icon(Icons.storefront), label: 'Grocery'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.card_giftcard), label: 'BlindBox'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.storefront), label: 'Grocery'),
           BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Browse'),
-          BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'Orders'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.receipt_long), label: 'Orders'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),

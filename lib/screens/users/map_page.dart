@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import '../../util/styles.dart';
+import '../../utils/styles.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -123,7 +123,8 @@ class _MapPageState extends State<MapPage> {
 
           // Center marker
           const Center(
-            child: Icon(Icons.location_on, size: 40, color: kPrimaryActionColor),
+            child:
+                Icon(Icons.location_on, size: 40, color: kPrimaryActionColor),
           ),
 
           // Address display on top
@@ -135,13 +136,15 @@ class _MapPageState extends State<MapPage> {
               decoration: BoxDecoration(
                 color: kCardColor,
                 borderRadius: BorderRadius.circular(8),
-                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                boxShadow: const [
+                  BoxShadow(color: Colors.black12, blurRadius: 4)
+                ],
               ),
               child: Text(
                 _currentAddress,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 14),
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
             ),
           ),
@@ -155,8 +158,8 @@ class _MapPageState extends State<MapPage> {
                 onPressed: _confirmLocation,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimaryActionColor,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 60, vertical: 18),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 60, vertical: 18),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                   elevation: 4,
