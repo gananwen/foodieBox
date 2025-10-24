@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../utils/styles.dart';
-import 'base_page.dart';
-import '../login_page.dart';
+import '../../util/styles.dart';
+import '../../widgets/base_page.dart';
+import 'login_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -30,20 +30,20 @@ class ProfilePage extends StatelessWidget {
           const SizedBox(height: 30),
 
           // --- Profile Info ---
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 30,
                   backgroundColor: Colors.grey,
                   child: Icon(Icons.person, color: Colors.white, size: 30),
                 ),
-                const SizedBox(width: 15),
+                SizedBox(width: 15),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Afsar Hossen',
                       style: TextStyle(
                         fontSize: 16,
@@ -51,9 +51,9 @@ class ProfilePage extends StatelessWidget {
                         color: kTextColor,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Row(
-                      children: const [
+                      children: [
                         Text(
                           'lmshuvo97@gmail.com',
                           style: TextStyle(fontSize: 13, color: kTextColor),
@@ -77,8 +77,8 @@ class ProfilePage extends StatelessWidget {
               color: kCardColor,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Column(
-              children: const [
+            child: const Column(
+              children: [
                 _ProfileItem(icon: Icons.receipt_long, label: 'Orders'),
                 Divider(height: 1, thickness: 1),
                 _ProfileItem(icon: Icons.person_outline, label: 'My Details'),

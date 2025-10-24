@@ -41,48 +41,46 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBR-eQjXLZu-EeZrAuLnFI75FxI_KrbwvM',
-    appId: '1:551655012145:web:2530e1cc2241cbb76de210',
-    messagingSenderId: '551655012145',
-    projectId: 'mae-assignment-fbf6c',
-    authDomain: 'mae-assignment-fbf6c.firebaseapp.com',
-    storageBucket: 'mae-assignment-fbf6c.firebasestorage.app',
-    measurementId: 'G-8LX6STN88L',
+    apiKey: 'AIzaSyBfbbqY5pf_aifjXWsoTczRPGatLr9NIKk',
+    appId: '1:538813940991:web:0b8be991641e5554c0f8ca',
+    messagingSenderId: '538813940991',
+    projectId: 'foodiebox-app',
+    authDomain: 'foodiebox-app.firebaseapp.com',
+    storageBucket: 'foodiebox-app.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBoCEK_lBXteBAEB2gpWcD9jLm7EBLP83M',
-    appId: '1:551655012145:android:b3cd6cd4e186605c6de210',
-    messagingSenderId: '551655012145',
-    projectId: 'mae-assignment-fbf6c',
-    storageBucket: 'mae-assignment-fbf6c.firebasestorage.app',
+    apiKey: 'AIzaSyB_EA1vc4oHFIV69ZNDYU_UbQhr_fGZDvQ',
+    appId: '1:538813940991:android:e22978d9eab4444ac0f8ca',
+    messagingSenderId: '538813940991',
+    projectId: 'foodiebox-app',
+    storageBucket: 'foodiebox-app.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyA8xJWrH8F2o3BPOGhI2l2ijjBsxqtuSBc',
-    appId: '1:551655012145:ios:3faed855d96350f36de210',
-    messagingSenderId: '551655012145',
-    projectId: 'mae-assignment-fbf6c',
-    storageBucket: 'mae-assignment-fbf6c.firebasestorage.app',
+    apiKey: 'AIzaSyAsSqVPQFraOPxV6ER3MFwtiJKoqGXcXiQ',
+    appId: '1:538813940991:ios:21fffea9d7bf72f8c0f8ca',
+    messagingSenderId: '538813940991',
+    projectId: 'foodiebox-app',
+    storageBucket: 'foodiebox-app.firebasestorage.app',
     iosBundleId: 'com.example.foodiebox',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyA8xJWrH8F2o3BPOGhI2l2ijjBsxqtuSBc',
-    appId: '1:551655012145:ios:3faed855d96350f36de210',
-    messagingSenderId: '551655012145',
-    projectId: 'mae-assignment-fbf6c',
-    storageBucket: 'mae-assignment-fbf6c.firebasestorage.app',
+    apiKey: 'AIzaSyAsSqVPQFraOPxV6ER3MFwtiJKoqGXcXiQ',
+    appId: '1:538813940991:ios:21fffea9d7bf72f8c0f8ca',
+    messagingSenderId: '538813940991',
+    projectId: 'foodiebox-app',
+    storageBucket: 'foodiebox-app.firebasestorage.app',
     iosBundleId: 'com.example.foodiebox',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyBR-eQjXLZu-EeZrAuLnFI75FxI_KrbwvM',
-    appId: '1:551655012145:web:f4ec3dcd666df2486de210',
-    messagingSenderId: '551655012145',
-    projectId: 'mae-assignment-fbf6c',
-    authDomain: 'mae-assignment-fbf6c.firebaseapp.com',
-    storageBucket: 'mae-assignment-fbf6c.firebasestorage.app',
-    measurementId: 'G-EB8SHMFRLH',
+    apiKey: 'AIzaSyBfbbqY5pf_aifjXWsoTczRPGatLr9NIKk',
+    appId: '1:538813940991:web:e4f000102124e5d3c0f8ca',
+    messagingSenderId: '538813940991',
+    projectId: 'foodiebox-app',
+    authDomain: 'foodiebox-app.firebaseapp.com',
+    storageBucket: 'foodiebox-app.firebasestorage.app',
   );
 }
