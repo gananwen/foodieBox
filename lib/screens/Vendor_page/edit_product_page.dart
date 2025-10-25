@@ -176,16 +176,16 @@ class EditProductPage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: kPrimaryActionColor),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.calendar_today_outlined,
+                        Icon(Icons.calendar_today_outlined,
                             color: kPrimaryActionColor,
                             size: 18), // Highlight color
-                        const SizedBox(width: 10),
+                        SizedBox(width: 10),
                         Text(
                           'Expire Date - 10 Oct 2025', // Dummy date
-                          style: const TextStyle(
+                          style: TextStyle(
                               color: kPrimaryActionColor, // Highlight color
                               fontWeight: FontWeight.bold,
                               fontSize: 14),

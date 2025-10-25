@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'pages/login_page.dart';
+import 'screens/Vendor_page/vendor_home_page.dart';
 import 'screens/auth_wrapper.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'screens/auth_wrapper.dart';
 import 'util/styles.dart';
 
 void main() async {
@@ -42,7 +41,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const AuthWrapper(),
+      home: const VendorHomePage(),
       debugShowCheckedModeBanner: false,
     );
   }
