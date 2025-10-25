@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../util/styles.dart';
-
 // --- This is a reusable form widget for all the TextFields and Checkboxes ---
 // It is used by both add_product_page.dart and modify_product_page.dart
 

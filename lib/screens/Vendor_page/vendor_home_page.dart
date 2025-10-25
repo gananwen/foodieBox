@@ -1,28 +1,21 @@
 import 'package:flutter/material.dart';
 import '../../util/styles.dart'; // Using your team's styles file
-import 'product_page.dart'; // Importing the REAL product page
-// TODO: Import your real promotions_page.dart when it's created
+
+// --- 1. 导入你所有的主页面 ---
+import 'product_page.dart';
+import 'orders_page.dart';
+import 'marketing_page.dart';
 
 // --- Dummy Pages for Navigation (To be replaced with your actual pages later) ---
-// ProductPage is now real and imported.
+// ProductPage, OrdersPage, 和 MarketingPage 已经是真实的了.
 
-class OrdersPage extends StatelessWidget {
-  const OrdersPage({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Active Orders')),
-      body: const Center(
-          child: Text('Active Order Page (Figure 30) Placeholder')),
-    );
-  }
-}
-
+// SettingsPage (Figure 26) 仍然是占位符
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: kAppBackgroundColor,
       appBar: AppBar(title: const Text('Settings')),
       body: const Center(child: Text('Settings Page (Figure 26) Placeholder')),
     );
@@ -31,6 +24,7 @@ class SettingsPage extends StatelessWidget {
 // ------------------------------------------------------------------------
 
 // --- Vendor Dashboard Page (Figure 25) ---
+// This widget is now the main "Shell" that holds the Bottom Nav Bar
 class VendorHomePage extends StatefulWidget {
   const VendorHomePage({super.key});
 
@@ -42,49 +36,42 @@ class _VendorHomePageState extends State<VendorHomePage> {
   // We keep track of the selected index for the BottomNavigationBar
   int _currentIndex = 0;
 
-  // Handlers for Bottom Nav Bar
+  // --- 2. 创建一个包含所有页面的列表 ---
+  // The order MUST match the BottomNavigationBar
+  final List<Widget> _pages = [
+    const VendorHomePageContent(), // 0. Dashboard
+    const ProductPage(), // 1. Product
+    const MarketingPage(), // 2. Promotions
+    const OrdersPage(), // 3. Orders
+    const SettingsPage(), // 4. More (Settings)
+  ];
+
+  // --- 4. 简化导航逻辑 ---
+  // This function now ONLY updates the state.
   void _onBottomBarTapped(int index) {
     setState(() {
       _currentIndex = index;
     });
-
-    // Handle navigation
-    // We only navigate if the tapped index is *not* the dashboard (index 0)
-    switch (index) {
-      case 0:
-        // Already on Dashboard, do nothing
-        break;
-      case 1:
-        Navigator.push(context,
-            MaterialPageRoute(builder: (context) => const ProductPage()));
-        break;
-      case 2:
-        // TODO: Navigate to Promotions Page (Figure 32)
-        // Example: Navigator.push(context, MaterialPageRoute(builder: (context) => const PromotionsPage()));
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Promotions Page not created yet')),
-        );
-        break;
-      case 3:
-        Navigator.push(context,
-            MaterialPageRoute(builder: (context) => const OrdersPage()));
-        break;
-      case 4:
-        // This 'More' button leads to the Settings Page (Figure 26)
-        Navigator.push(context,
-            MaterialPageRoute(builder: (context) => const SettingsPage()));
-        break;
-    }
+    // No more Navigator.push!
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kAppBackgroundColor, // FEFFE1
-      body: const VendorHomePageContent(), // The main content
+
+      // --- 3. Body 现在会根据 _currentIndex 自动切换页面 ---
+      // We use IndexedStack to keep the state of each page alive
+      // (e.g., preserves scroll position)
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _pages,
+      ),
+
+      // --- 你的 BottomNavigationBar 保持不变 ---
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        currentIndex: _currentIndex,
+        currentIndex: _currentIndex, // Index is now managed correctly
         backgroundColor: kCardColor, // White
 
         // This makes the selected item use your brand colors
@@ -123,6 +110,7 @@ class _VendorHomePageState extends State<VendorHomePage> {
 }
 
 // --- Separate Widget for Dashboard Content (Figure 25) ---
+// (This widget stays exactly the same as before)
 class VendorHomePageContent extends StatelessWidget {
   const VendorHomePageContent({super.key});
 
@@ -243,12 +231,11 @@ class VendorHomePageContent extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    CircleAvatar(
+                    const CircleAvatar(
                       radius: 30,
                       // Using light green as the avatar BG
                       backgroundColor: kSecondaryAccentColor,
-                      child:
-                          const Icon(Icons.person, size: 40, color: kTextColor),
+                      child: Icon(Icons.person, size: 40, color: kTextColor),
                     ),
                     const SizedBox(width: 12.0),
                     Column(
@@ -282,7 +269,8 @@ class VendorHomePageContent extends StatelessWidget {
                   icon:
                       const Icon(Icons.settings, size: 28.0, color: kTextColor),
                   onPressed: () {
-                    // Navigate to the Settings Page
+                    // This can still navigate, as it's not part of the main 5 tabs
+                    // Or, it could be the 'More' page (index 4)
                     Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -318,6 +306,9 @@ class VendorHomePageContent extends StatelessWidget {
             const SizedBox(height: 30.0),
 
             // --- Actions Section ---
+            // These buttons are now less necessary since you have the nav bar,
+            // but they are good for the Dashboard!
+            // I've kept their navigation logic as it was.
             const Text(
               'Actions',
               style: TextStyle(
@@ -329,7 +320,7 @@ class VendorHomePageContent extends StatelessWidget {
               'Expand your business',
               Icons.inventory_2_outlined,
               () {
-                // Navigate to the Product Page
+                // This will still work! It just pushes the ProductPage on top.
                 Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -341,7 +332,7 @@ class VendorHomePageContent extends StatelessWidget {
               'Manage incoming requests',
               Icons.receipt_long_outlined,
               () {
-                // Navigate to the Active Orders Page
+                // This will still work!
                 Navigator.push(
                     context,
                     MaterialPageRoute(

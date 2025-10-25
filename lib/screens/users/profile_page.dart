@@ -77,13 +77,16 @@ class ProfilePage extends StatelessWidget {
                 Divider(height: 1, thickness: 1),
                 _ProfileItem(icon: Icons.person_outline, label: 'My Details'),
                 Divider(height: 1, thickness: 1),
-                _ProfileItem(icon: Icons.location_on_outlined, label: 'Delivery Address'),
+                _ProfileItem(
+                    icon: Icons.location_on_outlined,
+                    label: 'Delivery Address'),
                 Divider(height: 1, thickness: 1),
                 _ProfileItem(icon: Icons.credit_card, label: 'Payment Methods'),
                 Divider(height: 1, thickness: 1),
                 _ProfileItem(icon: Icons.card_giftcard, label: 'Promo Card'),
                 Divider(height: 1, thickness: 1),
-                _ProfileItem(icon: Icons.notifications_none, label: 'Notifications'),
+                _ProfileItem(
+                    icon: Icons.notifications_none, label: 'Notifications'),
                 Divider(height: 1, thickness: 1),
                 _ProfileItem(icon: Icons.help_outline, label: 'Help'),
                 Divider(height: 1, thickness: 1),
