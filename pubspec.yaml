@@ -16,6 +16,7 @@ dependencies:
   # --- UI & Core Utility ---
   cupertino_icons: ^1.0.6
   http: ^1.1.0 
+  fl_chart: ^0.69.0
   
   # --- Location, Maps, and Geocoding ---
   google_maps_flutter: ^2.5.0
@@ -23,30 +24,42 @@ dependencies:
   geolocator: ^10.1.0
   google_places_flutter: ^2.0.6
 
-  
   # --- Predictive Search UI ---
   flutter_typeahead: ^5.2.0
+
+  # --- Firebase & State Management ---
   firebase_core: ^4.2.0
   firebase_auth: ^6.1.1
   firebase_storage: ^13.0.3
   provider: ^6.1.5+1
   cloud_firestore: ^6.0.3
-  google_sign_in: ^5.4.4
-
-  
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  
   flutter_lints: ^3.0.0
-  intl: ^0.19.0
 
-# ------------------------------------------------
-# FIX: The 'flutter' section and its sub-keys must be aligned correctly.
 flutter:
   uses-material-design: true
   
-  # Assets must be indented exactly two spaces from 'flutter:'
   assets:
-    - assets/images/ 
+    - assets/images/
+
+# --- App Icon Configuration ---
+flutter_launcher_icons:
+  android: true
+  ios: true
+  web:
+    generate: true
+    image_path: "assets/images/App_icons.png"
+    background_color: "#ffffff"
+    theme_color: "#ffffff"
+  windows:
+    generate: true
+    image_path: "assets/images/App_icons.png"
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: "assets/images/App_icons.png"
+  image_path: "assets/images/App_icons.png"
