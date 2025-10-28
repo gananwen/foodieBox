@@ -11,13 +11,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
+  intl: ^0.19.0
 
   # --- UI & Core Utility ---
   cupertino_icons: ^1.0.6
-  http: ^1.1.0 
+  http: ^1.1.0
   fl_chart: ^0.69.0
-  
+
   # --- Location, Maps, and Geocoding ---
   google_maps_flutter: ^2.5.0
   geocoding: ^4.0.0
@@ -27,13 +27,13 @@ dependencies:
   # --- Predictive Search UI ---
   flutter_typeahead: ^5.2.0
 
-  # --- Firebase & State Management ---
-  firebase_core: ^4.2.0
-  firebase_auth: ^6.1.1
-  firebase_storage: ^13.0.3
-  provider: ^6.1.5+1
-  cloud_firestore: ^6.0.3
-  google_sign_in: ^7.2.0
+  # --- Firebase & Auth ---
+  firebase_core: ^3.8.0
+  firebase_auth: ^5.3.3
+  cloud_firestore: ^5.4.4
+  firebase_storage: ^12.3.4
+  google_sign_in: ^6.2.1
+  provider: ^6.1.2
 
 dev_dependencies:
   flutter_test:
@@ -42,7 +42,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  
+
   assets:
     - assets/images/
 

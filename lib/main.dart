@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/Vendor_page/vendor_home_page.dart';
+import 'screens/admin/admin_home_page.dart';
 import 'screens/auth_wrapper.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -41,7 +41,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const VendorHomePage(),
+      home: const AdminHomePage(),
       debugShowCheckedModeBanner: false,
     );
   }

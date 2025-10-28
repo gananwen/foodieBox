@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:foodiebox/screens/Vendor_page/vendor_home_page.dart';
 import 'auth/user_login.dart';
 import '../screens/users/main_page.dart';
+import '../screens/admin/admin_home_page.dart';
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
@@ -46,7 +47,7 @@ class AuthWrapper extends StatelessWidget {
 
             switch (role) {
               case 'Admin':
-                return const VendorHomePage();
+                return const AdminHomePage();
 
               case 'Vendor':
                 return const VendorHomePage();

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../util/styles.dart';
 import 'notifications_page.dart';
-import '../admin_login.dart';
+import 'admin_login.dart';
+import 'vendor_management_page.dart';
+import 'orders_page.dart';
+import 'promotions_page.dart';
 
 class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
@@ -136,17 +139,35 @@ class _AdminDrawer extends StatelessWidget {
                 title: "Dashboard",
                 onTap: () => Navigator.pop(context)),
             _DrawerItem(
-                icon: Icons.people_alt_outlined,
-                title: "Vendor Management & customer support",
-                onTap: () {}),
+              icon: Icons.people_alt_outlined,
+              title: "Vendor Management & customer support",
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const VendorManagementPage()),
+                );
+              },
+            ),
             _DrawerItem(
-                icon: Icons.local_shipping_outlined,
-                title: "Orders & Deliveries",
-                onTap: () {}),
+              icon: Icons.local_shipping_outlined,
+              title: "Orders & Deliveries",
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const OrdersPage()),
+                );
+              },
+            ),
             _DrawerItem(
                 icon: Icons.campaign_outlined,
                 title: "Promotions & Ads",
-                onTap: () {}),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PromotionsPage()),
+                  );
+                }),
             _DrawerItem(
                 icon: Icons.reviews_outlined,
                 title: "Ratings & Moderation",
@@ -217,8 +238,10 @@ class _AdminDrawer extends StatelessWidget {
 
                 if (shouldLogout == true) {
                   Navigator.pop(context); // close drawer
-                  Navigator.pushReplacementNamed(
-                      context, '/admin_login'); // 👈 go to admin login page
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AdminLoginPage()),
+                  ); // 👈 go to admin login page
                 }
               },
             ),
@@ -496,7 +519,7 @@ void main() {
     debugShowCheckedModeBanner: false,
     home: const AdminHomePage(),
     routes: {
-      '/admin_login': (_) => const AdminLoginPage(),
+      '/admin_login': (context) => const AdminLoginPage(),
     },
   ));
 }

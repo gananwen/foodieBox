@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../util/styles.dart';
+import '../../util/styles.dart';
 
 class AdminLoginPage extends StatefulWidget {
   const AdminLoginPage({super.key});

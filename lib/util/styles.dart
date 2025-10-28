@@ -45,3 +45,9 @@ const LinearGradient kProfileHeaderGradient = LinearGradient(
   begin: Alignment.bottomLeft,
   end: Alignment.topRight,
 );
+
+const TextStyle kHintTextStyle = TextStyle(
+  fontSize: 13,
+  color: Colors.black54,
+  fontWeight: FontWeight.w400,
+);

@@ -81,8 +81,7 @@ class AuthRepository {
 
       if (user != null) {
         // Check if user exists in Firestore
-        final doc =
-            await _firestore.collection('users').doc(user.uid).get();
+        final doc = await _firestore.collection('users').doc(user.uid).get();
 
         if (!doc.exists) {
           final newUser = UserModel.fromFirebaseUser(user);
