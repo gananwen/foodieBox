@@ -6,6 +6,13 @@ import 'admin_login.dart';
 import 'vendor_management_page.dart';
 import 'orders_page.dart';
 import 'promotions_page.dart';
+import 'rating_page.dart';
+import 'dispute_page.dart';
+import 'payment_page.dart';
+import 'report_page.dart';
+import 'subscription_page.dart';
+import 'profile_page.dart';
+import 'settings/setting_page.dart';
 
 class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
@@ -171,19 +178,39 @@ class _AdminDrawer extends StatelessWidget {
             _DrawerItem(
                 icon: Icons.reviews_outlined,
                 title: "Ratings & Moderation",
-                onTap: () {}),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LowRatingsPanel()),
+                  );
+                }),
             _DrawerItem(
                 icon: Icons.account_balance_wallet_outlined,
                 title: "Payment management",
-                onTap: () {}),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PaymentPage()),
+                  );
+                }),
             _DrawerItem(
                 icon: Icons.analytics_outlined,
                 title: "Analytics & Reports",
-                onTap: () {}),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ReportPage()),
+                  );
+                }),
             _DrawerItem(
                 icon: Icons.subscriptions_outlined,
                 title: "Subscription management",
-                onTap: () {}),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SubscriptionApp()),
+                  );
+                }),
 
             const SizedBox(height: 24),
             const Divider(),
@@ -196,9 +223,23 @@ class _AdminDrawer extends StatelessWidget {
 
             // --- Others ---
             _DrawerItem(
-                icon: Icons.person_outline, title: "Profile", onTap: () {}),
+                icon: Icons.person_outline,
+                title: "Profile",
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ProfilePage()),
+                  );
+                }),
             _DrawerItem(
-                icon: Icons.settings_outlined, title: "Settings", onTap: () {}),
+                icon: Icons.settings_outlined,
+                title: "Settings",
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsApp()),
+                  );
+                }),
 
             // --- Logout with confirmation ---
             _DrawerItem(

@@ -12,11 +12,15 @@ dependencies:
   flutter:
     sdk: flutter
   intl: ^0.19.0
+  image_picker: ^1.1.1
+  table_calendar: ^3.0.8
 
   # --- UI & Core Utility ---
   cupertino_icons: ^1.0.6
   http: ^1.1.0
   fl_chart: ^0.69.0
+  pdf: ^3.11.0
+  printing: ^5.10.0
 
   # --- Location, Maps, and Geocoding ---
   google_maps_flutter: ^2.5.0
