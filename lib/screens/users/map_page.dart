@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import '../../util/styles.dart';
+import '../../util/styles.dart'; // Import your styles
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -18,7 +18,6 @@ class _MapPageState extends State<MapPage> {
   LatLng _currentMapCenter = const LatLng(3.1390, 101.6869);
   String _currentAddress = "Kuala Lumpur, Malaysia";
 
-  // User's real-time current position
   Position? _currentPosition;
 
   @override
@@ -52,12 +51,10 @@ class _MapPageState extends State<MapPage> {
 
       await _getAddressFromLatLng(currentLatLng);
 
-      // Move camera to current location
       mapController?.animateCamera(
         CameraUpdate.newLatLngZoom(_currentMapCenter, 17),
       );
     } catch (e) {
-      // Keep default Malaysia location if GPS fails
       setState(() {
         _currentAddress = "Kuala Lumpur, Malaysia";
       });
@@ -97,7 +94,11 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _confirmLocation() {
-    Navigator.pop(context, _currentAddress);
+    Navigator.pop(context, {
+      'address': _currentAddress,
+      'lat': _currentMapCenter.latitude,
+      'lng': _currentMapCenter.longitude,
+    });
   }
 
   @override
@@ -105,7 +106,8 @@ class _MapPageState extends State<MapPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Choose Your Location'),
-        backgroundColor: kPrimaryActionColor, // Pink top bar
+        // **THEME CHANGE:** Using kPrimaryActionColor for the app bar
+        backgroundColor: kPrimaryActionColor, 
       ),
       body: Stack(
         children: [
@@ -113,8 +115,8 @@ class _MapPageState extends State<MapPage> {
             initialCameraPosition:
                 CameraPosition(target: _currentMapCenter, zoom: 17.0),
             mapType: MapType.normal,
-            myLocationEnabled: true, // Blue dot for user's location
-            myLocationButtonEnabled: true, // Optional: button to center on user
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
             zoomControlsEnabled: false,
             onMapCreated: _onMapCreated,
             onCameraMove: _onCameraMove,
@@ -122,9 +124,10 @@ class _MapPageState extends State<MapPage> {
           ),
 
           // Center marker
-          const Center(
+          Center(
+            // **THEME CHANGE:** Using kPrimaryActionColor for the marker
             child:
-                Icon(Icons.location_on, size: 40, color: kPrimaryActionColor),
+                const Icon(Icons.location_on, size: 40, color: kPrimaryActionColor),
           ),
 
           // Address display on top
@@ -149,7 +152,7 @@ class _MapPageState extends State<MapPage> {
             ),
           ),
 
-          // Confirm button (bigger, rounded, professional)
+          // Confirm button
           Align(
             alignment: Alignment.bottomCenter,
             child: Padding(
@@ -157,7 +160,8 @@ class _MapPageState extends State<MapPage> {
               child: ElevatedButton(
                 onPressed: _confirmLocation,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimaryActionColor,
+                  // **THEME CHANGE:** Using kPrimaryActionColor for button background
+                  backgroundColor: kPrimaryActionColor, 
                   padding:
                       const EdgeInsets.symmetric(horizontal: 60, vertical: 18),
                   shape: RoundedRectangleBorder(
@@ -168,7 +172,8 @@ class _MapPageState extends State<MapPage> {
                   'Confirm Location',
                   style: TextStyle(
                       fontSize: 20,
-                      color: kTextColor,
+                      // **THEME CHANGE:** Using kCardColor (White) for contrast text on dark button
+                      color: kCardColor, 
                       fontWeight: FontWeight.bold),
                 ),
               ),
