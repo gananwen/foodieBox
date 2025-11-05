@@ -6,8 +6,8 @@ import 'analytics_page.dart'; // <-- 2. 导入 Analytics 页面
 
 // --- 促销管理页面 (Figure 32) ---
 class MarketingPage extends StatefulWidget {
-  const MarketingPage({super.key});
-
+  final VoidCallback onBackToDashboard;
+  const MarketingPage({super.key, required this.onBackToDashboard});
   @override
   State<MarketingPage> createState() => _MarketingPageState();
 }
@@ -193,7 +193,7 @@ class _MarketingPageState extends State<MarketingPage> {
         backgroundColor: kAppBackgroundColor,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: kTextColor),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: widget.onBackToDashboard,
         ),
       ),
       body: SingleChildScrollView(

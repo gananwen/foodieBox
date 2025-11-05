@@ -4,7 +4,8 @@ import 'order_details_page.dart'; // 我们下一步要创建的页面
 
 // --- 订单列表页面 (Figure 30) ---
 class OrdersPage extends StatefulWidget {
-  const OrdersPage({super.key});
+  final VoidCallback onBackToDashboard;
+  const OrdersPage({super.key, required this.onBackToDashboard});
 
   @override
   State<OrdersPage> createState() => _OrdersPageState();
@@ -239,7 +240,7 @@ class _OrdersPageState extends State<OrdersPage>
         backgroundColor: kAppBackgroundColor,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: kTextColor),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: widget.onBackToDashboard,
         ),
         // TabBar: "Pickup" 和 "Delivery"
         bottom: TabBar(

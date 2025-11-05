@@ -5,7 +5,8 @@ import 'edit_product_page.dart';
 
 // --- Product Page (Figure 27) ---
 class ProductPage extends StatefulWidget {
-  const ProductPage({super.key});
+  final VoidCallback onBackToDashboard;
+  const ProductPage({super.key, required this.onBackToDashboard});
 
   @override
   State<ProductPage> createState() => _ProductPageState();
@@ -260,7 +261,7 @@ class _ProductPageState extends State<ProductPage>
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: kTextColor),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: widget.onBackToDashboard,
         ),
         actions: [
           // Show Delete button ONLY if items are selected
