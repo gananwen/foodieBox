@@ -1,0 +1,758 @@
+import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:foodiebox/screens/users/order_confirmation_page.dart';
+import 'package:foodiebox/screens/users/order_failure_page.dart';
+
+class CheckoutPage extends StatefulWidget {
+  const CheckoutPage({super.key});
+
+  @override
+  State<CheckoutPage> createState() => _CheckoutPageState();
+}
+
+class _CheckoutPageState extends State<CheckoutPage> {
+  String selectedDelivery = 'Standard';
+  bool agreedToTerms = true;
+  String selectedPayment = 'Credit/Debit Card';
+
+  String address = 'Jalan Teknologi 5, Kuala Lumpur, 57000';
+  LatLng addressLatLng = const LatLng(3.1390, 101.6869);
+
+  double subtotal = 16.97;
+  double discount = 0.0;
+  double deliveryFee = 5.00;
+  double deliveryDiscount = 3.00;
+  String promoCode = '';
+  String promoLabel = '';
+  String promoError = '';
+
+  final List<Map<String, dynamic>> availablePromos = [
+    {
+      'title': '15% Additional Groceries Discount',
+      'code': 'VLZKOW7',
+      'minSpend': 45.00,
+      'discountAmount': 10.00,
+    },
+    {
+      'title': '30% OFF for your first pick up order',
+      'code': 'NEWPICKUP',
+      'minSpend': 25.00,
+      'discountAmount': 7.50,
+    },
+    {
+      'title': 'Enjoy RM10 off with RM 25 min. food delivery order',
+      'code': 'SYOK10',
+      'minSpend': 25.00,
+      'discountAmount': 10.00,
+    },
+  ];
+
+  double getTotal() {
+    return subtotal - discount + deliveryFee - deliveryDiscount;
+  }
+
+  double _getPromoMinSpend(String code) {
+    final promo = availablePromos.firstWhere(
+      (p) => p['code'] == code,
+      orElse: () => {},
+    );
+    return promo['minSpend'] ?? 0.0;
+  }
+
+  Future<void> _editAddress() async {
+    final result =
+        await Navigator.pushNamed(context, '/map') as Map<String, dynamic>?;
+    if (result != null) {
+      setState(() {
+        address = result['address'];
+        addressLatLng = LatLng(result['lat'], result['lng']);
+      });
+    }
+  }
+
+  Widget buildOrderSummary() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.grey.shade200, blurRadius: 4)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Subtotal: RM${subtotal.toStringAsFixed(2)}'),
+          Text('Total discount: -RM${discount.toStringAsFixed(2)}'),
+          Text('Delivery fee: RM${deliveryFee.toStringAsFixed(2)}'),
+          Text(
+            'Delivery fee discount: -RM${deliveryDiscount.toStringAsFixed(2)}',
+          ),
+          if (promoCode.isNotEmpty)
+            Text(
+              discount > 0
+                  ? "Promo Applied: $promoLabel"
+                  : "Promo '$promoCode' cannot be used (min RM${_getPromoMinSpend(promoCode).toStringAsFixed(2)})",
+              style: TextStyle(color: discount > 0 ? Colors.green : Colors.red),
+            ),
+          const Divider(),
+          Text(
+            'Total: RM${getTotal().toStringAsFixed(2)}',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastPromo();
+  }
+
+  Future<void> _loadLastPromo() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+    final data = doc.data();
+    if (data != null && data['lastPromo'] != null) {
+      final promo = data['lastPromo'];
+      final code = promo['code'];
+      final label = promo['label'];
+      final savedDiscount = promo['discount'];
+
+      final promoDetails = availablePromos.firstWhere(
+        (p) => p['code'] == code,
+        orElse: () => {},
+      );
+      final meetsMinSpend = subtotal >= (promoDetails['minSpend'] ?? 0.0);
+
+      setState(() {
+        promoCode = code;
+        promoLabel = label;
+        discount = meetsMinSpend ? savedDiscount : 0.0;
+        promoError = meetsMinSpend
+            ? ''
+            : 'Promo requires RM${promoDetails['minSpend']} minimum spend';
+      });
+    }
+  }
+
+  void _selectPaymentMethod() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.credit_card),
+              title: const Text('Credit/Debit Card'),
+              onTap: () {
+                setState(() => selectedPayment = 'Credit/Debit Card');
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.money),
+              title: const Text('Cash on Delivery'),
+              onTap: () {
+                setState(() => selectedPayment = 'Cash on Delivery');
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.account_balance_wallet),
+              title: const Text('E-Wallet'),
+              onTap: () {
+                setState(() => selectedPayment = 'E-Wallet');
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showPromoSelector() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          color: Colors.white,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Choose a Promo Code',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: availablePromos.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final promo = availablePromos[index];
+                    final meetsMinSpend = subtotal >= promo['minSpend'];
+                    final isSelected = promoCode == promo['code'];
+
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          promoCode = promo['code'];
+                          promoLabel = promo['title'];
+                          if (meetsMinSpend) {
+                            discount = promo['discountAmount'];
+                            promoError = '';
+                          } else {
+                            discount = 0.0;
+                            promoError =
+                                'Promo requires RM${promo['minSpend']} minimum spend';
+                          }
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween<double>(
+                          begin: 1.0,
+                          end: isSelected ? 1.03 : 1.0,
+                        ),
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                        builder: (context, scale, child) {
+                          return Transform.scale(
+                            scale: scale,
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                gradient: isSelected
+                                    ? LinearGradient(
+                                        colors: [
+                                          Colors.amber.shade100,
+                                          Colors.white,
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      )
+                                    : null,
+                                color: isSelected ? null : Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Colors.amber
+                                      : Colors.grey.shade300,
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: isSelected
+                                        ? Colors.amber.withOpacity(0.4)
+                                        : Colors.grey.shade100,
+                                    blurRadius: isSelected ? 12 : 6,
+                                    spreadRadius: isSelected ? 2 : 1,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          promo['title'],
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      Tooltip(
+                                        message:
+                                            'Min spend RM${promo['minSpend']}\nCode: ${promo['code']}',
+                                        child: const Icon(
+                                          Icons.info_outline,
+                                          size: 18,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            'Code: ${promo['code']}',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey.shade700,
+                                            ),
+                                          ),
+                                          if (meetsMinSpend)
+                                            const Padding(
+                                              padding: EdgeInsets.only(left: 6),
+                                              child: Icon(
+                                                Icons.local_offer,
+                                                color: Colors.green,
+                                                size: 18,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      Text(
+                                        meetsMinSpend
+                                            ? 'Eligible'
+                                            : 'Min RM${promo['minSpend']}',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: meetsMinSpend
+                                              ? Colors.green
+                                              : Colors.red,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget buildDeliveryOption(String label, String time, double price) {
+    final isSelected = selectedDelivery == label;
+    return GestureDetector(
+      onTap: () => setState(() => selectedDelivery = label),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: Colors.black12),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.grey.shade200, blurRadius: 4)],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('$label <$time', style: const TextStyle(fontSize: 14)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.amber : Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'RM${price.toStringAsFixed(2)}',
+                style: const TextStyle(fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('Checkout', style: TextStyle(color: Colors.black)),
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Delivery Address', style: TextStyle(fontSize: 16)),
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: _editAddress,
+              child: Container(
+                height: 160,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(color: Colors.grey.shade200, blurRadius: 4),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    GoogleMap(
+                      initialCameraPosition: CameraPosition(
+                        target: addressLatLng,
+                        zoom: 15,
+                      ),
+                      markers: {
+                        Marker(
+                          markerId: const MarkerId('address'),
+                          position: addressLatLng,
+                          infoWindow: InfoWindow(title: address),
+                        ),
+                      },
+                      zoomControlsEnabled: false,
+                      myLocationButtonEnabled: false,
+                    ),
+                    const Align(
+                      alignment: Alignment.topCenter,
+                      child: Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(
+                          Icons.edit_location_alt,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(address, style: const TextStyle(fontSize: 14)),
+            const SizedBox(height: 20),
+            const Text('Delivery Option', style: TextStyle(fontSize: 16)),
+            const SizedBox(height: 10),
+            buildDeliveryOption('Express', '20 min', 4.99),
+            buildDeliveryOption('Standard', '40 min', 2.99),
+            buildDeliveryOption('Saver', '60 min', 0.99),
+            const SizedBox(height: 20),
+            const Text('Payment Method', style: TextStyle(fontSize: 16)),
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: _selectPaymentMethod,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(color: Colors.grey.shade200, blurRadius: 4),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(selectedPayment, style: const TextStyle(fontSize: 14)),
+                    const Icon(Icons.arrow_forward_ios, size: 16),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text('Promo Code', style: TextStyle(fontSize: 16)),
+            const SizedBox(height: 10),
+            TweenAnimationBuilder<double>(
+              tween: Tween<double>(
+                begin: 1.0,
+                end: promoCode.isEmpty ? 1.05 : 1.0,
+              ),
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeInOut,
+              builder: (context, scale, child) {
+                return Transform.scale(
+                  scale: scale,
+                  child: ElevatedButton.icon(
+                    onPressed: _showPromoSelector,
+                    icon: const Icon(Icons.local_offer, size: 18),
+                    label: Text(
+                      promoCode.isEmpty ? 'Select Promo' : 'Promo: $promoCode',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 14,
+                        horizontal: 16,
+                      ),
+                      backgroundColor: promoCode.isEmpty
+                          ? Colors.white
+                          : Colors.amber.shade100,
+                      foregroundColor: Colors.black,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: BorderSide(
+                          color: promoCode.isEmpty
+                              ? Colors.grey.shade300
+                              : Colors.amber,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            if (promoCode.isNotEmpty && promoError.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'Suggested from last order',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+              ),
+            if (promoCode.isNotEmpty)
+              TextButton.icon(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Clear Promo'),
+                      content: const Text(
+                        'Are you sure you want to remove the applied promo code?',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              promoCode = '';
+                              promoLabel = '';
+                              discount = 0.0;
+                              promoError = '';
+                            });
+                            Navigator.pop(context);
+                          },
+                          child: const Text(
+                            'Clear',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.close, size: 16, color: Colors.red),
+                label: const Text(
+                  'Clear Promo',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+
+            if (promoError.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  promoError,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+            const SizedBox(height: 20),
+            const Text('Order Summary', style: TextStyle(fontSize: 16)),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(color: Colors.grey.shade200, blurRadius: 4),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Subtotal: RM${subtotal.toStringAsFixed(2)}'),
+                  Text('Total discount: -RM${discount.toStringAsFixed(2)}'),
+                  Text('Delivery fee: RM${deliveryFee.toStringAsFixed(2)}'),
+                  Text(
+                    'Delivery fee discount: -RM${deliveryDiscount.toStringAsFixed(2)}',
+                  ),
+                  if (promoCode.isNotEmpty)
+                    Text(
+                      discount > 0
+                          ? "Promo Applied: $promoLabel"
+                          : "Promo '$promoCode' cannot be used (min RM${_getPromoMinSpend(promoCode)})",
+                      style: TextStyle(
+                        color: discount > 0 ? Colors.green : Colors.red,
+                      ),
+                    ),
+                  const Divider(),
+                  Text(
+                    'Total: RM${getTotal().toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Checkbox(
+                  value: agreedToTerms,
+                  onChanged: (value) =>
+                      setState(() => agreedToTerms = value ?? true),
+                ),
+                const Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      text: 'By placing an order you agree to our ',
+                      children: [
+                        TextSpan(
+                          text: 'Terms and Conditions',
+                          style: TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                    style: TextStyle(fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: agreedToTerms ? _placeOrder : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Place Order',
+                  style: TextStyle(fontSize: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _placeOrder() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to place an order.')),
+      );
+      return;
+    }
+
+    final orderData = {
+      'userId': user.uid,
+      'address': address,
+      'lat': addressLatLng.latitude,
+      'lng': addressLatLng.longitude,
+      'deliveryOption': selectedDelivery,
+      'paymentMethod': selectedPayment,
+      'subtotal': subtotal,
+      'discount': discount,
+      'deliveryFee': deliveryFee,
+      'deliveryDiscount': deliveryDiscount,
+      'total': getTotal(),
+      'promoCode': promoCode,
+      'promoLabel': promoLabel,
+      'status': 'received', // ✅ Initial status for tracking
+      'items': [
+        {'name': 'Tacos', 'price': 12.49},
+        {'name': 'Cheese Quesadillas', 'price': 2.49},
+      ],
+      'timestamp': FieldValue.serverTimestamp(),
+    };
+
+    try {
+      final docRef = await FirebaseFirestore.instance
+          .collection('orders')
+          .add(orderData);
+      final orderId = docRef.id;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Order placed successfully!')),
+      );
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OrderConfirmationPage(
+            address: address,
+            location: addressLatLng,
+            total: getTotal(),
+            promoLabel: promoLabel,
+            orderId: orderId,
+          ),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to place order: $e')));
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const OrderFailurePage()),
+      );
+    }
+    if (promoCode.isNotEmpty) {
+      final promoRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('promoUsage')
+          .doc(promoCode);
+
+      await promoRef.set({
+        'label': promoLabel,
+        'lastUsed': FieldValue.serverTimestamp(),
+        'count': FieldValue.increment(1),
+      }, SetOptions(merge: true));
+
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'lastPromo': {
+          'code': promoCode,
+          'label': promoLabel,
+          'discount': discount,
+        },
+      }, SetOptions(merge: true));
+    }
+  }
+}
