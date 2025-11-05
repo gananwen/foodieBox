@@ -40,6 +40,7 @@ dependencies:
   provider: ^6.1.2
   flutter_animate: ^4.5.2
   shared_preferences: ^2.5.3
+  flutter_launcher_icons: ^0.14.4
 
 dev_dependencies:
   flutter_test:
@@ -52,20 +53,19 @@ flutter:
   assets:
     - assets/images/
 
+
 # --- App Icon Configuration ---
 flutter_launcher_icons:
+  image_path: "assets/images/App_icons.png"
   android: true
   ios: true
   web:
     generate: true
-    image_path: "assets/images/App_icons.png"
     background_color: "#ffffff"
     theme_color: "#ffffff"
   windows:
     generate: true
-    image_path: "assets/images/App_icons.png"
     icon_size: 256
   macos:
     generate: true
-    image_path: "assets/images/App_icons.png"
-  image_path: "assets/images/App_icons.png"
+

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../util/styles.dart';
 import 'notifications_page.dart';
-import 'admin_login.dart';
+import '../auth/admin_login.dart';
 import 'vendor_management_page.dart';
 import 'orders_page.dart';
 import 'promotions_page.dart';

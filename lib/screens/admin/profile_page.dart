@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'admin_login.dart';
+import '../auth/admin_login.dart';
 import 'admin_home_page.dart';
 import 'attendance_logs_page.dart';
 
