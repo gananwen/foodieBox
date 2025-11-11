@@ -5,37 +5,13 @@ import '../../util/styles.dart'; // Using your team's styles file
 import 'product_page.dart';
 import 'orders_page.dart';
 import 'marketing_page.dart';
+import 'more_page.dart'; // <-- 1. 导入新的 'more_page.dart'
 
-// --- Dummy Pages for Navigation ---
-// SettingsPage (Figure 26) 仍然是占位符
-// *** 它现在也必须接收 onBackToDashboard 函数 ***
-class SettingsPage extends StatelessWidget {
-  // 接收这个函数
-  final VoidCallback onBackToDashboard;
-  const SettingsPage({super.key, required this.onBackToDashboard});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kAppBackgroundColor,
-      // 修复 AppBar
-      appBar: AppBar(
-        title: const Text('Settings'),
-        backgroundColor: kAppBackgroundColor,
-        // 使用这个函数，而不是 Navigator.pop()
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: kTextColor),
-          onPressed: onBackToDashboard,
-        ),
-      ),
-      body: const Center(child: Text('Settings Page (Figure 26) Placeholder')),
-    );
-  }
-}
+// --- 2. 移除 'SettingsPage' 占位符 ---
+// (它现在被 'more_page.dart' 取代了)
 // ------------------------------------------------------------------------
 
 // --- Vendor Dashboard Page (Figure 25) ---
-// This widget is now the main "Shell" that holds the Bottom Nav Bar
 class VendorHomePage extends StatefulWidget {
   const VendorHomePage({super.key});
 
@@ -44,33 +20,26 @@ class VendorHomePage extends StatefulWidget {
 }
 
 class _VendorHomePageState extends State<VendorHomePage> {
-  // We keep track of the selected index for the BottomNavigationBar
   int _currentIndex = 0;
 
-  // --- 1. 创建一个函数来切换回 Dashboard ---
   void _goToDashboard() {
     setState(() {
       _currentIndex = 0;
     });
   }
 
-  // --- 2. 声明 _pages 列表 ---
   late final List<Widget> _pages;
 
-  // --- 3. 这是底部栏和 Action 按钮都会调用的函数 ---
   void _onTabTapped(int index) {
     setState(() {
       _currentIndex = index;
     });
-    // No more Navigator.push!
   }
 
   @override
   void initState() {
     super.initState();
 
-    // --- 4. 在 initState 中初始化 _pages 列表 ---
-    // 这样我们就可以把 _goToDashboard 和 _onTabTapped 函数传递下去
     _pages = [
       // 0. Dashboard - 把 _onTabTapped 传递给它
       VendorHomePageContent(onTabTapped: _onTabTapped),
@@ -80,8 +49,8 @@ class _VendorHomePageState extends State<VendorHomePage> {
       MarketingPage(onBackToDashboard: _goToDashboard),
       // 3. Orders
       OrdersPage(onBackToDashboard: _goToDashboard),
-      // 4. More (Settings)
-      SettingsPage(onBackToDashboard: _goToDashboard),
+      // 4. More (Settings) <-- 3. 使用新的 MorePage
+      MorePage(onBackToDashboard: _goToDashboard),
     ];
   }
 
@@ -89,22 +58,17 @@ class _VendorHomePageState extends State<VendorHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kAppBackgroundColor, // FEFFE1
-
-      // --- 5. Body 现在会根据 _currentIndex 自动切换页面 ---
       body: IndexedStack(
         index: _currentIndex,
         children: _pages,
       ),
-
-      // --- 6. 你的 BottomNavigationBar 保持不变 ---
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        currentIndex: _currentIndex, // Index is now managed correctly
+        currentIndex: _currentIndex,
         backgroundColor: kCardColor, // White
         selectedItemColor:
             _currentIndex == 2 ? kPrimaryActionColor : kTextColor,
-        unselectedItemColor:
-            kTextColor.withAlpha(128), // 修复: withOpacity -> withAlpha
+        unselectedItemColor: kTextColor.withAlpha(128),
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
@@ -128,7 +92,7 @@ class _VendorHomePageState extends State<VendorHomePage> {
             label: 'More',
           ),
         ],
-        onTap: _onTabTapped, // 使用我们统一的函数
+        onTap: _onTabTapped,
       ),
     );
   }
@@ -136,24 +100,22 @@ class _VendorHomePageState extends State<VendorHomePage> {
 
 // --- Separate Widget for Dashboard Content (Figure 25) ---
 class VendorHomePageContent extends StatelessWidget {
-  // --- 1. 接收 onTabTapped 函数 ---
   final Function(int) onTabTapped;
-
   const VendorHomePageContent({super.key, required this.onTabTapped});
+
+  // (你所有的 _buildStatCard, _buildActionBlock, 和 build 方法)
+  // ... (为了简洁，这里省略，保持你原来的代码不变) ...
 
   // Reusable widget to display a single quick stat card
   Widget _buildStatCard(String title, dynamic value) {
-    // Dummy data
     int todaysOrders = 25;
     double todaysSales = 300.00;
-
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: kSecondaryAccentColor, // E8FFC9 for sections
+        color: kSecondaryAccentColor,
         borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(
-            color: kTextColor.withAlpha(26), width: 3.0), // Your 3.0 width
+        border: Border.all(color: kTextColor.withAlpha(26), width: 3.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -190,10 +152,9 @@ class VendorHomePageContent extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         margin: const EdgeInsets.only(bottom: 16.0),
         decoration: BoxDecoration(
-          color: kSecondaryAccentColor, // E8FFC9 for sections
+          color: kSecondaryAccentColor,
           borderRadius: BorderRadius.circular(12.0),
-          border: Border.all(
-              color: kTextColor.withAlpha(26), width: 3.0), // Your 3.0 width
+          border: Border.all(color: kTextColor.withAlpha(26), width: 3.0),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -242,7 +203,6 @@ class VendorHomePageContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Dummy data
     String vendorName = "Afsar Hossen";
     String vendorId = "1234";
 
