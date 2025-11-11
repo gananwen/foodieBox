@@ -4,11 +4,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../util/styles.dart';
 import '../../widgets/base_page.dart';
 import '../auth/user_login.dart';
-import 'subpages/about_page.dart';
-import 'subpages/help_page.dart';
+import '../shared/about_page.dart';
+import '../shared/help_page.dart';
 import 'subpages/my_details_page.dart';
 import 'subpages/delivery_address_page.dart';
-import 'subpages/notifications_page.dart';
+import '../shared/notifications_page.dart';
 import 'subpages/promo_card_page.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -38,7 +38,10 @@ class ProfilePage extends StatelessWidget {
               ),
               Positioned.fill(
                 child: StreamBuilder<DocumentSnapshot>(
-                  stream: FirebaseFirestore.instance.collection('users').doc(userId).snapshots(),
+                  stream: FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(userId)
+                      .snapshots(),
                   builder: (context, snapshot) {
                     final data = snapshot.data?.data() as Map<String, dynamic>?;
 
@@ -52,9 +55,11 @@ class ProfilePage extends StatelessWidget {
                         CircleAvatar(
                           radius: 40,
                           backgroundColor: Colors.grey,
-                          backgroundImage: imageUrl != null ? NetworkImage(imageUrl) : null,
+                          backgroundImage:
+                              imageUrl != null ? NetworkImage(imageUrl) : null,
                           child: imageUrl == null
-                              ? const Icon(Icons.person, color: Colors.white, size: 40)
+                              ? const Icon(Icons.person,
+                                  color: Colors.white, size: 40)
                               : null,
                         ),
                         const SizedBox(height: 10),
@@ -69,15 +74,19 @@ class ProfilePage extends StatelessWidget {
                           onTap: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => const MyDetailsPage()),
+                              MaterialPageRoute(
+                                  builder: (context) => const MyDetailsPage()),
                             );
                           },
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(email, style: const TextStyle(fontSize: 13, color: kTextColor)),
+                              Text(email,
+                                  style: const TextStyle(
+                                      fontSize: 13, color: kTextColor)),
                               const SizedBox(width: 4),
-                              const Icon(Icons.edit, size: 14, color: kTextColor),
+                              const Icon(Icons.edit,
+                                  size: 14, color: kTextColor),
                             ],
                           ),
                         ),
@@ -100,19 +109,37 @@ class ProfilePage extends StatelessWidget {
             ),
             child: const Column(
               children: [
-                _ProfileItem(icon: Icons.person_outline, label: 'My Details', targetPage: MyDetailsPage()),
+                _ProfileItem(
+                    icon: Icons.person_outline,
+                    label: 'My Details',
+                    targetPage: MyDetailsPage()),
                 Divider(height: 1, thickness: 1),
-                _ProfileItem(icon: Icons.location_on_outlined, label: 'Delivery Address', targetPage: DeliveryAddressPage()),
+                _ProfileItem(
+                    icon: Icons.location_on_outlined,
+                    label: 'Delivery Address',
+                    targetPage: DeliveryAddressPage()),
                 Divider(height: 1, thickness: 1),
                 //_ProfileItem(icon: Icons.credit_card, label: 'Payment Methods', targetPage: PaymentMethodsPage()),
                 //Divider(height: 1, thickness: 1),
-                _ProfileItem(icon: Icons.card_giftcard, label: 'Promo Card', targetPage: PromoCardPage()),
+                _ProfileItem(
+                    icon: Icons.card_giftcard,
+                    label: 'Promo Card',
+                    targetPage: PromoCardPage()),
                 Divider(height: 1, thickness: 1),
-                _ProfileItem(icon: Icons.notifications_none, label: 'Notifications', targetPage: NotificationsPage()),
+                _ProfileItem(
+                    icon: Icons.notifications_none,
+                    label: 'Notifications',
+                    targetPage: NotificationsPage()),
                 Divider(height: 1, thickness: 1),
-                _ProfileItem(icon: Icons.help_outline, label: 'Help', targetPage: HelpPage()),
+                _ProfileItem(
+                    icon: Icons.help_outline,
+                    label: 'Help',
+                    targetPage: HelpPage()),
                 Divider(height: 1, thickness: 1),
-                _ProfileItem(icon: Icons.info_outline, label: 'About', targetPage: AboutPage()),
+                _ProfileItem(
+                    icon: Icons.info_outline,
+                    label: 'About',
+                    targetPage: AboutPage()),
               ],
             ),
           ),

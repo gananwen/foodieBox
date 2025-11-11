@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../../util/styles.dart';
+import '../../util/styles.dart';
 
 // Helper class for data model
 class AppNotification {
@@ -181,9 +181,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       title: Text(
                         notification.title,
                         style: TextStyle(
-                          fontWeight: isUnread
-                              ? FontWeight.bold
-                              : FontWeight.normal,
+                          fontWeight:
+                              isUnread ? FontWeight.bold : FontWeight.normal,
                           color: kTextColor,
                         ),
                       ),
@@ -215,9 +214,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
                             notification.time,
                             style: TextStyle(
                               fontSize: 11,
-                              color: isUnread
-                                  ? kPrimaryActionColor
-                                  : Colors.grey,
+                              color:
+                                  isUnread ? kPrimaryActionColor : Colors.grey,
                             ),
                           ),
                         ],

@@ -5,26 +5,13 @@ import '../../util/styles.dart'; // Using your team's styles file
 import 'product_page.dart';
 import 'orders_page.dart';
 import 'marketing_page.dart';
+import 'more_page.dart'; // <-- 1. 导入新的 'more_page.dart'
 
-// --- Dummy Pages for Navigation (To be replaced with your actual pages later) ---
-// ProductPage, OrdersPage, 和 MarketingPage 已经是真实的了.
-
-// SettingsPage (Figure 26) 仍然是占位符
-class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kAppBackgroundColor,
-      appBar: AppBar(title: const Text('Settings')),
-      body: const Center(child: Text('Settings Page (Figure 26) Placeholder')),
-    );
-  }
-}
+// --- 2. 移除 'SettingsPage' 占位符 ---
+// (它现在被 'more_page.dart' 取代了)
 // ------------------------------------------------------------------------
 
 // --- Vendor Dashboard Page (Figure 25) ---
-// This widget is now the main "Shell" that holds the Bottom Nav Bar
 class VendorHomePage extends StatefulWidget {
   const VendorHomePage({super.key});
 
@@ -33,52 +20,55 @@ class VendorHomePage extends StatefulWidget {
 }
 
 class _VendorHomePageState extends State<VendorHomePage> {
-  // We keep track of the selected index for the BottomNavigationBar
   int _currentIndex = 0;
 
-  // --- 2. 创建一个包含所有页面的列表 ---
-  // The order MUST match the BottomNavigationBar
-  final List<Widget> _pages = [
-    const VendorHomePageContent(), // 0. Dashboard
-    const ProductPage(), // 1. Product
-    const MarketingPage(), // 2. Promotions
-    const OrdersPage(), // 3. Orders
-    const SettingsPage(), // 4. More (Settings)
-  ];
+  void _goToDashboard() {
+    setState(() {
+      _currentIndex = 0;
+    });
+  }
 
-  // --- 4. 简化导航逻辑 ---
-  // This function now ONLY updates the state.
-  void _onBottomBarTapped(int index) {
+  late final List<Widget> _pages;
+
+  void _onTabTapped(int index) {
     setState(() {
       _currentIndex = index;
     });
-    // No more Navigator.push!
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    _pages = [
+      // 0. Dashboard - 把 _onTabTapped 传递给它
+      VendorHomePageContent(onTabTapped: _onTabTapped),
+      // 1. Product - 把 _goToDashboard 传递给它
+      ProductPage(onBackToDashboard: _goToDashboard),
+      // 2. Promotions
+      MarketingPage(onBackToDashboard: _goToDashboard),
+      // 3. Orders
+      OrdersPage(onBackToDashboard: _goToDashboard),
+      // 4. More (Settings) <-- 3. 使用新的 MorePage
+      MorePage(onBackToDashboard: _goToDashboard),
+    ];
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kAppBackgroundColor, // FEFFE1
-
-      // --- 3. Body 现在会根据 _currentIndex 自动切换页面 ---
-      // We use IndexedStack to keep the state of each page alive
-      // (e.g., preserves scroll position)
       body: IndexedStack(
         index: _currentIndex,
         children: _pages,
       ),
-
-      // --- 你的 BottomNavigationBar 保持不变 ---
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        currentIndex: _currentIndex, // Index is now managed correctly
+        currentIndex: _currentIndex,
         backgroundColor: kCardColor, // White
-
-        // This makes the selected item use your brand colors
         selectedItemColor:
             _currentIndex == 2 ? kPrimaryActionColor : kTextColor,
-        unselectedItemColor: kTextColor.withOpacity(0.5),
-
+        unselectedItemColor: kTextColor.withAlpha(128),
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
@@ -89,7 +79,6 @@ class _VendorHomePageState extends State<VendorHomePage> {
             icon: Icon(Icons.shopping_bag_outlined),
             label: 'Product',
           ),
-          // IMPORTANT: Promotions tab icon
           BottomNavigationBarItem(
             icon: Icon(Icons.volume_up_outlined),
             label: 'Promotions',
@@ -103,30 +92,30 @@ class _VendorHomePageState extends State<VendorHomePage> {
             label: 'More',
           ),
         ],
-        onTap: _onBottomBarTapped,
+        onTap: _onTabTapped,
       ),
     );
   }
 }
 
 // --- Separate Widget for Dashboard Content (Figure 25) ---
-// (This widget stays exactly the same as before)
 class VendorHomePageContent extends StatelessWidget {
-  const VendorHomePageContent({super.key});
+  final Function(int) onTabTapped;
+  const VendorHomePageContent({super.key, required this.onTabTapped});
+
+  // (你所有的 _buildStatCard, _buildActionBlock, 和 build 方法)
+  // ... (为了简洁，这里省略，保持你原来的代码不变) ...
 
   // Reusable widget to display a single quick stat card
   Widget _buildStatCard(String title, dynamic value) {
-    // Dummy data from parent state (would be passed in a real app)
     int todaysOrders = 25;
     double todaysSales = 300.00;
-
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: kSecondaryAccentColor, // E8FFC9 for sections
+        color: kSecondaryAccentColor,
         borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(
-            color: kTextColor.withOpacity(0.1), width: 3.0), // Your 3.0 width
+        border: Border.all(color: kTextColor.withAlpha(26), width: 3.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,7 +124,7 @@ class VendorHomePageContent extends StatelessWidget {
             title,
             style: TextStyle(
               fontSize: 14.0,
-              color: kTextColor.withOpacity(0.7),
+              color: kTextColor.withAlpha(179),
             ),
           ),
           const SizedBox(height: 8.0),
@@ -163,10 +152,9 @@ class VendorHomePageContent extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         margin: const EdgeInsets.only(bottom: 16.0),
         decoration: BoxDecoration(
-          color: kSecondaryAccentColor, // E8FFC9 for sections
+          color: kSecondaryAccentColor,
           borderRadius: BorderRadius.circular(12.0),
-          border: Border.all(
-              color: kTextColor.withOpacity(0.1), width: 3.0), // Your 3.0 width
+          border: Border.all(color: kTextColor.withAlpha(26), width: 3.0),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -179,7 +167,7 @@ class VendorHomePageContent extends StatelessWidget {
                     'ADD NEW' == actionType ? 'ADD NEW' : 'VIEW',
                     style: TextStyle(
                       fontSize: 12.0,
-                      color: kTextColor.withOpacity(0.6),
+                      color: kTextColor.withAlpha(153),
                     ),
                   ),
                   const SizedBox(height: 4.0),
@@ -196,7 +184,7 @@ class VendorHomePageContent extends StatelessWidget {
                     description,
                     style: TextStyle(
                       fontSize: 14.0,
-                      color: kTextColor.withOpacity(0.8),
+                      color: kTextColor.withAlpha(204),
                     ),
                   ),
                 ],
@@ -205,7 +193,7 @@ class VendorHomePageContent extends StatelessWidget {
             Icon(
               icon,
               size: 40.0,
-              color: kTextColor.withOpacity(0.7),
+              color: kTextColor.withAlpha(179),
             ),
           ],
         ),
@@ -215,7 +203,6 @@ class VendorHomePageContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Dummy data
     String vendorName = "Afsar Hossen";
     String vendorId = "1234";
 
@@ -233,7 +220,6 @@ class VendorHomePageContent extends StatelessWidget {
                   children: [
                     const CircleAvatar(
                       radius: 30,
-                      // Using light green as the avatar BG
                       backgroundColor: kSecondaryAccentColor,
                       child: Icon(Icons.person, size: 40, color: kTextColor),
                     ),
@@ -252,29 +238,25 @@ class VendorHomePageContent extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             Icon(Icons.edit_outlined,
-                                size: 18, color: kTextColor.withOpacity(0.7)),
+                                size: 18, color: kTextColor.withAlpha(179)),
                           ],
                         ),
                         Text(
                           'Vendor ID: $vendorId',
                           style: TextStyle(
-                              fontSize: 14, color: kTextColor.withOpacity(0.6)),
+                              fontSize: 14, color: kTextColor.withAlpha(153)),
                         ),
                       ],
                     ),
                   ],
                 ),
-                // Settings icon for the Settings Page (Figure 26)
+                // --- 2. 修复 Settings 按钮 ---
                 IconButton(
                   icon:
                       const Icon(Icons.settings, size: 28.0, color: kTextColor),
                   onPressed: () {
-                    // This can still navigate, as it's not part of the main 5 tabs
-                    // Or, it could be the 'More' page (index 4)
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const SettingsPage()));
+                    // "More" 按钮在索引 4
+                    onTabTapped(4);
                   },
                 ),
               ],
@@ -296,47 +278,38 @@ class VendorHomePageContent extends StatelessWidget {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               children: <Widget>[
-                _buildStatCard(
-                    'Today\'s Orders', 0), // Passed 0, will be replaced
-                _buildStatCard(
-                    'Today\'s Sales', 0.0), // Passed 0.0, will be replaced
+                _buildStatCard('Today\'s Orders', 0),
+                _buildStatCard('Today\'s Sales', 0.0),
               ],
             ),
 
             const SizedBox(height: 30.0),
 
             // --- Actions Section ---
-            // These buttons are now less necessary since you have the nav bar,
-            // but they are good for the Dashboard!
-            // I've kept their navigation logic as it was.
             const Text(
               'Actions',
               style: TextStyle(
                   fontSize: 20, fontWeight: FontWeight.w600, color: kTextColor),
             ),
             const SizedBox(height: 16.0),
+            // --- 3. 修复 Product 按钮 ---
             _buildActionBlock(
               'Product',
               'Expand your business',
               Icons.inventory_2_outlined,
               () {
-                // This will still work! It just pushes the ProductPage on top.
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const ProductPage()));
+                // "Product" 按钮在索引 1
+                onTabTapped(1);
               },
             ),
+            // --- 4. 修复 Orders 按钮 ---
             _buildActionBlock(
               'Orders',
               'Manage incoming requests',
               Icons.receipt_long_outlined,
               () {
-                // This will still work!
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const OrdersPage()));
+                // "Orders" 按钮在索引 3
+                onTabTapped(3);
               },
             ),
           ],

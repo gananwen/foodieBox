@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart'; // Add this package
-import '../../../util/styles.dart';
+import '../../util/styles.dart';
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
