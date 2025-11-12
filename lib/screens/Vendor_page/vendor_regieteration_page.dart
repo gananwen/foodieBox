@@ -10,6 +10,10 @@ import '../../models/user.dart'; // 导入 UserModel
 import '../../models/vendor.dart'; // 导入 VendorModel
 import 'vendor_home_page.dart';
 
+// --- (新增) 导入你的 MapPage ---
+// (请确保这个相对路径是正确的)
+import '../users/map_page.dart';
+
 class VendorRegistrationPage extends StatefulWidget {
   const VendorRegistrationPage({super.key});
 
@@ -32,8 +36,12 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
   final _passwordController = TextEditingController();
   final _confirmPassController = TextEditingController();
   final _storeNameController = TextEditingController();
-  final _storeAddressController = TextEditingController();
+  final _storeAddressController =
+      TextEditingController(); // <-- 地址 controller 已存在
   final _storePhoneController = TextEditingController();
+
+  // --- (新增) 供应商类型状态 ---
+  String? _selectedVendorType; // 'Blindbox' 或 'Grocery'
 
   // Image Files
   File? _businessPhoto;
@@ -56,8 +64,11 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
     super.dispose();
   }
 
+  // --- (FIX: 重新添加丢失的辅助函数) ---
+
   // --- (辅助) 图片选择函数 ---
   Future<File?> _pickImage() async {
+    // (使用 .gallery，根据你之前的请求)
     final XFile? pickedFile =
         await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
@@ -75,7 +86,7 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
       return await snapshot.ref.getDownloadURL();
     } catch (e) {
       debugPrint('File upload error: $e');
-      return '';
+      rethrow; // 重新抛出错误，让 _submitRegistration 知道
     }
   }
 
@@ -85,16 +96,17 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
     bool step1Valid = _step1Key.currentState?.validate() ?? false;
     bool step2Valid = _step2Key.currentState?.validate() ?? false;
 
+    // 检查 vendorType 和图片
     if (!step1Valid ||
-            !step2Valid ||
-            _businessLicense == null || // 营业执照是必需的
-            _businessPhoto == null // 店铺照片是必需的
-        ) {
-      // 如果验证失败或缺少图片，自动跳回第一步
+        !step2Valid ||
+        _selectedVendorType == null ||
+        _businessLicense == null ||
+        _businessPhoto == null) {
+      // 如果验证失败或缺少字段，自动跳回相应步骤
       setState(() {
         if (!step1Valid) {
           _currentStep = 0;
-        } else if (!step2Valid) {
+        } else if (!step2Valid || _selectedVendorType == null) {
           _currentStep = 1;
         } else {
           _currentStep = 2; // 缺少图片
@@ -128,7 +140,6 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
       String uid = user.uid;
 
       // 2. 上传所有图片到 Firebase Storage
-      // (我们使用 UID 来确保路径唯一)
       String businessPhotoUrl =
           await _uploadFile(_businessPhoto!, 'vendors/$uid/business_photo.jpg');
       String businessLicenseUrl = await _uploadFile(
@@ -145,7 +156,7 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
         firstName: nameParts.first,
         lastName: nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '',
         username: _emailController.text.trim().split('@').first,
-        role: 'Vendor', // *** 关键：设置角色为 Vendor ***
+        role: 'Vendor',
       );
 
       // 4. 创建 VendorModel (用于 'vendors' 集合)
@@ -154,34 +165,28 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
         storeName: _storeNameController.text.trim(),
         storeAddress: _storeAddressController.text.trim(),
         storePhone: _storePhoneController.text.trim(),
+        vendorType: _selectedVendorType!,
         businessPhotoUrl: businessPhotoUrl,
         businessLicenseUrl: businessLicenseUrl,
         halalCertificateUrl: halalCertificateUrl,
-        // 其他字段使用默认值
       );
 
-      // 5. 使用 "Batch Write" (批量写入) 来确保两个操作都成功
+      // 5. 使用 "Batch Write" (批量写入)
       WriteBatch batch = FirebaseFirestore.instance.batch();
-
-      // 操作 A: 写入 'users' 集合
       DocumentReference userDoc =
           FirebaseFirestore.instance.collection('users').doc(uid);
       batch.set(userDoc, userModel.toMap());
-
-      // 操作 B: 写入 'vendors' 集合
       DocumentReference vendorDoc =
           FirebaseFirestore.instance.collection('vendors').doc(uid);
       batch.set(vendorDoc, vendorModel.toMap());
-
-      // 提交批量操作
       await batch.commit();
 
-      // 6. 注册成功，跳转到 VendorHomePage
+      // 6. 注册成功
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const VendorHomePage()),
-          (route) => false, // 移除所有旧页面
+          (route) => false,
         );
       }
     } catch (e) {
@@ -196,6 +201,36 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
     }
   }
 
+  // --- (新增) 导航到地图并获取地址的函数 ---
+  Future<void> _navigateToMapPage() async {
+    try {
+      // 1. 导航到 MapPage 并等待结果
+      // MapPage 会返回一个 Map<String, dynamic>
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const MapPage()),
+      );
+
+      // 2. 检查结果并更新 controller
+      if (result != null && result is Map<String, dynamic>) {
+        final String address = result['address'] ?? 'No address selected';
+        // final double lat = result['lat']; // 你也可以保存纬度
+        // final double lng = result['lng']; // 你也可以保存经度
+
+        setState(() {
+          _storeAddressController.text = address;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error navigating to map: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open map: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -204,32 +239,38 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
         title: const Text('Vendor Registration'),
         backgroundColor: kAppBackgroundColor,
         leading: IconButton(
-          // 添加返回按钮
           icon: const Icon(Icons.arrow_back, color: kTextColor),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(color: kPrimaryActionColor))
           : Stepper(
               currentStep: _currentStep,
               onStepTapped: (step) => setState(() => _currentStep = step),
               onStepContinue: () {
                 bool isLastStep = _currentStep == 2;
-                // 检查当前步骤的表单是否验证通过
                 bool isCurrentStepValid = true;
                 if (_currentStep == 0) {
                   isCurrentStepValid = _step1Key.currentState!.validate();
                 } else if (_currentStep == 1) {
                   isCurrentStepValid = _step2Key.currentState!.validate();
+                  // --- (新增) 额外检查类型 ---
+                  if (_selectedVendorType == null) {
+                    isCurrentStepValid = false;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Please select a vendor type'),
+                          backgroundColor: kPrimaryActionColor),
+                    );
+                  }
                 }
 
                 if (isCurrentStepValid) {
                   if (isLastStep) {
-                    // 如果是最后一步，执行提交
                     _submitRegistration();
                   } else {
-                    // 否则，前进到下一步
                     setState(() => _currentStep += 1);
                   }
                 }
@@ -238,16 +279,12 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
                 if (_currentStep > 0) {
                   setState(() => _currentStep -= 1);
                 } else {
-                  // 如果在第一步按 "Cancel"，则返回登录页
                   Navigator.of(context).pop();
                 }
               },
               steps: [
-                // --- 步骤 1: 账户信息 (Figure 23) ---
                 _buildAccountStep(),
-                // --- 步骤 2: 店铺详情 (你要求的新增功能) ---
-                _buildStoreDetailsStep(),
-                // --- 步骤 3: 文件上传 (Figure 24) ---
+                _buildStoreDetailsStep(), // <-- (修改)
                 _buildDocumentsStep(),
               ],
             ),
@@ -264,8 +301,6 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
         child: Column(
           children: [
             _buildTextField(_fullNameController, 'Full Name', Icons.person),
-
-            // --- 2. (已修复) 更新调用方式 ---
             _buildTextField(
               _emailController,
               'Email',
@@ -284,7 +319,6 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
               Icons.lock,
               obscureText: true,
               validator: (value) {
-                // 'validator' 现在是命名参数，可以正常工作
                 if (value != _passwordController.text) {
                   return 'Passwords do not match';
                 }
@@ -297,7 +331,7 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
     );
   }
 
-  // --- (辅助) 步骤 2: 店铺详情表单 ---
+  // --- (辅助) 步骤 2: 店铺详情表单 (已修改) ---
   Step _buildStoreDetailsStep() {
     return Step(
       title: const Text('Store Details'),
@@ -307,16 +341,27 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
         child: Column(
           children: [
             _buildTextField(_storeNameController, 'Store Name', Icons.store),
-            _buildTextField(
-                _storeAddressController, 'Store Address', Icons.location_on),
 
-            // --- 3. (已修复) 更新调用方式 ---
+            // --- (修改) ---
+            // 将 _buildTextField 替换为 _buildAddressPicker
+            _buildAddressPicker(
+              _storeAddressController,
+              'Store Address',
+              Icons.location_on,
+              _navigateToMapPage, // 传递导航函数
+            ),
+            // --- (结束修改) ---
+
             _buildTextField(
               _storePhoneController,
               'Store Phone (e.g., 012...)',
               Icons.phone,
               inputType: TextInputType.phone,
             ),
+            const SizedBox(height: 16),
+            // --- (新增) Vendor Type 选择器 ---
+            _buildVendorTypeSelector(),
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -332,7 +377,6 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
         key: _step3Key,
         child: Column(
           children: [
-            // 你要求的 "Business Photo"
             _buildImagePicker(
               'Business Photo (Required)',
               _businessPhoto,
@@ -341,7 +385,6 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
                 if (file != null) setState(() => _businessPhoto = file);
               },
             ),
-            // "Business License"
             _buildImagePicker(
               'Business License (Required)',
               _businessLicense,
@@ -350,7 +393,6 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
                 if (file != null) setState(() => _businessLicense = file);
               },
             ),
-            // "Halal Certificate"
             _buildImagePicker(
               'Halal Certificate (Optional)',
               _halalCertificate,
@@ -366,7 +408,6 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
   }
 
   // --- (辅助) 可重用的文本输入框 ---
-  // --- 1. (已修复) 定义：将可选参数放入 {} 中 ---
   Widget _buildTextField(
     TextEditingController controller,
     String label,
@@ -383,7 +424,7 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
         keyboardType: inputType,
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: Icon(icon),
+          prefixIcon: Icon(icon, color: kTextColor.withOpacity(0.7)),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           filled: true,
           fillColor: kCardColor,
@@ -399,23 +440,119 @@ class _VendorRegistrationPageState extends State<VendorRegistrationPage> {
     );
   }
 
+  // --- (新增) 用于地址选择的 Widget ---
+  // (这个 widget 模仿了 _buildTextField，但是是只读的，并且有 onTap)
+  Widget _buildAddressPicker(
+    TextEditingController controller,
+    String label,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: GestureDetector(
+        // 1. 用 GestureDetector 包裹
+        onTap: onTap, // 2. 触发 onTap
+        child: AbsorbPointer(
+          // 3. 阻止 TextFormFielld 的内部点击
+          child: TextFormField(
+            controller: controller,
+            readOnly: true, // 4. 设为只读
+            decoration: InputDecoration(
+              labelText: label,
+              hintText: 'Tap to choose location', // 提示
+              prefixIcon: Icon(icon, color: kTextColor.withOpacity(0.7)),
+              // (可选) 添加一个地图图标
+              suffixIcon:
+                  const Icon(Icons.map_outlined, color: kPrimaryActionColor),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: kCardColor,
+            ),
+            // 验证器仍然会检查 _storeAddressController 是否为空
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return '$label is required';
+              }
+              return null;
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   // --- (辅助) 可重用的图片选择器 ---
   Widget _buildImagePicker(String label, File? file, VoidCallback onPressed) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Container(
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
+          border: Border.all(color: Colors.grey.withOpacity(0.5)),
           borderRadius: BorderRadius.circular(12),
+          color: kCardColor,
         ),
         child: ListTile(
           leading: Icon(file != null ? Icons.check_circle : Icons.upload_file,
-              color: file != null ? kSecondaryAccentColor : Colors.grey),
-          title: Text(file != null ? 'Image Selected' : label),
-          subtitle: file != null ? Text(file.path.split('/').last) : null,
+              color: file != null ? kCategoryColor : Colors.grey),
+          title: Text(file != null ? file.path.split('/').last : label,
+              style: TextStyle(
+                  fontSize: 14,
+                  color: file != null ? kTextColor : Colors.grey.shade700)),
           onTap: onPressed,
         ),
       ),
+    );
+  }
+
+  // --- (新增) Vendor Type 选择器 Widget ---
+  Widget _buildVendorTypeSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 12.0, bottom: 8.0),
+          child: Text(
+            'Vendor Type (Required)',
+            style: TextStyle(fontSize: 14, color: kTextColor),
+          ),
+        ),
+        SegmentedButton<String>(
+          segments: const <ButtonSegment<String>>[
+            ButtonSegment<String>(
+              value: 'Blindbox',
+              label: Text('Blindbox'),
+              icon: Icon(Icons.card_giftcard_outlined),
+            ),
+            ButtonSegment<String>(
+              value: 'Grocery',
+              label: Text('Grocery'),
+              icon: Icon(Icons.shopping_cart_outlined),
+            ),
+          ],
+          selected: _selectedVendorType != null
+              ? <String>{_selectedVendorType!}
+              : <String>{},
+          onSelectionChanged: (Set<String> newSelection) {
+            setState(() {
+              _selectedVendorType = newSelection.first;
+            });
+          },
+
+          // --- (FIX) 添加这一行 ---
+          emptySelectionAllowed: true,
+          // --- (FIX) ---
+
+          style: SegmentedButton.styleFrom(
+            backgroundColor: kCardColor,
+            foregroundColor: kTextColor.withOpacity(0.7),
+            selectedForegroundColor: kPrimaryActionColor,
+            selectedBackgroundColor: kPrimaryActionColor.withOpacity(0.1),
+            side: BorderSide(color: Colors.grey.withOpacity(0.5)),
+          ),
+        ),
+      ],
     );
   }
 }

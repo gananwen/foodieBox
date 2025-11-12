@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
-import '../../util/styles.dart'; // Using your team's styles file
+import '../../util/styles.dart';
 
-// --- 1. 导入你所有的主页面 ---
+// --- 1. 导入所需文件 ---
 import 'product_page.dart';
 import 'orders_page.dart';
 import 'marketing_page.dart';
-import 'more_page.dart'; // <-- 1. 导入新的 'more_page.dart'
+import 'more_page.dart';
+import '../../repositories/vendor_data_repository.dart'; // <-- 导入 Repository
+import '../../models/user.dart'; // <-- 导入 Models
+import '../../models/vendor.dart'; // <-- 导入 Models
 
-// --- 2. 移除 'SettingsPage' 占位符 ---
-// (它现在被 'more_page.dart' 取代了)
-// ------------------------------------------------------------------------
-
-// --- Vendor Dashboard Page (Figure 25) ---
 class VendorHomePage extends StatefulWidget {
   const VendorHomePage({super.key});
 
@@ -21,14 +19,30 @@ class VendorHomePage extends StatefulWidget {
 
 class _VendorHomePageState extends State<VendorHomePage> {
   int _currentIndex = 0;
+  // --- 2. 为 FutureBuilder 创建 Repository 实例和 Future ---
+  final VendorDataRepository _repo = VendorDataRepository();
+  late Future<VendorDataBundle> _dataFuture;
+
+  // --- 3. 在 initState 中加载数据 ---
+  @override
+  void initState() {
+    super.initState();
+    _dataFuture = _repo.getVendorData();
+  }
+
+  // --- (新增) 重新加载数据的函数 ---
+  // 当我们从编辑页面返回时，我们将调用它
+  void _reloadData() {
+    setState(() {
+      _dataFuture = _repo.getVendorData();
+    });
+  }
 
   void _goToDashboard() {
     setState(() {
       _currentIndex = 0;
     });
   }
-
-  late final List<Widget> _pages;
 
   void _onTabTapped(int index) {
     setState(() {
@@ -37,35 +51,59 @@ class _VendorHomePageState extends State<VendorHomePage> {
   }
 
   @override
-  void initState() {
-    super.initState();
-
-    _pages = [
-      // 0. Dashboard - 把 _onTabTapped 传递给它
-      VendorHomePageContent(onTabTapped: _onTabTapped),
-      // 1. Product - 把 _goToDashboard 传递给它
-      ProductPage(onBackToDashboard: _goToDashboard),
-      // 2. Promotions
-      MarketingPage(onBackToDashboard: _goToDashboard),
-      // 3. Orders
-      OrdersPage(onBackToDashboard: _goToDashboard),
-      // 4. More (Settings) <-- 3. 使用新的 MorePage
-      MorePage(onBackToDashboard: _goToDashboard),
-    ];
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kAppBackgroundColor, // FEFFE1
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
+      backgroundColor: kAppBackgroundColor,
+      // --- 4. 使用 FutureBuilder 包装你的 body ---
+      body: FutureBuilder<VendorDataBundle>(
+        future: _dataFuture,
+        builder: (context, snapshot) {
+          // --- 状态 A: 正在加载 ---
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+                child: CircularProgressIndicator(color: kPrimaryActionColor));
+          }
+          // --- 状态 B: 出错 ---
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Text('Error loading data: ${snapshot.error}',
+                    style: const TextStyle(color: kPrimaryActionColor)),
+              ),
+            );
+          }
+          // --- 状态 C: 成功 ---
+          if (snapshot.hasData) {
+            final bundle = snapshot.data!; // 这就是我们的数据！
+
+            // 5. 将 'bundle' 传递给子页面
+            final List<Widget> pages = [
+              VendorHomePageContent(onTabTapped: _onTabTapped, bundle: bundle),
+              ProductPage(onBackToDashboard: _goToDashboard),
+              MarketingPage(onBackToDashboard: _goToDashboard),
+              OrdersPage(onBackToDashboard: _goToDashboard),
+              MorePage(
+                onBackToDashboard: _goToDashboard,
+                bundle: bundle,
+                onProfileUpdated: _reloadData, // <-- 传递刷新函数
+              ),
+            ];
+
+            // 6. 返回你的 IndexedStack
+            return IndexedStack(
+              index: _currentIndex,
+              children: pages,
+            );
+          }
+          // --- 默认状态 (不应该到这里) ---
+          return const Center(child: Text('Something went wrong.'));
+        },
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _currentIndex,
-        backgroundColor: kCardColor, // White
+        backgroundColor: kCardColor,
         selectedItemColor:
             _currentIndex == 2 ? kPrimaryActionColor : kTextColor,
         unselectedItemColor: kTextColor.withAlpha(128),
@@ -98,15 +136,13 @@ class _VendorHomePageState extends State<VendorHomePage> {
   }
 }
 
-// --- Separate Widget for Dashboard Content (Figure 25) ---
+// --- (已修改) Dashboard 子 Widget ---
 class VendorHomePageContent extends StatelessWidget {
   final Function(int) onTabTapped;
-  const VendorHomePageContent({super.key, required this.onTabTapped});
+  final VendorDataBundle bundle; // <-- 1. 接收数据
+  const VendorHomePageContent(
+      {super.key, required this.onTabTapped, required this.bundle});
 
-  // (你所有的 _buildStatCard, _buildActionBlock, 和 build 方法)
-  // ... (为了简洁，这里省略，保持你原来的代码不变) ...
-
-  // Reusable widget to display a single quick stat card
   Widget _buildStatCard(String title, dynamic value) {
     int todaysOrders = 25;
     double todaysSales = 300.00;
@@ -143,7 +179,6 @@ class VendorHomePageContent extends StatelessWidget {
     );
   }
 
-  // Reusable widget for action buttons (Product/Orders)
   Widget _buildActionBlock(String actionType, String description, IconData icon,
       VoidCallback onTap) {
     return GestureDetector(
@@ -203,8 +238,12 @@ class VendorHomePageContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String vendorName = "Afsar Hossen";
-    String vendorId = "1234";
+    // --- 2. 使用真实数据 ---
+    final user = bundle.user;
+    final vendor = bundle.vendor;
+    final String vendorName = "${user.firstName} ${user.lastName}";
+    final String vendorId = vendor.uid;
+    final String photoUrl = vendor.businessPhotoUrl;
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -212,59 +251,58 @@ class VendorHomePageContent extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            // --- Header/Profile Section ---
+            // --- 3. (已修改) Header/Profile Section ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const CircleAvatar(
-                      radius: 30,
-                      backgroundColor: kSecondaryAccentColor,
-                      child: Icon(Icons.person, size: 40, color: kTextColor),
-                    ),
-                    const SizedBox(width: 12.0),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                Expanded(
+                  child: Row(
+                    children: [
+                      // --- (已修改) 使用真实图片 ---
+                      CircleAvatar(
+                        radius: 30,
+                        backgroundColor: kSecondaryAccentColor,
+                        backgroundImage:
+                            photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+                        child: photoUrl.isEmpty
+                            ? const Icon(Icons.store,
+                                size: 40, color: kTextColor)
+                            : null,
+                      ),
+                      const SizedBox(width: 12.0),
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // --- (已修改) 使用真实姓名 ---
                             Text(
                               vendorName,
                               style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                   color: kTextColor),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(width: 4),
-                            Icon(Icons.edit_outlined,
-                                size: 18, color: kTextColor.withAlpha(179)),
+                            Text(
+                              'Vendor ID: ${vendorId.substring(0, 6)}...', // 缩短 ID
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  color: kTextColor.withAlpha(153)),
+                            ),
                           ],
                         ),
-                        Text(
-                          'Vendor ID: $vendorId',
-                          style: TextStyle(
-                              fontSize: 14, color: kTextColor.withAlpha(153)),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
-                // --- 2. 修复 Settings 按钮 ---
                 IconButton(
                   icon:
                       const Icon(Icons.settings, size: 28.0, color: kTextColor),
-                  onPressed: () {
-                    // "More" 按钮在索引 4
-                    onTabTapped(4);
-                  },
+                  onPressed: () => onTabTapped(4), // 跳转到 "More"
                 ),
               ],
             ),
-
             const SizedBox(height: 30.0),
-
-            // --- Quick Stats Section ---
             const Text(
               'Quick Stats',
               style: TextStyle(
@@ -282,35 +320,24 @@ class VendorHomePageContent extends StatelessWidget {
                 _buildStatCard('Today\'s Sales', 0.0),
               ],
             ),
-
             const SizedBox(height: 30.0),
-
-            // --- Actions Section ---
             const Text(
               'Actions',
               style: TextStyle(
                   fontSize: 20, fontWeight: FontWeight.w600, color: kTextColor),
             ),
             const SizedBox(height: 16.0),
-            // --- 3. 修复 Product 按钮 ---
             _buildActionBlock(
               'Product',
               'Expand your business',
               Icons.inventory_2_outlined,
-              () {
-                // "Product" 按钮在索引 1
-                onTabTapped(1);
-              },
+              () => onTabTapped(1),
             ),
-            // --- 4. 修复 Orders 按钮 ---
             _buildActionBlock(
               'Orders',
               'Manage incoming requests',
               Icons.receipt_long_outlined,
-              () {
-                // "Orders" 按钮在索引 3
-                onTabTapped(3);
-              },
+              () => onTabTapped(3),
             ),
           ],
         ),
