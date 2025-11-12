@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../util/styles.dart';
 import 'notifications_page.dart';
@@ -555,7 +556,9 @@ BoxDecoration _chartBoxDecoration() {
   );
 }
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(); // 👈 Required before using Firebase
   runApp(MaterialApp(
     debugShowCheckedModeBanner: false,
     home: const AdminHomePage(),
