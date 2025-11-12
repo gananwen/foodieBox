@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart'; 
 import 'package:foodiebox/screens/users/main_page.dart';
 import 'package:foodiebox/screens/users/order_tracking_page.dart';
 
@@ -39,32 +39,40 @@ class OrderConfirmationPage extends StatelessWidget {
           children: [
             const Icon(Icons.check_circle, color: Colors.green, size: 80),
             const SizedBox(height: 10),
-            const Text('Your Order has been accepted',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Your Order has been accepted',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 6),
-            const Text('Your items have been placed and are on their way to being processed',
-                textAlign: TextAlign.center, style: TextStyle(fontSize: 14)),
+            const Text(
+              'Your items have been placed and are on their way to being processed',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14),
+            ),
             const SizedBox(height: 20),
+
+            // ✅ Replaced GoogleMap with address card
             Container(
-              height: 160,
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.amber, width: 1.5),
+                color: Colors.grey.shade100,
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: GoogleMap(
-                  initialCameraPosition: CameraPosition(target: location, zoom: 15),
-                  markers: {
-                    Marker(markerId: const MarkerId('delivery'), position: location),
-                  },
-                  zoomControlsEnabled: false,
-                  myLocationButtonEnabled: false,
-                ),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on, color: Colors.red, size: 28),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      address,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 10),
-            Text(address, style: const TextStyle(fontSize: 14)),
+
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(16),
@@ -79,7 +87,8 @@ class OrderConfirmationPage extends StatelessWidget {
                   const SizedBox(height: 10),
                   Text('Total: RM${total.toStringAsFixed(2)}'),
                   if (promoLabel.isNotEmpty)
-                    Text('Promo Applied: $promoLabel', style: const TextStyle(color: Colors.green)),
+                    Text('Promo Applied: $promoLabel',
+                        style: const TextStyle(color: Colors.green)),
                 ],
               ),
             ),
@@ -88,12 +97,14 @@ class OrderConfirmationPage extends StatelessWidget {
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => OrderTrackingPage(orderId: orderId),
-                      ),
-                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => OrderTrackingPage(orderId: orderId),
+                        ),
+                      );
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.amber,
                       foregroundColor: Colors.black,
@@ -106,11 +117,13 @@ class OrderConfirmationPage extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (context) => const MainPage()),
-                      (route) => false,
-                    ),
+                    onPressed: () {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (context) => const MainPage()),
+                        (route) => false,
+                      );
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey.shade300,
                       foregroundColor: Colors.black,
