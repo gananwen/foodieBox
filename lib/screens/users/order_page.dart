@@ -8,7 +8,7 @@ class OrdersPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BasePage(
-      currentIndex: 4, // index for Orders
+      currentIndex: 3, // index for Orders
       child: Column(
         children: [
           const SizedBox(height: 50),

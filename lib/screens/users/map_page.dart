@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import '../../util/styles.dart'; // Import your styles
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../../api/api_config.dart';
+import '../../util/styles.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -13,76 +16,49 @@ class MapPage extends StatefulWidget {
 
 class _MapPageState extends State<MapPage> {
   GoogleMapController? mapController;
-
-  // Default to Kuala Lumpur, Malaysia
   LatLng _currentMapCenter = const LatLng(3.1390, 101.6869);
-  String _currentAddress = "Kuala Lumpur, Malaysia";
+  String _currentAddress = "Loading...";
+  bool _locationReady = false;
 
-  Position? _currentPosition;
+  final TextEditingController _searchController = TextEditingController();
+  List<dynamic> _suggestions = [];
 
   @override
   void initState() {
     super.initState();
     _getUserCurrentLocation();
+    _searchController.addListener(_onSearchChanged);
   }
 
   Future<void> _getUserCurrentLocation() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return;
+    final permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) return;
 
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) return;
-      }
-      if (permission == LocationPermission.deniedForever) return;
+    final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    final currentLatLng = LatLng(position.latitude, position.longitude);
 
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+    setState(() {
+      _currentMapCenter = currentLatLng;
+      _locationReady = true;
+    });
 
-      LatLng currentLatLng = LatLng(position.latitude, position.longitude);
-
-      setState(() {
-        _currentMapCenter = currentLatLng;
-        _currentPosition = position;
-      });
-
-      await _getAddressFromLatLng(currentLatLng);
-
-      mapController?.animateCamera(
-        CameraUpdate.newLatLngZoom(_currentMapCenter, 17),
-      );
-    } catch (e) {
-      setState(() {
-        _currentAddress = "Kuala Lumpur, Malaysia";
-      });
-    }
+    await _getAddressFromLatLng(currentLatLng);
   }
 
   Future<void> _getAddressFromLatLng(LatLng position) async {
     try {
-      List<Placemark> placemarks =
-          await placemarkFromCoordinates(position.latitude, position.longitude);
-
-      Placemark place = placemarks.first;
-
-      String address =
-          "${place.street}, ${place.locality}, ${place.administrativeArea}, ${place.country}";
-
-      setState(() {
-        _currentAddress = address.isEmpty ? "Unknown Location" : address;
-      });
-    } catch (e) {
-      setState(() {
-        _currentAddress = "Unable to get address.";
-      });
+      final placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
+      final place = placemarks.first;
+      final address = "${place.street}, ${place.locality}, ${place.administrativeArea}, ${place.country}";
+      setState(() => _currentAddress = address.isEmpty ? "Unknown Location" : address);
+    } catch (_) {
+      setState(() => _currentAddress = "Unable to get address.");
     }
   }
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
+    mapController?.animateCamera(CameraUpdate.newLatLngZoom(_currentMapCenter, 17));
   }
 
   void _onCameraMove(CameraPosition position) {
@@ -101,86 +77,121 @@ class _MapPageState extends State<MapPage> {
     });
   }
 
+  void _onSearchChanged() async {
+    final input = _searchController.text;
+    if (input.length < 3) {
+      setState(() => _suggestions = []);
+      return;
+    }
+
+    final url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$input&key=${ApiConfig.googleMapsApiKey}&components=country:my';
+    final response = await http.get(Uri.parse(url));
+    final data = json.decode(response.body);
+
+    if (data['status'] == 'OK') {
+      setState(() => _suggestions = data['predictions']);
+    } else {
+      setState(() => _suggestions = []);
+    }
+  }
+
+  void _selectPlace(String placeId) async {
+    final url = 'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=${ApiConfig.googleMapsApiKey}';
+    final response = await http.get(Uri.parse(url));
+    final data = json.decode(response.body);
+
+    final loc = data['result']['geometry']['location'];
+    final addr = data['result']['formatted_address'];
+    final newCenter = LatLng(loc['lat'], loc['lng']);
+
+    setState(() {
+      _currentMapCenter = newCenter;
+      _currentAddress = addr;
+      _searchController.text = addr;
+      _suggestions = [];
+    });
+
+    mapController?.animateCamera(CameraUpdate.newLatLngZoom(newCenter, 17));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Choose Your Location'),
-        // **THEME CHANGE:** Using kPrimaryActionColor for the app bar
-        backgroundColor: kPrimaryActionColor, 
-      ),
-      body: Stack(
-        children: [
-          GoogleMap(
-            initialCameraPosition:
-                CameraPosition(target: _currentMapCenter, zoom: 17.0),
-            mapType: MapType.normal,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: true,
-            zoomControlsEnabled: false,
-            onMapCreated: _onMapCreated,
-            onCameraMove: _onCameraMove,
-            onCameraIdle: _onCameraIdle,
-          ),
-
-          // Center marker
-          Center(
-            // **THEME CHANGE:** Using kPrimaryActionColor for the marker
-            child:
-                const Icon(Icons.location_on, size: 40, color: kPrimaryActionColor),
-          ),
-
-          // Address display on top
-          Align(
-            alignment: Alignment.topCenter,
-            child: Container(
-              margin: const EdgeInsets.only(top: 20, left: 20, right: 20),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: kCardColor,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: const [
-                  BoxShadow(color: Colors.black12, blurRadius: 4)
-                ],
-              ),
-              child: Text(
-                _currentAddress,
-                textAlign: TextAlign.center,
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-            ),
-          ),
-
-          // Confirm button
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 40),
-              child: ElevatedButton(
-                onPressed: _confirmLocation,
-                style: ElevatedButton.styleFrom(
-                  // **THEME CHANGE:** Using kPrimaryActionColor for button background
-                  backgroundColor: kPrimaryActionColor, 
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 60, vertical: 18),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  elevation: 4,
+      appBar: AppBar(title: const Text('Choose Your Location'), backgroundColor: kPrimaryActionColor),
+      body: !_locationReady
+          ? const Center(child: CircularProgressIndicator())
+          : Stack(
+              children: [
+                GoogleMap(
+                  initialCameraPosition: CameraPosition(target: _currentMapCenter, zoom: 17.0),
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: true,
+                  zoomControlsEnabled: false,
+                  onMapCreated: _onMapCreated,
+                  onCameraMove: _onCameraMove,
+                  onCameraIdle: _onCameraIdle,
                 ),
-                child: const Text(
-                  'Confirm Location',
-                  style: TextStyle(
-                      fontSize: 20,
-                      // **THEME CHANGE:** Using kCardColor (White) for contrast text on dark button
-                      color: kCardColor, 
-                      fontWeight: FontWeight.bold),
+                const Center(child: Icon(Icons.location_on, size: 40, color: kPrimaryActionColor)),
+                Positioned(
+                  top: 20,
+                  left: 20,
+                  right: 20,
+                  child: Column(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)]),
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: const InputDecoration(hintText: 'Search location', prefixIcon: Icon(Icons.search), border: InputBorder.none, contentPadding: EdgeInsets.all(12)),
+                        ),
+                      ),
+                      if (_suggestions.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)]),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: _suggestions.length,
+                            itemBuilder: (context, index) {
+                              final s = _suggestions[index];
+                              return ListTile(
+                                leading: const Icon(Icons.location_on),
+                                title: Text(s['description']),
+                                onTap: () => _selectPlace(s['place_id']),
+                              );
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 100, left: 20, right: 20),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: kCardColor, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)]),
+                    child: Text(_currentAddress, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 40),
+                    child: ElevatedButton(
+                      onPressed: _confirmLocation,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kPrimaryActionColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 18),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 4,
+                      ),
+                      child: const Text('Confirm Location', style: TextStyle(fontSize: 20, color: kCardColor, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }

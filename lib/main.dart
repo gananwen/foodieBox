@@ -5,7 +5,7 @@ import 'screens/auth_wrapper.dart';
 import 'screens/auth/user_login.dart'; 
 import 'screens/users/main_page.dart'; 
 import 'screens/onboarding/onboarding_screen.dart';
-import 'screens/users/checkout_page.dart';
+import 'screens/users/order_confirmation_page.dart';
 import 'screens/auth/vendor_login.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -47,7 +47,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const VendorLoginPage(), 
+      home: const MainPage(), 
       debugShowCheckedModeBanner: false,
     );
   }

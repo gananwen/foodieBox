@@ -17,7 +17,7 @@ dependencies:
 
   # --- UI & Core Utility ---
   cupertino_icons: ^1.0.6
-  http: ^1.1.0
+  http: ^0.13.5
   fl_chart: ^0.69.0
   pdf: ^3.11.0
   printing: ^5.10.0
@@ -41,6 +41,7 @@ dependencies:
   flutter_animate: ^4.5.2
   shared_preferences: ^2.5.3
   flutter_launcher_icons: ^0.14.4
+  google_place: ^0.4.7
 
 dev_dependencies:
   flutter_test:

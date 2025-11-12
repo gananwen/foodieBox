@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import '../util/styles.dart';
 import '../screens/users/main_page.dart';
 import '../screens/users/grocery_page.dart';
-import '../screens/users/profile_page.dart';
 import '../screens/users/blind_box.dart';
-import '../screens/users/browse_page.dart';
 import '../screens/users/order_page.dart';
 
 class BasePage extends StatefulWidget {
@@ -33,13 +31,7 @@ class _BasePageState extends State<BasePage> {
         target = const GroceryPage();
         break;
       case 3:
-        target = const BrowsePage();
-        break;
-      case 4:
         target = const OrdersPage();
-        break;
-      case 5:
-        target = const ProfilePage();
         break;
       default:
         target = const MainPage();
@@ -56,9 +48,7 @@ class _BasePageState extends State<BasePage> {
     return Scaffold(
       backgroundColor: kCardColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: widget.child,
-        ),
+        child: widget.child,
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: widget.currentIndex,
@@ -73,10 +63,8 @@ class _BasePageState extends State<BasePage> {
               icon: Icon(Icons.card_giftcard), label: 'BlindBox'),
           BottomNavigationBarItem(
               icon: Icon(Icons.storefront), label: 'Grocery'),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Browse'),
           BottomNavigationBarItem(
               icon: Icon(Icons.receipt_long), label: 'Orders'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
     );

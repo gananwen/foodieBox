@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geocoding/geocoding.dart'; 
+import 'package:geocoding/geocoding.dart';
 import '../../users/map_page.dart';
 
 class DeliveryAddressPage extends StatefulWidget {
@@ -17,7 +17,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   final _addressController = TextEditingController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _detailsController = TextEditingController(); 
+  final _detailsController = TextEditingController();
 
   final List<String> _labels = ['Home', 'Office', 'Other'];
   String _selectedLabel = 'Home';
@@ -26,10 +26,10 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   double? lng;
 
   GoogleMapController? _mapController;
-  
+
   // State for conceptual autocomplete results (would be filled by an API)
   List<String> _autocompleteSuggestions = [];
-  
+
   // Default camera position
   static const LatLng _initialCameraPosition = LatLng(3.1390, 101.6869);
 
@@ -37,7 +37,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   void initState() {
     super.initState();
     // Listen to changes for potential autocomplete trigger
-    _addressController.addListener(_onAddressChanged); 
+    _addressController.addListener(_onAddressChanged);
   }
 
   @override
@@ -49,10 +49,10 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     _detailsController.dispose();
     super.dispose();
   }
-  
+
   // --- Autocomplete/Suggestion Stub ---
   void _onAddressChanged() {
-    // In a real app, this method would trigger an API call 
+    // In a real app, this method would trigger an API call
     // to Google Places or similar service when text length > 3.
     // We update the state to conceptually show suggestions.
     final input = _addressController.text;
@@ -64,7 +64,9 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
           '${input}th Street, New York',
           '${input}0 Jalan Raja, Kuala Lumpur',
           '${input} A venue, Singapore',
-        ].where((s) => s.toLowerCase().startsWith(input.toLowerCase())).toList();
+        ]
+            .where((s) => s.toLowerCase().startsWith(input.toLowerCase()))
+            .toList();
       });
     } else {
       setState(() {
@@ -86,7 +88,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   Future<void> _geocodeAddress() async {
     final address = _addressController.text.trim();
     if (address.isEmpty) return;
-    
+
     // Clear suggestions before geocoding
     setState(() => _autocompleteSuggestions = []);
 
@@ -96,11 +98,11 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       );
 
       List<Location> locations = await locationFromAddress(address);
-      
+
       if (locations.isNotEmpty) {
         final newLat = locations.first.latitude;
         final newLng = locations.first.longitude;
-        
+
         setState(() {
           lat = newLat;
           lng = newLng;
@@ -109,8 +111,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         _mapController?.animateCamera(
           CameraUpdate.newLatLngZoom(LatLng(newLat, newLng), 16),
         );
-         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location found! Map updated.')),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location found! Map updated.')),
         );
       } else {
         setState(() {
@@ -118,7 +120,9 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
           lng = null;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Address not found. Please check spelling or use the map picker.')),
+          const SnackBar(
+              content: Text(
+                  'Address not found. Please check spelling or use the map picker.')),
         );
       }
     } catch (e) {
@@ -134,19 +138,19 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       context,
       MaterialPageRoute(builder: (context) => const MapPage()),
     );
-    
+
     if (result != null && result is Map<String, dynamic>) {
       // 1. Fill the address field with the chosen location from the map.
-      _addressController.text = result['address']; 
-      
+      _addressController.text = result['address'];
+
       // 2. Store coordinates
       lat = (result['lat'] as num?)?.toDouble();
       lng = (result['lng'] as num?)?.toDouble();
-      
+
       setState(() {
-         _autocompleteSuggestions = []; // Clear suggestions after map pick
+        _autocompleteSuggestions = []; // Clear suggestions after map pick
       });
-      
+
       // 3. Update map preview
       if (_mapController != null && lat != null && lng != null) {
         _mapController!.animateCamera(
@@ -155,7 +159,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       }
     }
   }
-  
+
   // --- Save/Edit/Delete/Reset methods (Unchanged from previous revision) ---
   Future<void> _saveAddress() async {
     final userId = FirebaseAuth.instance.currentUser!.uid;
@@ -164,9 +168,15 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     final phone = _phoneController.text.trim();
     final details = _detailsController.text.trim();
 
-    if (address.isEmpty || lat == null || lng == null || name.isEmpty || phone.isEmpty) {
+    if (address.isEmpty ||
+        lat == null ||
+        lng == null ||
+        name.isEmpty ||
+        phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please ensure location is set and contact info is complete.')),
+        const SnackBar(
+            content: Text(
+                'Please ensure location is set and contact info is complete.')),
       );
       return;
     }
@@ -199,12 +209,14 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(editingId != null ? 'Address updated' : 'Address added')),
+        SnackBar(
+            content:
+                Text(editingId != null ? 'Address updated' : 'Address added')),
       );
 
       _resetForm();
     } catch (e) {
-       ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to save address: $e')),
       );
     }
@@ -218,11 +230,11 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       _phoneController.text = data['contactPhone'] ?? '';
       _detailsController.text = data['details'] ?? '';
       _selectedLabel = data['label'] ?? 'Home';
-      
+
       lat = (data['lat'] as num?)?.toDouble();
       lng = (data['lng'] as num?)?.toDouble();
     });
-    
+
     if (lat != null && lng != null) {
       _mapController?.animateCamera(
         CameraUpdate.newLatLngZoom(LatLng(lat!, lng!), 16),
@@ -243,7 +255,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       _autocompleteSuggestions = [];
     });
     _mapController?.animateCamera(
-        CameraUpdate.newLatLngZoom(_initialCameraPosition, 10),
+      CameraUpdate.newLatLngZoom(_initialCameraPosition, 10),
     );
   }
 
@@ -255,7 +267,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         .collection('addresses')
         .doc(docId)
         .delete();
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address deleted')));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Address deleted')));
   }
 
   void _goToCheckout() {
@@ -263,8 +276,9 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   }
 
   // --- UI Helper Functions ---
-  
-  InputDecoration _inputDecoration(String labelText, {String? hintText, Widget? suffixIcon}) {
+
+  InputDecoration _inputDecoration(String labelText,
+      {String? hintText, Widget? suffixIcon}) {
     return InputDecoration(
       labelText: labelText,
       hintText: hintText,
@@ -287,7 +301,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   }
 
   // --- Widget Build ---
-  
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -296,7 +310,9 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     }
     final userId = user.uid;
 
-    final LatLng mapTarget = (lat != null && lng != null) ? LatLng(lat!, lng!) : _initialCameraPosition;
+    final LatLng mapTarget = (lat != null && lng != null)
+        ? LatLng(lat!, lng!)
+        : _initialCameraPosition;
     final Set<Marker> markers = (lat != null && lng != null)
         ? {Marker(markerId: const MarkerId('selected'), position: mapTarget)}
         : {};
@@ -310,7 +326,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Delivery Address', style: TextStyle(color: Colors.black)),
+        title: const Text('Delivery Address',
+            style: TextStyle(color: Colors.black)),
         centerTitle: true,
       ),
       floatingActionButton: FloatingActionButton(
@@ -345,7 +362,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
               ),
             ),
           ),
-          
+
           // --- Main Content (Scrollable Form and List) ---
           Expanded(
             child: Stack(
@@ -354,33 +371,37 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   children: [
                     const SizedBox(height: 10),
-                    
+
                     // 1. LOCATION SELECTION SECTION
-                    const Text('1. Set Location', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text('1. Set Location',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold)),
                     const Divider(),
-                    
+
                     // Address Label Dropdown
                     DropdownButtonFormField<String>(
                       value: _selectedLabel,
                       items: _labels.map((label) {
-                        return DropdownMenuItem(value: label, child: Text(label));
+                        return DropdownMenuItem(
+                            value: label, child: Text(label));
                       }).toList(),
-                      onChanged: (value) => setState(() => _selectedLabel = value ?? 'Home'),
+                      onChanged: (value) =>
+                          setState(() => _selectedLabel = value ?? 'Home'),
                       decoration: _inputDecoration('Address Label'),
                     ),
                     const SizedBox(height: 10),
-                    
+
                     // Address Field (Manual input with geocoding trigger)
                     TextField(
                       controller: _addressController,
                       // The main trigger for geocoding when user is done typing
-                      onSubmitted: (_) => _geocodeAddress(), 
+                      onSubmitted: (_) => _geocodeAddress(),
                       decoration: _inputDecoration(
-                        'Type your address', 
+                        'Type your address',
                         hintText: 'e.g. 16 Jalan Merah, Taman XYZ',
                         suffixIcon: IconButton(
                           icon: const Icon(Icons.search, color: Colors.amber),
-                          onPressed: _geocodeAddress, 
+                          onPressed: _geocodeAddress,
                         ),
                       ),
                     ),
@@ -390,32 +411,41 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                     ElevatedButton.icon(
                       onPressed: _openMapPicker,
                       icon: const Icon(Icons.map, color: Colors.white),
-                      label: Text(lat != null ? 'Re-select Location on Map' : 'Select Location on Map', style: const TextStyle(color: Colors.white)),
+                      label: Text(
+                          lat != null
+                              ? 'Re-select Location on Map'
+                              : 'Select Location on Map',
+                          style: const TextStyle(color: Colors.white)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.amber,
                         minimumSize: const Size.fromHeight(50),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
-                    if (lat != null) 
+                    if (lat != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 8.0),
                         child: Text(
                           'Location verified on map. Lat: ${lat!.toStringAsFixed(4)}, Lng: ${lng!.toStringAsFixed(4)}',
-                          style: const TextStyle(color: Colors.green, fontSize: 12),
+                          style: const TextStyle(
+                              color: Colors.green, fontSize: 12),
                           textAlign: TextAlign.center,
                         ),
                       ),
                     const SizedBox(height: 30),
 
                     // 2. CONTACT AND DETAILS SECTION
-                    const Text('2. Contact and Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text('2. Contact and Details',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold)),
                     const Divider(),
 
                     // Contact Name
                     TextField(
                       controller: _nameController,
-                      decoration: _inputDecoration('Contact Name', hintText: 'e.g. John Doe'),
+                      decoration: _inputDecoration('Contact Name',
+                          hintText: 'e.g. John Doe'),
                     ),
                     const SizedBox(height: 10),
 
@@ -423,14 +453,16 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                     TextField(
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
-                      decoration: _inputDecoration('Phone Number', hintText: 'e.g. 0123456789'),
+                      decoration: _inputDecoration('Phone Number',
+                          hintText: 'e.g. 0123456789'),
                     ),
                     const SizedBox(height: 10),
 
                     // Details (Level/Unit)
                     TextField(
                       controller: _detailsController,
-                      decoration: _inputDecoration('Address Details (Optional)', hintText: 'e.g. Level 3, Unit B-12'),
+                      decoration: _inputDecoration('Address Details (Optional)',
+                          hintText: 'e.g. Level 3, Unit B-12'),
                       maxLines: 2,
                     ),
                     const SizedBox(height: 20),
@@ -441,33 +473,47 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.amber,
                         minimumSize: const Size.fromHeight(50),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: Text(editingId != null ? 'Update Address' : 'Save New Address',
-                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      child: Text(
+                          editingId != null
+                              ? 'Update Address'
+                              : 'Save New Address',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold)),
                     ),
-                    if (editingId != null) 
+                    if (editingId != null)
                       TextButton(
-                        onPressed: _resetForm, 
-                        child: const Text('Cancel Edit', style: TextStyle(color: Colors.red)),
+                        onPressed: _resetForm,
+                        child: const Text('Cancel Edit',
+                            style: TextStyle(color: Colors.red)),
                       ),
                     const Divider(height: 40),
 
                     // --- Saved Addresses List (Section 3) ---
-                    const Text('3. Saved Addresses', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text('3. Saved Addresses',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 10),
-                    
+
                     StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance
                           .collection('users')
                           .doc(userId)
                           .collection('addresses')
-                          .orderBy('timestamp', descending: true) 
+                          .orderBy('timestamp', descending: true)
                           .snapshots(),
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text('No addresses saved yet.'));
-                        
+                        if (snapshot.connectionState == ConnectionState.waiting)
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+                          return const Center(
+                              child: Text('No addresses saved yet.'));
+
                         final docs = snapshot.data!.docs;
                         return Column(
                           children: docs.map((doc) {
@@ -477,41 +523,54 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                             final details = data['details'] ?? '';
                             final name = data['contactName'] ?? 'N/A';
                             final phone = data['contactPhone'] ?? 'N/A';
-                            
+
                             return Card(
                               margin: const EdgeInsets.symmetric(vertical: 6),
                               elevation: 2,
                               child: ListTile(
-                                leading: Icon(
-                                    label == 'Home' ? Icons.home : (label == 'Office' ? Icons.work : Icons.location_on),
-                                    color: Colors.amber),
-                                title: Text('$label - $name', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                subtitle: Text(
-                                    '$address\nDetails: $details\nPhone: $phone', 
-                                    style: const TextStyle(fontSize: 12, color: Colors.black54),
-                                    maxLines: 3, 
+                                  leading: Icon(
+                                      label == 'Home'
+                                          ? Icons.home
+                                          : (label == 'Office'
+                                              ? Icons.work
+                                              : Icons.location_on),
+                                      color: Colors.amber),
+                                  title: Text('$label - $name',
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold)),
+                                  subtitle: Text(
+                                    '$address\nDetails: $details\nPhone: $phone',
+                                    style: const TextStyle(
+                                        fontSize: 12, color: Colors.black54),
+                                    maxLines: 3,
                                     overflow: TextOverflow.ellipsis,
-                                ),
-                                isThreeLine: true,
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, color: Colors.amber, size: 20),
-                                      onPressed: () => _startEditing(doc.id, data),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
-                                      onPressed: () => _deleteAddress(doc.id),
-                                    ),
-                                  ],
-                                ),
-                                onTap: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Selected $label for delivery.')),
-                                  );
-                                },
-                              ),
+                                  ),
+                                  isThreeLine: true,
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit,
+                                            color: Colors.amber, size: 20),
+                                        onPressed: () =>
+                                            _startEditing(doc.id, data),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete,
+                                            color: Colors.redAccent, size: 20),
+                                        onPressed: () => _deleteAddress(doc.id),
+                                      ),
+                                    ],
+                                  ),
+                                  onTap: () {
+                                    Navigator.pop(context, {
+                                      'label': label,
+                                      'contactName': name,
+                                      'address': address,
+                                      'lat': data['lat'],
+                                      'lng': data['lng'],
+                                    });
+                                  }),
                             );
                           }).toList(),
                         );
@@ -519,7 +578,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                     ),
                   ],
                 ),
-                
+
                 // --- Autocomplete Suggestions Overlay ---
                 if (_autocompleteSuggestions.isNotEmpty)
                   Positioned(
@@ -542,8 +601,10 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                           itemBuilder: (context, index) {
                             final suggestion = _autocompleteSuggestions[index];
                             return ListTile(
-                              leading: const Icon(Icons.location_on, color: Colors.grey, size: 20),
-                              title: Text(suggestion, style: const TextStyle(fontSize: 14)),
+                              leading: const Icon(Icons.location_on,
+                                  color: Colors.grey, size: 20),
+                              title: Text(suggestion,
+                                  style: const TextStyle(fontSize: 14)),
                               onTap: () => _selectSuggestion(suggestion),
                             );
                           },

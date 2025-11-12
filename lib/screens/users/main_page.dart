@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import '../../util/styles.dart';
 import '../../widgets/base_page.dart';
 import 'map_page.dart';
-import 'blind_box.dart';
-import 'grocery_page.dart';
+import '../users/profile_page.dart';
 import 'filter_page.dart';
+import '../../api/api_config.dart';
+
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -22,7 +23,6 @@ class _MainPageState extends State<MainPage> {
       MaterialPageRoute(builder: (context) => const MapPage()),
     );
 
-    // Correctly handles the returned Map<String, dynamic>
     if (selectedLocation != null && selectedLocation is Map<String, dynamic>) {
       setState(() {
         _currentAddress = selectedLocation['address'] as String;
@@ -35,10 +35,11 @@ class _MainPageState extends State<MainPage> {
     return BasePage(
       currentIndex: 0,
       child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // --- Top Bar & Location ---
+            // --- Top Bar ---
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 50, 20, 10),
               child: Row(
@@ -75,6 +76,25 @@ class _MainPageState extends State<MainPage> {
                         color: kTextColor),
                     onPressed: () {},
                   ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const ProfilePage()),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        border:
+                            Border.all(color: kPrimaryActionColor, width: 2),
+                        shape: BoxShape.circle,
+                      ),
+                      child:
+                          const Icon(Icons.person_outline, color: kTextColor),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -94,13 +114,11 @@ class _MainPageState extends State<MainPage> {
                         filled: true,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                              color: kYellowMedium, width: 1.5), // Using kYellowMedium
+                          borderSide: const BorderSide(color: Colors.grey),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                              color: kYellowMedium, width: 1.5), // Using kYellowMedium
+                          borderSide: const BorderSide(color: Colors.grey),
                         ),
                         contentPadding:
                             const EdgeInsets.symmetric(vertical: 10),
@@ -110,7 +128,7 @@ class _MainPageState extends State<MainPage> {
                   const SizedBox(width: 10),
                   IconButton(
                     icon: const Icon(Icons.filter_list,
-                        color: kPrimaryActionColor), // Using kPrimaryActionColor
+                        color: kPrimaryActionColor),
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -123,94 +141,112 @@ class _MainPageState extends State<MainPage> {
               ),
             ),
 
-            // --- Sliding Promo Banner ---
-            SizedBox(
-              height: 160,
-              child: PageView.builder(
-                itemCount: 3,
-                controller: PageController(viewportFraction: 0.9),
-                itemBuilder: (context, index) {
-                  return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      // **THEME CHANGE:** Using kPromotionGradient (Pink/Red)
-                      gradient: kPromotionGradient, 
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text('Syok Deals: RM10 OFF',
-                            style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white)),
-                        SizedBox(height: 6),
-                        Text('Limited time offers from top-rated shops!',
-                            style: TextStyle(color: Colors.white70)),
-                      ],
-                    ),
-                  );
-                },
+            // --- Horizontal Scrollable Categories ---
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              child: SizedBox(
+                height: 120, // increased from 100 to allow label space
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _buildCircleCategory(
+                        'Hot Deals', 'assets/images/hot_deals.jpg'),
+                    const SizedBox(width: 16),
+                    _buildCircleCategory(
+                        'Frozen Rescue', 'assets/images/frozen_rescue.jpg'),
+                    const SizedBox(width: 16),
+                    _buildCircleCategory(
+                        'Pantry Saver', 'assets/images/pantry_saver.jpg'),
+                    const SizedBox(width: 16),
+                    _buildCircleCategory('Healthy Leftovers',
+                        'assets/images/healthy_leftovers.jpg'),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 25),
 
-            // --- Categories ---
+            // --- Promotions Banner ---
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                spacing: 20,
-                runSpacing: 20,
-                children: [
-                  _buildCategoryItem('Promo', Icons.local_offer),
-                  _buildCategoryItem('Healthy', Icons.eco),
-                  _buildCategoryItem('Pizza', Icons.local_pizza),
-                  _buildCategoryItem('Ramen', Icons.ramen_dining),
-                  _buildCategoryItem('Burger', Icons.fastfood),
-                ],
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: kPromotionGradient,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child:
+                          const Icon(Icons.image, size: 40, color: Colors.grey),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text('Promotions',
+                              style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white)),
+                          SizedBox(height: 6),
+                          Text('Check out the latest vouchers available!',
+                              style: TextStyle(color: Colors.white70)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 30),
 
             // --- Order Snacks Section ---
             const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20.0),
+              padding: EdgeInsets.symmetric(horizontal: 20),
               child: Text('Order snacks from', style: kLabelTextStyle),
             ),
             const SizedBox(height: 10),
             _buildShopCard('W Hotel Buffet',
-                'PSD Free delivery WKL Klang (spend RM30)', 4.9),
+                'PSD Free delivery WKL Klang (spend RM30)', 4.9, 504),
             _buildShopCard(
-                'Tesco', 'PSD Free delivery WKL Klang (spend RM30)', 4.8),
+                'Tesco', 'PSD Free delivery WKL Klang (spend RM30)', 4.8, 3080),
             const SizedBox(height: 30),
 
             // --- Syok Deals Section ---
             const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20.0),
+              padding: EdgeInsets.symmetric(horizontal: 20),
               child: Text('Syok Deals: RM10 OFF', style: kLabelTextStyle),
             ),
             const SizedBox(height: 10),
-            _buildShopCard('W Hotel Buffet', 'Limited time RM10 OFF', 4.9),
-            _buildShopCard('Tesco', 'Limited time RM10 OFF', 4.8),
-            const SizedBox(height: 30),
+            _buildShopCard('W Hotel Buffet', 'Limited time RM10 OFF', 4.9, 504),
+            _buildShopCard('Tesco', 'Limited time RM10 OFF', 4.8, 3080),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCategoryItem(String label, IconData icon) {
+  Widget _buildCircleCategory(String label, String imagePath) {
     return Column(
       children: [
         Container(
-          width: 65,
-          height: 65,
+          width: 80,
+          height: 80,
           decoration: BoxDecoration(
-            color: kYellowLight, // Using kYellowLight
             shape: BoxShape.circle,
+            image: DecorationImage(
+              image: AssetImage(imagePath),
+              fit: BoxFit.cover,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black12,
@@ -219,7 +255,6 @@ class _MainPageState extends State<MainPage> {
               ),
             ],
           ),
-          child: Icon(icon, color: kTextColor, size: 28),
         ),
         const SizedBox(height: 6),
         Text(label, style: const TextStyle(fontSize: 12, color: kTextColor)),
@@ -227,12 +262,13 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  Widget _buildShopCard(String title, String subtitle, double rating) {
+  Widget _buildShopCard(
+      String title, String subtitle, double rating, int reviews) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: kYellowLight, // Using kYellowLight
+        color: kCardColor,
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
@@ -248,7 +284,7 @@ class _MainPageState extends State<MainPage> {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: kCardColor, // Using kCardColor (White)
+              color: Colors.grey.shade200,
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.image, size: 30, color: Colors.grey),
@@ -269,7 +305,8 @@ class _MainPageState extends State<MainPage> {
           Column(
             children: [
               const Icon(Icons.star, color: Colors.orange, size: 20),
-              Text(rating.toString(), style: const TextStyle(fontSize: 14)),
+              Text('$rating', style: const TextStyle(fontSize: 14)),
+              Text('$reviews+', style: const TextStyle(fontSize: 12)),
             ],
           ),
         ],
