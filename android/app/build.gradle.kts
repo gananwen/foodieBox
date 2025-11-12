@@ -24,7 +24,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.foodiebox"
-        minSdk = flutter.minSdkVersion
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -43,7 +43,7 @@ flutter {
 
 dependencies {
     // Firebase SDKs
-    implementation("com.google.firebase:firebase-auth:22.3.0")
+    implementation("com.google.firebase:firebase-auth:23.2.1")
     implementation("com.google.firebase:firebase-firestore:24.10.0")
     implementation("com.google.firebase:firebase-storage:20.3.0")
 
