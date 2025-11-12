@@ -18,169 +18,185 @@ class ProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final userId = FirebaseAuth.instance.currentUser!.uid;
 
-    return BasePage(
-      currentIndex: 5,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // --- Yellow Header with Profile Info ---
-          Stack(
-            children: [
-              ClipPath(
-                clipper: _HeaderClipper(),
-                child: Container(
-                  height: 200,
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    gradient: kProfileHeaderGradient,
+    return Scaffold(
+      backgroundColor: kCardColor,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        automaticallyImplyLeading: true, // shows the back button
+        iconTheme: const IconThemeData(color: kTextColor),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 40),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- Yellow Header with Profile Info ---
+            Stack(
+              children: [
+                ClipPath(
+                  clipper: _HeaderClipper(),
+                  child: Container(
+                    height: 200,
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      gradient: kProfileHeaderGradient,
+                    ),
                   ),
                 ),
-              ),
-              Positioned.fill(
-                child: StreamBuilder<DocumentSnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(userId)
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    final data = snapshot.data?.data() as Map<String, dynamic>?;
+                Positioned.fill(
+                  child: StreamBuilder<DocumentSnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(userId)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData || snapshot.data?.data() == null) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
-                    final name = data?['name'] ?? 'Your Name';
-                    final email = data?['email'] ?? 'your@email.com';
-                    final imageUrl = data?['profilePic'];
+                      final data =
+                          snapshot.data!.data() as Map<String, dynamic>;
+                      final name = data['name'] ?? 'Your Name';
+                      final email = data['email'] ?? 'your@email.com';
+                      final imageUrl = data['profilePic'];
 
-                    return Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircleAvatar(
-                          radius: 40,
-                          backgroundColor: Colors.grey,
-                          backgroundImage:
-                              imageUrl != null ? NetworkImage(imageUrl) : null,
-                          child: imageUrl == null
-                              ? const Icon(Icons.person,
-                                  color: Colors.white, size: 40)
-                              : null,
-                        ),
-                        const SizedBox(height: 10),
-                        Text(name,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: kTextColor,
-                            )),
-                        const SizedBox(height: 4),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => const MyDetailsPage()),
-                            );
-                          },
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(email,
-                                  style: const TextStyle(
-                                      fontSize: 13, color: kTextColor)),
-                              const SizedBox(width: 4),
-                              const Icon(Icons.edit,
-                                  size: 14, color: kTextColor),
-                            ],
+                      return Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircleAvatar(
+                            radius: 40,
+                            backgroundColor: Colors.grey,
+                            backgroundImage: imageUrl != null
+                                ? NetworkImage(imageUrl)
+                                : null,
+                            child: imageUrl == null
+                                ? const Icon(Icons.person,
+                                    color: Colors.white, size: 40)
+                                : null,
                           ),
-                        ),
-                      ],
-                    );
-                  },
+                          const SizedBox(height: 10),
+                          Text(name,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: kTextColor,
+                              )),
+                          const SizedBox(height: 4),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                        const MyDetailsPage()),
+                              );
+                            },
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(email,
+                                    style: const TextStyle(
+                                        fontSize: 13, color: kTextColor)),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.edit,
+                                    size: 14, color: kTextColor),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 30),
-
-          // --- Menu Items ---
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: BoxDecoration(
-              color: kCardColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Column(
-              children: [
-                _ProfileItem(
-                    icon: Icons.person_outline,
-                    label: 'My Details',
-                    targetPage: MyDetailsPage()),
-                Divider(height: 1, thickness: 1),
-                _ProfileItem(
-                    icon: Icons.location_on_outlined,
-                    label: 'Delivery Address',
-                    targetPage: DeliveryAddressPage()),
-                Divider(height: 1, thickness: 1),
-                //_ProfileItem(icon: Icons.credit_card, label: 'Payment Methods', targetPage: PaymentMethodsPage()),
-                //Divider(height: 1, thickness: 1),
-                _ProfileItem(
-                    icon: Icons.card_giftcard,
-                    label: 'Promo Card',
-                    targetPage: PromoCardPage()),
-                Divider(height: 1, thickness: 1),
-                _ProfileItem(
-                    icon: Icons.notifications_none,
-                    label: 'Notifications',
-                    targetPage: NotificationsPage()),
-                Divider(height: 1, thickness: 1),
-                _ProfileItem(
-                    icon: Icons.help_outline,
-                    label: 'Help',
-                    targetPage: HelpPage()),
-                Divider(height: 1, thickness: 1),
-                _ProfileItem(
-                    icon: Icons.info_outline,
-                    label: 'About',
-                    targetPage: AboutPage()),
               ],
             ),
-          ),
 
-          const SizedBox(height: 40),
+            const SizedBox(height: 30),
 
-          // --- Log Out Button ---
-          Center(
-            child: SizedBox(
-              width: MediaQuery.of(context).size.width * 0.85,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => const LoginPage()),
-                    (route) => false,
-                  );
-                },
-                icon: const Icon(Icons.logout, color: kTextColor),
-                label: const Text(
-                  'Log out',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: kTextColor,
+            // --- Menu Items ---
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              decoration: BoxDecoration(
+                color: kCardColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Column(
+                children: [
+                  _ProfileItem(
+                      icon: Icons.person_outline,
+                      label: 'My Details',
+                      targetPage: MyDetailsPage()),
+                  Divider(height: 1, thickness: 1),
+                  _ProfileItem(
+                      icon: Icons.location_on_outlined,
+                      label: 'Delivery Address',
+                      targetPage: DeliveryAddressPage()),
+                  Divider(height: 1, thickness: 1),
+                  //_ProfileItem(icon: Icons.credit_card, label: 'Payment Methods', targetPage: PaymentMethodsPage()),
+                  //Divider(height: 1, thickness: 1),
+                  _ProfileItem(
+                      icon: Icons.card_giftcard,
+                      label: 'Promo Card',
+                      targetPage: PromoCardPage()),
+                  Divider(height: 1, thickness: 1),
+                  _ProfileItem(
+                      icon: Icons.notifications_none,
+                      label: 'Notifications',
+                      targetPage: NotificationsPage()),
+                  Divider(height: 1, thickness: 1),
+                  _ProfileItem(
+                      icon: Icons.help_outline,
+                      label: 'Help',
+                      targetPage: HelpPage()),
+                  Divider(height: 1, thickness: 1),
+                  _ProfileItem(
+                      icon: Icons.info_outline,
+                      label: 'About',
+                      targetPage: AboutPage()),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 40),
+
+            // --- Log Out Button ---
+            Center(
+              child: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.85,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const LoginPage()),
+                      (route) => false,
+                    );
+                  },
+                  icon: const Icon(Icons.logout, color: kTextColor),
+                  label: const Text(
+                    'Log out',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: kTextColor,
+                    ),
                   ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kYellowSoft,
-                  elevation: 2,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: const BorderSide(color: Colors.transparent),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kYellowSoft,
+                    elevation: 2,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: Colors.transparent),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 40),
-        ],
+            const SizedBox(height: 40),
+          ],
+        ),
       ),
     );
   }
