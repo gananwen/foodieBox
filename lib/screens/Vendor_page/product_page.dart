@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../util/styles.dart'; // Using your team's styles
+import '../../util/styles.dart';
 import 'add_product_page.dart';
 import 'edit_product_page.dart';
+// --- (NEW) 导入模型和仓库 ---
+import '../../models/product.dart';
+import '../../repositories/product_repository.dart';
 
 // --- Product Page (Figure 27) ---
 class ProductPage extends StatefulWidget {
@@ -16,61 +19,18 @@ class _ProductPageState extends State<ProductPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  // This list holds all products, as if from Firebase
-  List<Product> _allProducts = [];
+  // --- (NEW) ---
+  final ProductRepository _productRepo = ProductRepository();
 
   // This set tracks which product IDs are currently selected
   final Set<String> _selectedProductIds = {};
+
+  // --- (REMOVED) 虚拟数据和 _loadDummyProducts() 已删除 ---
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    // Load dummy data when the page starts
-    _loadDummyProducts();
-  }
-
-  void _loadDummyProducts() {
-    // This is where you would fetch data from Firebase Firestore
-    setState(() {
-      _allProducts = [
-        Product(
-            id: 'p1',
-            name: 'Mystery Box',
-            type: 'Blind Box',
-            price: 20.00,
-            sold: '100+ sold',
-            imageUrl: ''),
-        Product(
-            id: 'p2',
-            name: 'Fresh Apples',
-            type: 'Grocery Deal',
-            price: 20.00,
-            sold: '100+ sold',
-            imageUrl: ''),
-        Product(
-            id: 'p3',
-            name: 'Fresh Orange',
-            type: 'Grocery Deal',
-            price: 20.00,
-            sold: '100+ sold',
-            imageUrl: ''),
-        Product(
-            id: 'p4',
-            name: 'Fresh Mango',
-            type: 'Grocery Deal',
-            price: 20.00,
-            sold: '100+ sold',
-            imageUrl: ''),
-        Product(
-            id: 'p5',
-            name: 'Fresh Corn',
-            type: 'Grocery Deal',
-            price: 20.00,
-            sold: '100+ sold',
-            imageUrl: ''),
-      ];
-    });
   }
 
   @override
@@ -90,50 +50,65 @@ class _ProductPageState extends State<ProductPage>
     });
   }
 
-  // Deletes all selected products
-  void _deleteSelectedProducts() {
-    // This is where you would send delete requests to Firebase
-    setState(() {
-      _allProducts.removeWhere((p) => _selectedProductIds.contains(p.id));
-      _selectedProductIds.clear();
-    });
-    // Show a confirmation
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Products deleted')),
-    );
+  // --- (MODIFIED) Deletes all selected products from Firebase ---
+  Future<void> _deleteSelectedProducts() async {
+    // (你可以在这里添加一个 loading 状态)
+    try {
+      // 为每个选中的 ID 并行触发删除
+      final deleteFutures =
+          _selectedProductIds.map((id) => _productRepo.deleteProduct(id));
+      await Future.wait(deleteFutures);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('${_selectedProductIds.length} Products deleted')),
+        );
+      }
+
+      setState(() {
+        _selectedProductIds.clear();
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete products: $e')),
+        );
+      }
+    }
   }
 
-  // Builds the list of products based on the selected tab
-  Widget _buildProductList(String filterType) {
+  // --- (MODIFIED) Builds the list from the Firebase data ---
+  Widget _buildProductList(List<Product> allProducts, String filterType) {
     List<Product> filteredList;
 
     if (filterType == 'All') {
-      filteredList = _allProducts;
+      filteredList = allProducts;
     } else {
-      filteredList = _allProducts.where((p) => p.type == filterType).toList();
+      // 使用我们模型中的 'productType' 字段
+      filteredList =
+          allProducts.where((p) => p.productType == filterType).toList();
     }
 
     if (filteredList.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No products in this category.',
-          style: TextStyle(color: kTextColor),
+          style: TextStyle(color: kTextColor.withOpacity(0.7), fontSize: 16),
         ),
       );
     }
 
     // Use ListView.builder for performance
     return ListView.builder(
-      // Add padding to the list itself
       padding: const EdgeInsets.only(top: 8.0, bottom: 80.0), // Padding for FAB
       itemCount: filteredList.length,
       itemBuilder: (context, index) {
         final product = filteredList[index];
-        final bool isSelected = _selectedProductIds.contains(product.id);
+        final bool isSelected = _selectedProductIds.contains(product.id!);
 
         return Container(
-          margin: const EdgeInsets.symmetric(
-              horizontal: 10, vertical: 6), // Increased vertical margin
+          margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: kCardColor, // White
             borderRadius: BorderRadius.circular(12),
@@ -145,47 +120,68 @@ class _ProductPageState extends State<ProductPage>
             ),
           ),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-                vertical: 8.0, horizontal: 8.0), // Increased vertical padding
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
             // 1. Checkbox on the left
             leading: Checkbox(
               value: isSelected,
               onChanged: (bool? value) {
-                // This now ONLY controls the checkbox
-                _toggleSelection(product.id);
+                _toggleSelection(product.id!);
               },
               activeColor: kPrimaryActionColor,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(4)),
             ),
 
-            // 2. Image placeholder on the right
+            // 2. --- (MODIFIED) Image placeholder (loads real image) ---
             trailing: Container(
-              width: 70, // Increased size
-              height: 70, // Increased size
+              width: 70,
+              height: 70,
               decoration: BoxDecoration(
                 color: kAppBackgroundColor,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.image_outlined,
-                  color: kTextColor, size: 35), // Increased size
+              // 如果 imageUrl 为空，显示图标，否则加载网络图片
+              child: product.imageUrl.isEmpty
+                  ? const Icon(Icons.image_outlined,
+                      color: kTextColor, size: 35)
+                  : ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        product.imageUrl,
+                        fit: BoxFit.cover,
+                        // 可选：添加加载和错误占位符
+                        loadingBuilder: (context, child, progress) {
+                          return progress == null
+                              ? child
+                              : const Center(
+                                  child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ));
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(Icons.error_outline,
+                              color: kPrimaryActionColor, size: 35);
+                        },
+                      ),
+                    ),
             ),
 
-            // 3. Product Type
+            // 3. --- (MODIFIED) Product Type (from model) ---
             title: Text(
-              product.type,
+              product.productType,
               style: TextStyle(
                 color: kTextColor.withOpacity(0.6),
                 fontSize: 12,
               ),
             ),
 
-            // 4. Product Name and Price
+            // 4. --- (MODIFIED) Product Name and Price (from model) ---
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  product.name,
+                  product.title, // 使用 'title'
                   style: const TextStyle(
                     color: kTextColor,
                     fontWeight: FontWeight.bold,
@@ -193,30 +189,19 @@ class _ProductPageState extends State<ProductPage>
                   ),
                 ),
                 const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      product.sold,
-                      style: TextStyle(
-                        color: kTextColor.withOpacity(0.6),
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'RM${product.price.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: kTextColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+                // (你可以按需添加 'sold' 字段)
+                Text(
+                  'RM${product.discountedPrice.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    color: kTextColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
               ],
             ),
 
-            // 5. This tap is for the whole tile area *except* the checkbox
+            // 5. Tap to Edit
             onTap: () {
               // This is for Figure 29
               Navigator.push(
@@ -235,8 +220,7 @@ class _ProductPageState extends State<ProductPage>
   // This builds the "X Selected" bar (matches Figure 27)
   Widget _buildSelectionHeader() {
     if (_selectedProductIds.isEmpty) {
-      return const SizedBox
-          .shrink(); // Return an empty box if nothing is selected
+      return const SizedBox.shrink();
     }
     return Container(
       color: kSecondaryAccentColor.withOpacity(0.5), // Light green
@@ -288,7 +272,7 @@ class _ProductPageState extends State<ProductPage>
                         child: const Text('Delete'),
                         onPressed: () {
                           Navigator.of(ctx).pop();
-                          _deleteSelectedProducts();
+                          _deleteSelectedProducts(); // 调用 async 函数
                         },
                       ),
                     ],
@@ -296,7 +280,6 @@ class _ProductPageState extends State<ProductPage>
                 );
               },
             ),
-          // --- REMOVED: Add button IconButton was here ---
         ],
         // The TabBar for filtering
         bottom: TabBar(
@@ -311,24 +294,51 @@ class _ProductPageState extends State<ProductPage>
           ],
         ),
       ),
+      // --- (MODIFIED) Body now uses a StreamBuilder ---
       body: Column(
         children: [
-          // This displays the "X Selected" bar
           _buildSelectionHeader(),
-          // This displays the list of products
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildProductList('All'),
-                _buildProductList('Blind Box'),
-                _buildProductList('Grocery Deal'),
-              ],
+            child: StreamBuilder<List<Product>>(
+              stream: _productRepo.getProductsStream(),
+              builder: (context, snapshot) {
+                // 1. Handle Loading
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                      child: CircularProgressIndicator(
+                          color: kPrimaryActionColor));
+                }
+                // 2. Handle Error
+                if (snapshot.hasError) {
+                  return Center(
+                      child: Text('Error: ${snapshot.error}',
+                          style: const TextStyle(color: kTextColor)));
+                }
+                // 3. Handle No Data
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(
+                      child: Text('No products found. Tap "+" to add one!',
+                          style: TextStyle(color: kTextColor, fontSize: 16)));
+                }
+
+                // 4. Handle Success
+                final allProducts = snapshot.data!;
+
+                // 将获取到的数据传递给 TabBarView
+                return TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildProductList(allProducts, 'All'),
+                    _buildProductList(allProducts, 'Blind Box'),
+                    _buildProductList(allProducts, 'Grocery Deal'),
+                  ],
+                );
+              },
             ),
           ),
         ],
       ),
-      // --- ADDED: Floating Action Button for Add Product ---
+      // Floating Action Button for Add Product
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
@@ -344,25 +354,4 @@ class _ProductPageState extends State<ProductPage>
       ),
     );
   }
-}
-
-// --- Data Model ---
-// A simple class to represent a Product.
-// In a real app, this would have fromJson/toJson methods for Firebase.
-class Product {
-  final String id;
-  final String name;
-  final String type; // 'Blind Box' or 'Grocery Deal'
-  final double price;
-  final String sold;
-  final String imageUrl; // Placeholder for product image
-
-  Product({
-    required this.id,
-    required this.name,
-    required this.type,
-    required this.price,
-    required this.sold,
-    required this.imageUrl,
-  });
 }

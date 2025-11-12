@@ -5,6 +5,8 @@ import '../../util/styles.dart';
 import '../../repositories/auth_repository.dart';
 import '../../repositories/user_repository.dart';
 import '../Vendor_page/vendor_home_page.dart';
+// 1. 导入你的供应商注册页面
+import '../Vendor_page/vendor_regieteration_page.dart';
 
 class VendorLoginPage extends StatefulWidget {
   const VendorLoginPage({super.key});
@@ -52,9 +54,11 @@ class _VendorLoginPageState extends State<VendorLoginPage>
     final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter email and password")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please enter email and password")),
+        );
+      }
       return;
     }
 
@@ -62,26 +66,39 @@ class _VendorLoginPageState extends State<VendorLoginPage>
 
     try {
       final user = await _authRepo.signInWithEmail(email, password);
-      final userData = await _userRepo.getUserData(user!.uid);
+      // 检查 user 是否为 null
+      if (user == null) {
+        throw Exception("Login failed. Please try again.");
+      }
+
+      final userData = await _userRepo.getUserData(user.uid);
 
       if (userData?.role != 'Vendor') {
+        // 如果不是 Vendor，也登出
+        await _authRepo.signOut();
         throw Exception("Access denied: This account is not a vendor.");
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Vendor login successful")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Vendor login successful")),
+        );
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const VendorHomePage()),
-      );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const VendorHomePage()),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Login failed: ${e.toString()}")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Login failed: ${e.toString()}")),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -103,6 +120,16 @@ class _VendorLoginPageState extends State<VendorLoginPage>
                   child: Image.asset(_logoPath, height: 200),
                 ),
               ),
+              const Center(
+                child: Text(
+                  'Vendor Login', // 添加标题
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: kTextColor,
+                  ),
+                ),
+              ),
               const SizedBox(height: 30),
               _CustomInputField(label: 'Email', controller: _emailController),
               const SizedBox(height: 20),
@@ -117,7 +144,7 @@ class _VendorLoginPageState extends State<VendorLoginPage>
                   : ElevatedButton(
                       onPressed: _signInVendor,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: kCategoryColor,
+                        backgroundColor: kCategoryColor, // 绿色
                         foregroundColor: kTextColor,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30),
@@ -131,6 +158,34 @@ class _VendorLoginPageState extends State<VendorLoginPage>
                             fontWeight: FontWeight.bold, fontSize: 18),
                       ),
                     ),
+              const SizedBox(height: 20), // 2. (新增) 添加注册链接
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    "Don't have a vendor account? ",
+                    style: TextStyle(color: kTextColor),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const VendorRegistrationPage(), // 跳转到你的注册页
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'Register here',
+                      style: TextStyle(
+                        color: kPrimaryActionColor, // Pink
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  )
+                ],
+              ),
               const SizedBox(height: 40),
             ],
           ),

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../util/styles.dart';
-import '../../screens/auth_wrapper.dart';
+
+// --- 1. 更改导入 ---
+// import '../../screens/auth_wrapper.dart'; // <-- 移除这个
+import '../auth/vendor_login.dart'; // <-- 添加这个 (请确认路径是否正确)
+
 import 'account_settings_page.dart';
-// --- 1. 修复导入路径 (notification -> notifications) ---
 import '../shared/notifications_page.dart';
 import '../shared/help_page.dart';
 import '../shared/about_page.dart';
@@ -82,12 +85,13 @@ class MorePage extends StatelessWidget {
     );
   }
 
-  // --- (辅助) 登出函数 ---
+  // --- 2. (辅助) 登出函数 (已修改) ---
   void _logOut(BuildContext context) async {
     await FirebaseAuth.instance.signOut();
     if (context.mounted) {
       Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const AuthWrapper()),
+        // --- 立即导航到 Vendor 登录页 ---
+        MaterialPageRoute(builder: (context) => const VendorLoginPage()),
         (route) => false,
       );
     }
