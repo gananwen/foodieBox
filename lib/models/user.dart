@@ -1,6 +1,5 @@
-import 'package:firebase_auth/firebase_auth.dart' as auth; // 使用 'as auth' 避免冲突
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 
-// 这个模型代表 'users' 集合中的一个文档
 class UserModel {
   final String uid;
   final String email;
@@ -8,7 +7,6 @@ class UserModel {
   final String lastName;
   final String username;
   final String role;
-  // 你可以按需添加更多字段 (e.g., phoneNumber, profilePictureUrl)
 
   UserModel({
     required this.uid,
@@ -19,7 +17,6 @@ class UserModel {
     required this.role,
   });
 
-  // 从 Firebase User 对象 (Google 登录时) 创建 UserModel
   factory UserModel.fromFirebaseUser(auth.User user) {
     final nameParts = user.displayName?.split(' ') ?? ['New', 'User'];
     final firstName = nameParts.first;
@@ -31,11 +28,10 @@ class UserModel {
       firstName: firstName,
       lastName: lastName,
       username: user.email?.split('@').first ?? user.uid,
-      role: 'User', // 默认角色
+      role: 'User',
     );
   }
 
-  // 从 Firestore (Map) 转换
   factory UserModel.fromMap(Map<String, dynamic> map) {
     return UserModel(
       uid: map['uid'] ?? '',
@@ -56,5 +52,24 @@ class UserModel {
       'username': username,
       'role': role,
     };
+  }
+
+  // --- (新增) CopyWith 方法 ---
+  UserModel copyWith({
+    String? uid,
+    String? email,
+    String? firstName,
+    String? lastName,
+    String? username,
+    String? role,
+  }) {
+    return UserModel(
+      uid: uid ?? this.uid,
+      email: email ?? this.email,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      username: username ?? this.username,
+      role: role ?? this.role,
+    );
   }
 }

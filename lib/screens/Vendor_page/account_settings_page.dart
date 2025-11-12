@@ -1,28 +1,20 @@
 import 'package:flutter/material.dart';
 import '../../util/styles.dart';
 
-// 导入你的子页面
 import 'edit_profile_page.dart';
 import 'edit_store_details_page.dart';
-// --- 1. 移除 'edit_store_hours_page.dart' ---
-// import 'edit_store_hours_page.dart';
+// --- 1. 导入 Repository ---
+import '../../repositories/vendor_data_repository.dart';
 
-// --- 账户和店铺设置页面 (Figure 26 的子页面) ---
 class AccountSettingsPage extends StatefulWidget {
-  const AccountSettingsPage({super.key});
+  final VendorDataBundle bundle; // <-- 2. 接收数据
+  const AccountSettingsPage({super.key, required this.bundle});
 
   @override
   State<AccountSettingsPage> createState() => _AccountSettingsPageState();
 }
 
 class _AccountSettingsPageState extends State<AccountSettingsPage> {
-  // --- 虚拟数据 (模拟从 Firebase 加载的数据) ---
-  String _fullName = "Afsar Hossen";
-  String _email = "vendor@store.com";
-  String _storeName = "Afsar's Fresh Mart";
-  String _storeAddress = "123 Jalan Ampang, 50450 Kuala Lumpur";
-  String _storeHours = "9:00 AM - 6:00 PM (Mon-Fri)";
-
   // --- (辅助) 构建分区标题 ---
   Widget _buildSectionHeader(String title) {
     return Padding(
@@ -52,6 +44,8 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
             style: const TextStyle(
                 color: kTextColor, fontWeight: FontWeight.bold)),
         subtitle: Text(subtitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(color: kTextColor.withAlpha(153))), // 60%
         trailing: const Icon(Icons.chevron_right, color: kTextColor, size: 20),
         onTap: onTap,
@@ -61,6 +55,10 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // --- 4. (新增) 从 widget 中获取真实数据 ---
+    final user = widget.bundle.user;
+    final vendor = widget.bundle.vendor;
+
     return Scaffold(
       backgroundColor: kAppBackgroundColor,
       appBar: AppBar(
@@ -73,56 +71,59 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
       ),
       body: ListView(
         children: [
-          // --- 个人账户部分 ---
+          // --- 5. (已修改) 个人账户部分 ---
           _buildSectionHeader('ACCOUNT INFORMATION'),
           _buildInfoTile(
             'Full Name',
-            _fullName,
+            "${user.firstName} ${user.lastName}", // 真实数据
             () {
               Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => const EditProfilePage()));
+                      // --- 传递数据 ---
+                      builder: (context) =>
+                          EditProfilePage(bundle: widget.bundle)));
             },
           ),
           _buildInfoTile(
             'Email',
-            _email,
+            user.email, // 真实数据
             () {
               Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => const EditProfilePage()));
+                      // --- 传递数据 ---
+                      builder: (context) =>
+                          EditProfilePage(bundle: widget.bundle)));
             },
           ),
           _buildInfoTile(
             'Password',
-            '********', // 总是显示星号
+            '********',
             () {
               Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => const EditProfilePage()));
+                      // --- 传递数据 ---
+                      builder: (context) =>
+                          EditProfilePage(bundle: widget.bundle)));
             },
           ),
 
-          // --- 店铺设置部分 ---
+          // --- 6. (已修改) 店铺设置部分 ---
           _buildSectionHeader('STORE INFORMATION'),
-          // --- 2. 更改标题和描述 ---
           _buildInfoTile(
-            'Store Details & Hours',
-            '$_storeName\n$_storeHours', // 合并名称和时间
+            'Store Details', // <-- (修改) 移除 Hours
+            '${vendor.storeName}\n${vendor.storeAddress}',
             () {
-              // --- 3. 链接到合并后的页面 ---
               Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => const EditStoreDetailsPage()));
+                      // --- 传递数据 ---
+                      builder: (context) =>
+                          EditStoreDetailsPage(bundle: widget.bundle)));
             },
           ),
-
-          // --- 4. 移除单独的 "Store Hours" tile ---
-
           _buildInfoTile(
             'Payment Methods',
             'Bank Transfer, E-Wallets',

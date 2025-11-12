@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../util/styles.dart';
+// --- 1. 导入 Repository 和 Models ---
+import '../../repositories/vendor_data_repository.dart';
 import 'package:flutter/foundation.dart'; // 用于 debugPrint
 
-// --- (完整) 编辑个人资料页面 ---
 class EditProfilePage extends StatefulWidget {
-  const EditProfilePage({super.key});
+  final VendorDataBundle bundle; // <-- 2. 接收数据
+  const EditProfilePage({super.key, required this.bundle});
 
   @override
   State<EditProfilePage> createState() => _EditProfilePageState();
@@ -12,6 +14,8 @@ class EditProfilePage extends StatefulWidget {
 
 class _EditProfilePageState extends State<EditProfilePage> {
   final _formKey = GlobalKey<FormState>();
+  final _repo = VendorDataRepository();
+  bool _isLoading = false;
 
   // --- Controllers ---
   late TextEditingController _nameController;
@@ -20,16 +24,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final TextEditingController _newPassController = TextEditingController();
   final TextEditingController _confirmPassController = TextEditingController();
 
-  // --- 虚拟数据 (模拟从 Firebase 加载) ---
-  final String _currentName = "Afsar Hossen";
-  final String _currentEmail = "vendor@store.com";
-
   @override
   void initState() {
     super.initState();
-    // 预先填充当前数据
-    _nameController = TextEditingController(text: _currentName);
-    _emailController = TextEditingController(text: _currentEmail);
+    // --- 3. 预先填充真实数据 ---
+    final user = widget.bundle.user;
+    _nameController =
+        TextEditingController(text: "${user.firstName} ${user.lastName}");
+    _emailController = TextEditingController(text: user.email);
   }
 
   @override
@@ -42,31 +44,60 @@ class _EditProfilePageState extends State<EditProfilePage> {
     super.dispose();
   }
 
-  // --- 保存个人资料 ---
-  void _saveProfile() {
+  // --- 4. (已修改) 保存个人资料 ---
+  Future<void> _saveProfile() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
+      setState(() => _isLoading = true);
 
-      // TODO: 在这里处理 Firebase 更新逻辑
-      // 1. 重新认证 (如果需要更改密码或邮箱)
-      // 2. 更新 Firestore 'users' 集合中的 'name'
-      // 3. 更新 Firebase Auth 的 'email'
-      // 4. 更新 Firebase Auth 的 'password'
+      // TODO: 密码更改需要单独的 Firebase Auth 逻辑
+      // if (_newPassController.text.isNotEmpty) {
+      //   debugPrint('Password Change Requested');
+      //   // 这里你需要调用 _authRepo.reauthenticate(...)
+      //   // 和 _authRepo.updatePassword(...)
+      // }
 
-      debugPrint('Name: ${_nameController.text}');
-      debugPrint('Email: ${_emailController.text}');
+      try {
+        final nameParts = _nameController.text.trim().split(' ');
+        final firstName = nameParts.first;
+        final lastName =
+            nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
 
-      if (_newPassController.text.isNotEmpty) {
-        debugPrint('Password Change Requested');
+        // 5. 使用 'copyWith' 创建更新后的 UserModel
+        final updatedUser = widget.bundle.user.copyWith(
+          firstName: firstName,
+          lastName: lastName,
+          email: _emailController.text.trim(),
+          // 'username' 也可以在这里更新
+          username: _emailController.text.trim().split('@').first,
+        );
+
+        // 6. 调用 Repository 更新
+        await _repo.updateUser(updatedUser);
+
+        // TODO: 更新 Auth email (需要重新认证)
+        // await _authRepo.updateEmail(...)
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile updated successfully!'),
+              backgroundColor: kSecondaryAccentColor,
+            ),
+          );
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Failed to update: $e'),
+                backgroundColor: kPrimaryActionColor),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
       }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile updated successfully!'),
-          backgroundColor: kSecondaryAccentColor,
-        ),
-      );
-      Navigator.of(context).pop();
     }
   }
 
@@ -178,14 +209,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 label: 'Current Password',
                 controller: _currentPassController,
                 obscureText: true,
-                // 密码可以为空 (如果不想更改)
               ),
               _buildTextField(
                 label: 'New Password',
                 controller: _newPassController,
                 obscureText: true,
                 validator: (value) {
-                  // 仅当新密码不为空时，才验证"当前密码"
                   if (value != null && value.isNotEmpty) {
                     if (_currentPassController.text.isEmpty) {
                       return 'Please enter your current password';
@@ -212,21 +241,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
               const SizedBox(height: 24),
 
-              // --- 保存按钮 ---
+              // --- 7. (已修改) 保存按钮 ---
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimaryActionColor, // 高亮色
+                    backgroundColor: kPrimaryActionColor,
                     foregroundColor: kTextColor,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: _saveProfile,
-                  child: const Text('Save Changes',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  // --- 检查 _isLoading ---
+                  onPressed: _isLoading ? null : _saveProfile,
+                  child: _isLoading
+                      ? const CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(kTextColor),
+                        )
+                      : const Text('Save Changes',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
