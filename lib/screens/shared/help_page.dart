@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../../util/styles.dart';
+import '../../util/styles.dart';
 
 class HelpPage extends StatefulWidget {
   const HelpPage({super.key});

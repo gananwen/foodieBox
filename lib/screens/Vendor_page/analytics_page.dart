@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../util/styles.dart';
+import 'review_page.dart'; // <-- 1. 导入你新的 ReviewPage
 
 // --- 分析页面 (客户收藏夹) ---
 class AnalyticsPage extends StatelessWidget {
@@ -31,67 +32,80 @@ class AnalyticsPage extends StatelessWidget {
         itemCount: favoriteProducts.length,
         itemBuilder: (context, index) {
           final product = favoriteProducts[index];
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12.0),
-            padding: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              color: kCardColor,
-              borderRadius: BorderRadius.circular(12.0),
-              border: Border.all(color: kTextColor.withAlpha(51), width: 1.5),
-            ),
-            child: Row(
-              children: [
-                // 排名
-                Text(
-                  '#${index + 1}',
-                  style: const TextStyle(
-                    color: kPrimaryActionColor, // 高亮色
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+          // --- 2. 把卡片包在 GestureDetector 里 ---
+          return GestureDetector(
+            onTap: () {
+              // --- 3. 导航到 ReviewPage, 并传递产品名称 ---
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      ReviewPage(productName: product['name']!),
                 ),
-                const SizedBox(width: 16),
-                // 产品详情
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              );
+            },
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 12.0),
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: kCardColor,
+                borderRadius: BorderRadius.circular(12.0),
+                border: Border.all(color: kTextColor.withAlpha(51), width: 1.5),
+              ),
+              child: Row(
+                children: [
+                  // 排名
+                  Text(
+                    '#${index + 1}',
+                    style: const TextStyle(
+                      color: kPrimaryActionColor, // 高亮色
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // 产品详情
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product['name']!,
+                          style: const TextStyle(
+                            color: kTextColor,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          product['sold']!,
+                          style: TextStyle(
+                            color: kTextColor.withAlpha(179), // 70%
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // 评分
+                  Row(
                     children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 20),
+                      const SizedBox(width: 4),
                       Text(
-                        product['name']!,
+                        product['rating']!,
                         style: const TextStyle(
                           color: kTextColor,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        product['sold']!,
-                        style: TextStyle(
-                          color: kTextColor.withAlpha(179), // 70%
-                          fontSize: 14,
-                        ),
-                      ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 16),
-                // 评分
-                Row(
-                  children: [
-                    const Icon(Icons.star, color: Colors.amber, size: 20),
-                    const SizedBox(width: 4),
-                    Text(
-                      product['rating']!,
-                      style: const TextStyle(
-                        color: kTextColor,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },

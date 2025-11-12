@@ -1,0 +1,144 @@
+import 'package:flutter/material.dart';
+import '../../util/styles.dart';
+
+// 导入你的子页面
+import 'edit_profile_page.dart';
+import 'edit_store_details_page.dart';
+// --- 1. 移除 'edit_store_hours_page.dart' ---
+// import 'edit_store_hours_page.dart';
+
+// --- 账户和店铺设置页面 (Figure 26 的子页面) ---
+class AccountSettingsPage extends StatefulWidget {
+  const AccountSettingsPage({super.key});
+
+  @override
+  State<AccountSettingsPage> createState() => _AccountSettingsPageState();
+}
+
+class _AccountSettingsPageState extends State<AccountSettingsPage> {
+  // --- 虚拟数据 (模拟从 Firebase 加载的数据) ---
+  String _fullName = "Afsar Hossen";
+  String _email = "vendor@store.com";
+  String _storeName = "Afsar's Fresh Mart";
+  String _storeAddress = "123 Jalan Ampang, 50450 Kuala Lumpur";
+  String _storeHours = "9:00 AM - 6:00 PM (Mon-Fri)";
+
+  // --- (辅助) 构建分区标题 ---
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24.0, bottom: 8.0, left: 16.0),
+      child: Text(
+        title,
+        style: TextStyle(
+          color: kTextColor.withAlpha(179), // 70%
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  // --- (辅助) 构建可点击的设置项 ---
+  Widget _buildInfoTile(String title, String subtitle, VoidCallback onTap) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+      decoration: BoxDecoration(
+        color: kCardColor,
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(color: kTextColor.withAlpha(26), width: 1.5),
+      ),
+      child: ListTile(
+        title: Text(title,
+            style: const TextStyle(
+                color: kTextColor, fontWeight: FontWeight.bold)),
+        subtitle: Text(subtitle,
+            style: TextStyle(color: kTextColor.withAlpha(153))), // 60%
+        trailing: const Icon(Icons.chevron_right, color: kTextColor, size: 20),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: kAppBackgroundColor,
+      appBar: AppBar(
+        title: const Text('Account & Store'),
+        backgroundColor: kAppBackgroundColor,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: kTextColor),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: ListView(
+        children: [
+          // --- 个人账户部分 ---
+          _buildSectionHeader('ACCOUNT INFORMATION'),
+          _buildInfoTile(
+            'Full Name',
+            _fullName,
+            () {
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const EditProfilePage()));
+            },
+          ),
+          _buildInfoTile(
+            'Email',
+            _email,
+            () {
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const EditProfilePage()));
+            },
+          ),
+          _buildInfoTile(
+            'Password',
+            '********', // 总是显示星号
+            () {
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const EditProfilePage()));
+            },
+          ),
+
+          // --- 店铺设置部分 ---
+          _buildSectionHeader('STORE INFORMATION'),
+          // --- 2. 更改标题和描述 ---
+          _buildInfoTile(
+            'Store Details & Hours',
+            '$_storeName\n$_storeHours', // 合并名称和时间
+            () {
+              // --- 3. 链接到合并后的页面 ---
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const EditStoreDetailsPage()));
+            },
+          ),
+
+          // --- 4. 移除单独的 "Store Hours" tile ---
+
+          _buildInfoTile(
+            'Payment Methods',
+            'Bank Transfer, E-Wallets',
+            () {
+              // TODO: 跳转到 Payment Methods 页面
+            },
+          ),
+          _buildInfoTile(
+            'Data & Backup',
+            'Manage your data',
+            () {
+              // TODO: 跳转到 Data & Backup 页面
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}

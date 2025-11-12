@@ -4,11 +4,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../util/styles.dart';
 import '../../widgets/base_page.dart';
 import '../auth/user_login.dart';
-import 'subpages/about_page.dart';
-import 'subpages/help_page.dart';
+import '../shared/about_page.dart';
+import '../shared/help_page.dart';
 import 'subpages/my_details_page.dart';
 import 'subpages/delivery_address_page.dart';
-import 'subpages/notifications_page.dart';
+import '../shared/notifications_page.dart';
 import 'subpages/promo_card_page.dart';
 
 class ProfilePage extends StatelessWidget {
