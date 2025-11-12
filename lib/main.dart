@@ -8,7 +8,7 @@ import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/users/checkout_page.dart';
 import 'screens/auth/vendor_login.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'screens/Vendor_page/vendor_home_page.dart';
+import 'screens/Vendor_page/vendor_regieteration_page.dart';
 import 'firebase_options.dart';
 import 'util/styles.dart';
 
@@ -48,7 +48,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const VendorHomePage(),
+      home: const VendorLoginPage(),
       debugShowCheckedModeBanner: false,
     );
   }
