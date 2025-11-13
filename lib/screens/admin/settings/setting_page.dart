@@ -4,10 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:foodiebox/screens/admin/admin_home_page.dart';
 import 'package:foodiebox/screens/admin/profile_page.dart';
 import 'general_settings_page.dart';
-import 'lalamove_api_settings_page.dart';
 import 'payment_gateaways_page.dart';
-import 'fraud_detection_modal.dart';
-import 'billing_invoices_page.dart';
 import 'notifications_settings_page.dart';
 import 'data_backup_page.dart';
 import 'help_modal.dart';
@@ -51,29 +48,10 @@ class _SettingsAppState extends State<SettingsApp> {
           MaterialPageRoute(builder: (_) => const GeneralSettingsPage()),
         );
         break;
-      case 'Lalamove API Settings':
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const LalamoveApiSettingsPage()),
-        );
-        break;
       case 'Payment Gateways':
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const PaymentGatewaysPage()),
-        );
-        break;
-      case 'Fraud Detection':
-        showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          builder: (_) => const FraudDetectionModal(),
-        );
-        break;
-      case 'Billing & Invoices':
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const BillingInvoicesPage()),
         );
         break;
       case 'Notifications':
@@ -100,7 +78,38 @@ class _SettingsAppState extends State<SettingsApp> {
           context: context,
           applicationName: 'FoodieBox Admin',
           applicationVersion: '1.0.0',
-          applicationLegalese: '© 2025 FoodieBox Technologies',
+          applicationLegalese:
+              '© 2025 FoodieBox Technologies. All rights reserved.',
+          applicationIcon: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                'assets/images/App_icons.png',
+                height: 48,
+                width: 48,
+              ),
+            ),
+          ),
+          children: const [
+            SizedBox(height: 12),
+            Text(
+              'FoodieBox Admin helps you efficiently manage restaurants, orders, and delivery integrations in one secure dashboard.',
+              style: TextStyle(
+                fontSize: 15,
+                color: Color(0xFF374151),
+                height: 1.5,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Tap "View Licenses" below to see open-source attributions.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF6B7280),
+              ),
+            ),
+          ],
         );
         break;
     }
@@ -111,12 +120,16 @@ class _SettingsAppState extends State<SettingsApp> {
     final displayName = userData?['name'] ?? 'Your Name';
     final email = userData?['email'] ?? _auth.currentUser?.email ?? '';
     final avatarUrl = userData?['avatarUrl'];
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    final horizontalPadding =
+        screenWidth < 600 ? 16.0 : screenWidth * 0.2; // Responsive margins
 
     return Theme(
       data: Theme.of(context).copyWith(
         colorScheme: Theme.of(context)
             .colorScheme
-            .copyWith(surfaceTint: Colors.transparent), // Remove lilac tint
+            .copyWith(surfaceTint: Colors.transparent),
       ),
       child: Scaffold(
         backgroundColor: const Color(0xFFF7F7F7),
@@ -132,131 +145,126 @@ class _SettingsAppState extends State<SettingsApp> {
           ),
           title: const Text('Settings'),
           centerTitle: true,
-          backgroundColor: Colors.white, // Make the AppBar pure white
-          surfaceTintColor: Colors.transparent, // Remove M3 tint overlay
-          elevation: 0.5, // Optional: keeps a subtle shadow
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0.5,
         ),
-        body: ListView(
-          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16),
-          children: [
-            // ===================== Profile Section =====================
-            GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProfilePage()),
-                );
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 6,
-                      offset: const Offset(0, 3),
+        body: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              vertical: 8.0,
+              horizontal: horizontalPadding,
+            ),
+            child: Column(
+              children: [
+                // ===================== Profile Section =====================
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ProfilePage()),
+                    );
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0, vertical: 20.0),
-                margin: const EdgeInsets.only(bottom: 16.0),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundColor: Colors.grey.shade200,
-                      backgroundImage:
-                          avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                      child: avatarUrl == null
-                          ? const Icon(Icons.person,
-                              size: 36, color: Colors.grey)
-                          : null,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 20.0),
+                    margin: const EdgeInsets.only(bottom: 16.0),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 30,
+                          backgroundColor: Colors.grey.shade200,
+                          backgroundImage: avatarUrl != null
+                              ? NetworkImage(avatarUrl)
+                              : null,
+                          child: avatarUrl == null
+                              ? const Icon(Icons.person,
+                                  size: 36, color: Colors.grey)
+                              : null,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                displayName,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF1F2937),
-                                ),
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      displayName,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF1F2937),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Icon(Icons.edit,
+                                      size: 18, color: Colors.grey.shade600),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              Icon(Icons.edit,
-                                  size: 18, color: Colors.grey.shade600),
+                              Text(
+                                email,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ],
                           ),
-                          Text(
-                            email,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+
+                // ===================== Settings Sections =====================
+                _buildSectionTitle('General'),
+                _buildSettingsTile(context,
+                    icon: Icons.settings_outlined,
+                    title: 'General',
+                    onTap: () => _navigateTo('General')),
+                _buildSettingsTile(context,
+                    icon: Icons.account_balance_wallet_outlined,
+                    title: 'Payment Gateways',
+                    onTap: () => _navigateTo('Payment Gateways')),
+                _buildSettingsTile(context,
+                    icon: Icons.notifications_none_outlined,
+                    title: 'Notifications',
+                    onTap: () => _navigateTo('Notifications'),
+                    badgeCount: 3),
+                _buildSettingsTile(context,
+                    icon: Icons.refresh,
+                    title: 'Data & Backup',
+                    onTap: () => _navigateTo('Data & Backup')),
+
+                _buildSectionTitle('Support'),
+                _buildSettingsTile(context,
+                    icon: Icons.help_outline,
+                    title: 'Help',
+                    onTap: () => _navigateTo('Help')),
+                _buildSettingsTile(context,
+                    icon: Icons.info_outline,
+                    title: 'About',
+                    onTap: () => _navigateTo('About')),
+              ],
             ),
-
-            // ===================== Settings Sections =====================
-            _buildSectionTitle('General'),
-            _buildSettingsTile(context,
-                icon: Icons.settings_outlined,
-                title: 'General',
-                onTap: () => _navigateTo('General')),
-            _buildSettingsTile(context,
-                icon: Icons.api_outlined,
-                title: 'Lalamove API Settings',
-                onTap: () => _navigateTo('Lalamove API Settings')),
-            _buildSettingsTile(context,
-                icon: Icons.account_balance_wallet_outlined,
-                title: 'Payment Gateways',
-                onTap: () => _navigateTo('Payment Gateways')),
-
-            _buildSectionTitle('Security & Privacy'),
-            _buildSettingsTile(context,
-                icon: Icons.shield_outlined,
-                title: 'Fraud Detection',
-                onTap: () => _navigateTo('Fraud Detection'),
-                badgeCount: 2),
-
-            _buildSectionTitle('Billing'),
-            _buildSettingsTile(context,
-                icon: Icons.receipt_long_outlined,
-                title: 'Billing & Invoices',
-                onTap: () => _navigateTo('Billing & Invoices')),
-            _buildSettingsTile(context,
-                icon: Icons.notifications_none_outlined,
-                title: 'Notifications',
-                onTap: () => _navigateTo('Notifications'),
-                badgeCount: 3),
-            _buildSettingsTile(context,
-                icon: Icons.refresh,
-                title: 'Data & Backup',
-                onTap: () => _navigateTo('Data & Backup')),
-
-            _buildSectionTitle('Support'),
-            _buildSettingsTile(context,
-                icon: Icons.help_outline,
-                title: 'Help',
-                onTap: () => _navigateTo('Help')),
-            _buildSettingsTile(context,
-                icon: Icons.info_outline,
-                title: 'About',
-                onTap: () => _navigateTo('About')),
-          ],
+          ),
         ),
       ),
     );
@@ -266,12 +274,15 @@ class _SettingsAppState extends State<SettingsApp> {
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF6B7280),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF6B7280),
+          ),
         ),
       ),
     );
