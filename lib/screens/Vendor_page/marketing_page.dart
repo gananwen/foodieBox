@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // <-- 1. 导入 intl
+import 'package:intl/intl.dart';
 import '../../util/styles.dart';
 import 'add_promotion_page.dart';
 import 'analytics_page.dart';
-// --- 2. 导入新模型和仓库 ---
+// --- 1. 导入新模型、仓库和编辑页面 ---
 import '../../models/promotion.dart';
 import '../../repositories/promotion_repository.dart';
-// (移除了旧的 'edit_promotion_page.dart' 导入)
+import 'edit_promotion_page.dart'; // <-- (新增)
 
 class MarketingPage extends StatefulWidget {
   final VoidCallback onBackToDashboard;
@@ -16,18 +16,29 @@ class MarketingPage extends StatefulWidget {
 }
 
 class _MarketingPageState extends State<MarketingPage> {
-  // --- 3. 实例化仓库 ---
+  // --- 2. 实例化仓库 ---
   final PromotionRepository _repo = PromotionRepository();
 
-  // --- 4. (已修改) 构建促销卡片 ---
+  // --- 3. (已修改) 构建促销卡片 ---
   Widget _buildPromotionCard(PromotionModel promo) {
-    final bool isActive = promo.endDate.isAfter(DateTime.now());
-    final String expiryText = isActive
-        ? 'Expires on ${DateFormat('dd MMM yyyy').format(promo.endDate)}'
-        : 'Expired on ${DateFormat('dd MMM yyyy').format(promo.endDate)}';
+    final bool isActive = promo.startDate.isBefore(DateTime.now()) &&
+        promo.endDate.isAfter(DateTime.now());
+
+    final String statusText = isActive
+        ? 'Active'
+        : (promo.endDate.isBefore(DateTime.now()) ? 'Expired' : 'Scheduled');
+
+    final Color statusColor = isActive
+        ? Colors.green
+        : (promo.endDate.isBefore(DateTime.now())
+            ? kTextColor.withAlpha(100)
+            : Colors.blue);
+
+    final String dateRange =
+        '${DateFormat('dd MMM').format(promo.startDate)} - ${DateFormat('dd MMM yyyy').format(promo.endDate)}';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16), // 为卡片添加间距
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: kCardColor,
         borderRadius: BorderRadius.circular(12),
@@ -60,7 +71,7 @@ class _MarketingPageState extends State<MarketingPage> {
                 ? const Center(
                     child:
                         Icon(Icons.image_outlined, size: 50, color: kTextColor))
-                : null, // 如果有图片，则不显示图标
+                : null,
           ),
           // 2. 详情
           Padding(
@@ -68,17 +79,24 @@ class _MarketingPageState extends State<MarketingPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  expiryText,
-                  style: TextStyle(
-                    color: isActive
-                        ? kPrimaryActionColor
-                        : kTextColor.withAlpha(179),
-                    fontSize: 12,
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                // (新增) 状态徽章
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    statusText,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Text(
                   promo.title,
                   style: const TextStyle(
@@ -94,6 +112,14 @@ class _MarketingPageState extends State<MarketingPage> {
                   style: const TextStyle(
                     color: kTextColor,
                     fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  dateRange,
+                  style: TextStyle(
+                    color: kTextColor.withAlpha(179),
+                    fontSize: 12,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -115,13 +141,14 @@ class _MarketingPageState extends State<MarketingPage> {
                       side: BorderSide(
                           color: kTextColor.withAlpha(77), width: 1.5),
                     ),
+                    // --- 4. (已修改) 导航到新的 EditPromotionPage ---
                     onPressed: () {
-                      // TODO: 创建一个新的 EditPromotionPage(promo: promo)
-                      // (旧的 edit_promotion_page.dart 已失效)
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text(
-                                'Edit page needs to be updated for new model.')),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              EditPromotionPage(promotion: promo),
+                        ),
                       );
                     },
                     child: const Text('Edit Deal'),
@@ -229,7 +256,7 @@ class _MarketingPageState extends State<MarketingPage> {
             ),
             const SizedBox(height: 12),
             StreamBuilder<List<PromotionModel>>(
-              stream: _repo.getPromotionsStream(),
+              stream: _repo.getPromotionsStream(), // (使用已更新的 repo)
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
@@ -246,9 +273,13 @@ class _MarketingPageState extends State<MarketingPage> {
                 }
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return const Center(
-                    child: Text(
-                      'No active deals found. Tap "+" to create one.',
-                      style: TextStyle(color: kTextColor),
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text(
+                        'No active deals found. Tap "+" to create one.',
+                        style: TextStyle(color: kTextColor),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   );
                 }
