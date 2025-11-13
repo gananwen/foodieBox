@@ -30,7 +30,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   final List<Map<String, dynamic>> availablePromos = [
     {
-      'title': '15% Additional Groceries Discount',
+      'title': '14% Additional Groceries Discount',
       'code': 'VLZKOW7',
       'minSpend': 45.00,
       'discountAmount': 10.00,
@@ -109,9 +109,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
   @override
   void initState() {
     super.initState();
-    _loadLastPromo();
+    // Removed _loadLastPromo() to prevent auto-selecting the last used promo.
   }
 
+  // NOTE: This method is kept but no longer called by initState.
   Future<void> _loadLastPromo() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -359,7 +360,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border.all(color: Colors.black12),
+          // ✅ FIX: Apply amber border when selected
+          border: Border.all(
+            color: isSelected ? Colors.amber : Colors.black12,
+            width: isSelected ? 2.0 : 1.0,
+          ),
           borderRadius: BorderRadius.circular(12),
           boxShadow: [BoxShadow(color: Colors.grey.shade200, blurRadius: 4)],
         ),
@@ -575,7 +580,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   style: TextStyle(color: Colors.red),
                 ),
               ),
-
             if (promoError.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
@@ -609,7 +613,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     Text(
                       discount > 0
                           ? "Promo Applied: $promoLabel"
-                          : "Promo '$promoCode' cannot be used (min RM${_getPromoMinSpend(promoCode)})",
+                          : "Promo '$promoCode' cannot be used (min RM${_getPromoMinSpend(promoCode).toStringAsFixed(2)})",
                       style: TextStyle(
                         color: discount > 0 ? Colors.green : Colors.red,
                       ),
@@ -680,8 +684,54 @@ class _CheckoutPageState extends State<CheckoutPage> {
       return;
     }
 
+    // ✅ FIX: If an ineligible promo is active, show the dialog.
+    // If the user clears the promo, recursively call _placeOrder to immediately retry.
+    if (promoCode.isNotEmpty && discount == 0.0) {
+      final minSpend = _getPromoMinSpend(promoCode).toStringAsFixed(2);
+
+      final shouldClear = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Promo Not Applicable'),
+          content: Text(
+            'The promo code "$promoCode" requires a minimum spend of RM$minSpend. Please clear the promo to continue with your order.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(context, false), // Cancel order attempt
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context, true); // Signal to clear promo
+              },
+              child: const Text(
+                'Clear Promo',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldClear == true) {
+        setState(() {
+          promoCode = '';
+          promoLabel = '';
+          promoError = '';
+        });
+        // ✅ Rerun the function immediately now that the promo is cleared
+        return _placeOrder();
+      }
+      // If user cancels the dialog, stop the order attempt
+      return;
+    }
+
+    // --- Proceed with order placement if validation passes ---
+
     final orderData = {
-      'userId': user.uid,
+      'userId': user.uid, // ✅ add this line
       'address': address,
       'lat': addressLatLng.latitude,
       'lng': addressLatLng.longitude,
@@ -694,7 +744,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       'total': getTotal(),
       'promoCode': promoCode,
       'promoLabel': promoLabel,
-      'status': 'received', // ✅ Initial status for tracking
+      'status': 'received',
       'items': [
         {'name': 'Tacos', 'price': 12.49},
         {'name': 'Cheese Quesadillas', 'price': 2.49},
@@ -703,16 +753,40 @@ class _CheckoutPageState extends State<CheckoutPage> {
     };
 
     try {
-      final docRef = await FirebaseFirestore.instance
-          .collection('orders')
-          .add(orderData);
+      final docRef =
+          await FirebaseFirestore.instance.collection('orders').add(orderData);
       final orderId = docRef.id;
+
+      if (promoCode.isNotEmpty) {
+        // Update user's promo usage history
+        final promoRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('promoUsage')
+            .doc(promoCode);
+
+        await promoRef.set({
+          'label': promoLabel,
+          'lastUsed': FieldValue.serverTimestamp(),
+          'count': FieldValue.increment(1),
+        }, SetOptions(merge: true));
+
+        // Save last used promo code data to the user's root document
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'lastPromo': {
+            'code': promoCode,
+            'label': promoLabel,
+            'discount': discount,
+          },
+        }, SetOptions(merge: true));
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Order placed successfully!')),
       );
 
-      Navigator.push(
+      // Use pushReplacement for successful order
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => OrderConfirmationPage(
@@ -728,31 +802,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to place order: $e')));
-      Navigator.push(
+
+      // Use pushReplacement for failed order
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const OrderFailurePage()),
       );
-    }
-    if (promoCode.isNotEmpty) {
-      final promoRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('promoUsage')
-          .doc(promoCode);
-
-      await promoRef.set({
-        'label': promoLabel,
-        'lastUsed': FieldValue.serverTimestamp(),
-        'count': FieldValue.increment(1),
-      }, SetOptions(merge: true));
-
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'lastPromo': {
-          'code': promoCode,
-          'label': promoLabel,
-          'discount': discount,
-        },
-      }, SetOptions(merge: true));
     }
   }
 }

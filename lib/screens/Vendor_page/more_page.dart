@@ -1,64 +1,78 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../util/styles.dart';
-import '../../screens/auth_wrapper.dart';
+import '../auth/vendor_login.dart';
 import 'account_settings_page.dart';
-// --- 1. 修复导入路径 (notification -> notifications) ---
 import '../shared/notifications_page.dart';
 import '../shared/help_page.dart';
 import '../shared/about_page.dart';
+// --- 1. 导入 Repository ---
+import '../../repositories/vendor_data_repository.dart';
 
-// --- "More" 页面 (Figure 26 的新样式) ---
 class MorePage extends StatelessWidget {
   final VoidCallback onBackToDashboard;
-  const MorePage({super.key, required this.onBackToDashboard});
+  final VendorDataBundle bundle; // <-- 2. 接收数据
+  final VoidCallback onProfileUpdated; // <-- (新增) 刷新回调
 
-  // --- (辅助) 构建顶部的个人资料卡片 ---
+  const MorePage({
+    super.key,
+    required this.onBackToDashboard,
+    required this.bundle,
+    required this.onProfileUpdated, // <-- (新增)
+  });
+
+  // --- 3. (已修改) 辅助: 构建顶部的个人资料卡片 ---
   Widget _buildProfileHeader() {
-    const String vendorName = "Afsar Hossen";
-    const String vendorId = "VendorID: 1234";
+    final user = bundle.user;
+    final vendor = bundle.vendor;
+    final String vendorName = "${user.firstName} ${user.lastName}";
+    final String vendorId = vendor.uid;
+    final String photoUrl = vendor.businessPhotoUrl;
 
     return Container(
       padding: const EdgeInsets.all(20.0),
       decoration: BoxDecoration(
-        color: kCardColor, // 白色背景
+        color: kCardColor,
         borderRadius: BorderRadius.circular(12.0),
         border: Border.all(color: kTextColor.withAlpha(26), width: 1.5),
       ),
       child: Row(
         children: [
-          const CircleAvatar(
+          // --- (已修改) 使用真实图片 ---
+          CircleAvatar(
             radius: 30,
-            backgroundColor: kSecondaryAccentColor, // 浅绿色
-            child: Icon(Icons.person, size: 40, color: kTextColor),
+            backgroundColor: kSecondaryAccentColor,
+            backgroundImage:
+                photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+            child: photoUrl.isEmpty
+                ? const Icon(Icons.store, size: 40, color: kTextColor)
+                : null,
           ),
           const SizedBox(width: 16.0),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Text(
-                    vendorName,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: kTextColor,
-                    ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // --- (已修改) 使用真实姓名 ---
+                Text(
+                  vendorName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: kTextColor,
                   ),
-                  const SizedBox(width: 4),
-                  Icon(Icons.edit_outlined,
-                      size: 18, color: kTextColor.withAlpha(179)),
-                ],
-              ),
-              Text(
-                vendorId,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: kTextColor.withAlpha(153),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+                // --- (已修改) 使用真实 ID ---
+                Text(
+                  'VendorID: ${vendorId.substring(0, 6)}...',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: kTextColor.withAlpha(153),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -67,17 +81,25 @@ class MorePage extends StatelessWidget {
 
   // --- (辅助) 构建列表项 ---
   Widget _buildListTile(
-      BuildContext context, IconData icon, String title, Widget page) {
+    BuildContext context,
+    IconData icon,
+    String title,
+    // (修改) 让 page 变成一个构建器，这样我们可以传递回调
+    Widget Function() pageBuilder,
+  ) {
     return ListTile(
       leading: Icon(icon, color: kTextColor.withAlpha(204)),
       title:
           Text(title, style: const TextStyle(color: kTextColor, fontSize: 16)),
       trailing: const Icon(Icons.chevron_right, color: kTextColor, size: 20),
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        // 导航到页面
+        await Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => page),
+          MaterialPageRoute(builder: (context) => pageBuilder()),
         );
+        // --- (新增) 当从设置页面返回时，调用刷新 ---
+        onProfileUpdated();
       },
     );
   }
@@ -87,7 +109,7 @@ class MorePage extends StatelessWidget {
     await FirebaseAuth.instance.signOut();
     if (context.mounted) {
       Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const AuthWrapper()),
+        MaterialPageRoute(builder: (context) => const VendorLoginPage()),
         (route) => false,
       );
     }
@@ -98,7 +120,7 @@ class MorePage extends StatelessWidget {
     return Scaffold(
       backgroundColor: kAppBackgroundColor,
       appBar: AppBar(
-        title: const Text('Settings'), // 标题改为 "Settings"
+        title: const Text('Settings'),
         backgroundColor: kAppBackgroundColor,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: kTextColor),
@@ -108,59 +130,55 @@ class MorePage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          // 1. 顶部的个人资料卡片 (Figure 26 样式)
           _buildProfileHeader(),
           const SizedBox(height: 24),
 
-          // 2. 菜单列表
+          // 5. (已修改) 导航到 AccountSettingsPage 时传递 'bundle'
           _buildListTile(
             context,
-            Icons.person_outline, // 账户图标
-            'Account & Store Settings', // 合并的功能
-            const AccountSettingsPage(), // 链接到占位符
+            Icons.person_outline,
+            'Account & Store Settings',
+            () => AccountSettingsPage(bundle: bundle), // <-- 传递数据
           ),
           const Divider(height: 1),
-          // --- 2. 修复链接 (NotificationPage -> NotificationsPage) ---
           _buildListTile(
             context,
-            Icons.notifications_none_outlined, // 通知图标
+            Icons.notifications_none_outlined,
             'Notifications',
-            const NotificationsPage(), // 链接到你队友的 NotificationsPage
+            () => const NotificationsPage(),
           ),
           const Divider(height: 1),
           _buildListTile(
             context,
-            Icons.help_outline, // 帮助图标
+            Icons.help_outline,
             'Help & Support',
-            const HelpPage(), // 链接到你队友的 HelpPage
+            () => const HelpPage(),
           ),
           const Divider(height: 1),
           _buildListTile(
             context,
-            Icons.info_outline, // "About" 图标
+            Icons.info_outline,
             'About FoodieBox',
-            const AboutPage(), // 链接到你队友的 AboutPage
+            () => const AboutPage(),
           ),
           const Divider(height: 1),
           const SizedBox(height: 40),
 
-          // 3. 登出按钮
+          // ... (你现有的 "Log Out" 按钮保持不变) ...
           Container(
             decoration: BoxDecoration(
               color: kCardColor,
               borderRadius: BorderRadius.circular(12.0),
-              border:
-                  Border.all(color: kPrimaryActionColor.withAlpha(100)), // 红色边框
+              border: Border.all(color: kPrimaryActionColor.withAlpha(100)),
             ),
             child: ListTile(
-              leading:
-                  const Icon(Icons.logout, color: kPrimaryActionColor), // 高亮色
+              leading: const Icon(Icons.logout, color: kPrimaryActionColor),
               title: const Text(
                 'Log Out',
                 style: TextStyle(
                     color: kPrimaryActionColor, fontWeight: FontWeight.bold),
               ),
-              onTap: () => _logOut(context), // 调用登出函数
+              onTap: () => _logOut(context),
             ),
           ),
         ],

@@ -43,6 +43,7 @@ dependencies:
   shared_preferences: ^2.5.3
   flutter_launcher_icons: ^0.14.4
   google_place: ^0.4.7
+  confetti: ^0.8.0
 
 dev_dependencies:
   flutter_test:

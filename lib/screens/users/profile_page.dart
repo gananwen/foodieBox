@@ -10,6 +10,7 @@ import 'subpages/my_details_page.dart';
 import 'subpages/delivery_address_page.dart';
 import '../shared/notifications_page.dart';
 import 'subpages/promo_card_page.dart';
+import 'subpages/orders_history_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -19,7 +20,7 @@ class ProfilePage extends StatelessWidget {
     final userId = FirebaseAuth.instance.currentUser!.uid;
 
     return Scaffold(
-      backgroundColor: kCardColor,
+      backgroundColor: kAppBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -123,6 +124,12 @@ class ProfilePage extends StatelessWidget {
               ),
               child: const Column(
                 children: [
+                  _ProfileItem(
+                    icon: Icons.receipt_long,
+                    label: 'Order History',
+                    targetPage: OrderHistoryPage(),
+                  ),
+                  Divider(height: 1, thickness: 1),
                   _ProfileItem(
                       icon: Icons.person_outline,
                       label: 'My Details',

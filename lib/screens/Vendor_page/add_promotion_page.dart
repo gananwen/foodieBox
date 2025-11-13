@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // 导入 intl package 用于日期格式化
-import '../../util/styles.dart'; // 导入你的样式
+import 'package:intl/intl.dart';
+import '../../util/styles.dart';
+// --- 1. 导入新模型和仓库 ---
+import '../../models/promotion.dart';
+import '../../repositories/promotion_repository.dart';
 
-// --- 添加促销页面 (Figure 33) ---
 class AddPromotionPage extends StatefulWidget {
   const AddPromotionPage({super.key});
 
@@ -12,20 +14,25 @@ class AddPromotionPage extends StatefulWidget {
 
 class _AddPromotionPageState extends State<AddPromotionPage> {
   final _formKey = GlobalKey<FormState>();
+  final _repo = PromotionRepository(); // <-- 2. 添加仓库
+  bool _isLoading = false;
 
-  // --- Form State Variables ---
+  // --- 3. (已修改) 表单状态变量 ---
   String _dealTitle = '';
-  String? _selectedProductType; // 'Blindbox', 'Grocery Deal', 'Online Deal'
+  String? _selectedProductType; // 'Blindbox', 'Grocery'
   DateTime? _startDate;
   DateTime? _endDate;
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
-  double? _originalPrice;
-  double? _discountedPrice;
-  int _quantity = 1;
+  int _discountPercentage = 0;
+  int _totalRedemptions = 0;
 
-  // --- Text Controllers ---
-  // 我们用 TextEditingControllers 来显示选中的日期/时间
+  // --- (新增) 为新字段添加 Controllers ---
+  final TextEditingController _discountPercController = TextEditingController();
+  final TextEditingController _totalRedemptionsController =
+      TextEditingController();
+
+  // (不变)
   final TextEditingController _startDateController = TextEditingController();
   final TextEditingController _endDateController = TextEditingController();
   final TextEditingController _startTimeController = TextEditingController();
@@ -33,15 +40,16 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
 
   @override
   void dispose() {
-    // 记得 dispose controllers
     _startDateController.dispose();
     _endDateController.dispose();
     _startTimeController.dispose();
     _endTimeController.dispose();
+    _discountPercController.dispose();
+    _totalRedemptionsController.dispose();
     super.dispose();
   }
 
-  // --- 日期选择函数 ---
+  // --- (不变) 日期/时间选择函数 ---
   Future<void> _selectDate(BuildContext context, bool isStartDate) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -53,7 +61,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
       setState(() {
         if (isStartDate) {
           _startDate = picked;
-          // 使用 intl package 格式化日期
           _startDateController.text = DateFormat('dd MMM yyyy').format(picked);
         } else {
           _endDate = picked;
@@ -63,7 +70,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     }
   }
 
-  // --- 时间选择函数 ---
   Future<void> _selectTime(BuildContext context, bool isStartTime) async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
@@ -73,7 +79,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
       setState(() {
         if (isStartTime) {
           _startTime = picked;
-          _startTimeController.text = picked.format(context); // 格式化时间
+          _startTimeController.text = picked.format(context);
         } else {
           _endTime = picked;
           _endTimeController.text = picked.format(context);
@@ -82,34 +88,80 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     }
   }
 
-  // --- 保存表单函数 ---
-  void _savePromotion() {
-    // 1. 验证表单
+  // --- 4. (已修改) _savePromotion 函数 ---
+  Future<void> _savePromotion() async {
     if (_formKey.currentState!.validate()) {
-      // 2. 保存表单数据
       _formKey.currentState!.save();
 
-      // 3. TODO: 在这里将数据发送到 Firebase
-      print('--- SAVING PROMOTION ---');
-      print('Title: $_dealTitle');
-      print('Product Type: $_selectedProductType');
-      print('Start Date/Time: $_startDate / $_startTime');
-      print('End Date/Time: $_endDate / $_endTime');
-      print('Price (Orig/Disc): $_originalPrice / $_discountedPrice');
-      print('Quantity: $_quantity');
+      // 额外的验证
+      if (_selectedProductType == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Please select a product type'),
+              backgroundColor: kPrimaryActionColor),
+        );
+        return;
+      }
 
-      // 4. 显示成功提示并返回上一页
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Flash Deal successfully created!'),
-          backgroundColor: kSecondaryAccentColor, // 绿色
-        ),
-      );
-      Navigator.of(context).pop();
+      setState(() => _isLoading = true);
+
+      try {
+        // 组合日期和时间
+        final DateTime startDateTime = DateTime(
+          _startDate!.year,
+          _startDate!.month,
+          _startDate!.day,
+          _startTime!.hour,
+          _startTime!.minute,
+        );
+        final DateTime endDateTime = DateTime(
+          _endDate!.year,
+          _endDate!.month,
+          _endDate!.day,
+          _endTime!.hour,
+          _endTime!.minute,
+        );
+
+        // 创建新的 PromotionModel
+        final newPromotion = PromotionModel(
+          title: _dealTitle,
+          productType: _selectedProductType!,
+          startDate: startDateTime,
+          endDate: endDateTime,
+          discountPercentage: _discountPercentage,
+          totalRedemptions: _totalRedemptions,
+          // bannerUrl 和 claimedRedemptions 使用默认值
+        );
+
+        // 调用仓库保存
+        await _repo.addPromotion(newPromotion);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Flash Deal successfully created!'),
+              backgroundColor: kSecondaryAccentColor,
+            ),
+          );
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Failed to create deal: $e'),
+                backgroundColor: kPrimaryActionColor),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
     }
   }
 
-  // --- (辅助) 可重用的文本输入框 ---
+  // --- (辅助) 可重用的文本输入框 (不变) ---
   Widget _buildTextField({
     required String label,
     required Function(String?) onSaved,
@@ -135,19 +187,26 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
             hintText: 'Input',
             fillColor: kCardColor,
             filled: true,
-            suffixIcon: controller != null
+            suffixIcon: (controller != null && controller.text.isNotEmpty)
                 ? IconButton(
                     icon: const Icon(Icons.close, size: 18),
-                    onPressed: () => controller.clear(),
+                    onPressed: () {
+                      controller.clear();
+                      // 如果是日期/时间字段，也清除状态
+                      if (controller == _startDateController) _startDate = null;
+                      if (controller == _endDateController) _endDate = null;
+                      if (controller == _startTimeController) _startTime = null;
+                      if (controller == _endTimeController) _endTime = null;
+                    },
                   )
                 : null,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: kTextColor.withOpacity(0.2)),
+              borderSide: BorderSide(color: kTextColor.withAlpha(51)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: kTextColor.withOpacity(0.2)),
+              borderSide: BorderSide(color: kTextColor.withAlpha(51)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -170,7 +229,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     );
   }
 
-  // --- (辅助) 可重用的日期/时间输入框 ---
+  // --- (辅助) 可重用的日期/时间输入框 (不变) ---
   Widget _buildDateTimePicker({
     required String label,
     required TextEditingController controller,
@@ -221,8 +280,8 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
                   decoration: BoxDecoration(
                     color: kCardColor,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: kTextColor.withOpacity(0.2), width: 1.5),
+                    border:
+                        Border.all(color: kTextColor.withAlpha(51), width: 1.5),
                   ),
                   child: const Center(
                     child: Column(
@@ -246,18 +305,17 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
                 onSaved: (value) => _dealTitle = value!,
               ),
 
-              // --- 3. 选择产品类型 ---
+              // --- 3. (已修改) 移除 "Online Deal" ---
               const Padding(
                 padding: EdgeInsets.only(left: 12.0, bottom: 4.0),
                 child: Text('Choose Products',
                     style: TextStyle(fontSize: 12, color: kTextColor)),
               ),
               _buildProductTypeRadio('Blindbox'),
-              _buildProductTypeRadio('Grocery Deal'),
-              _buildProductTypeRadio('Online Deal'),
+              _buildProductTypeRadio('Grocery'),
               const SizedBox(height: 16),
 
-              // --- 4. 开始/结束 时间/日期 ---
+              // --- 4. (不变) 开始/结束 时间/日期 ---
               Row(
                 children: [
                   Expanded(
@@ -297,69 +355,70 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
                 ],
               ),
 
-              // --- 5. 价格 ---
+              // --- 5. (已修改) 价格 -> 百分比 / 总数 ---
               Row(
                 children: [
                   Expanded(
                     child: _buildTextField(
-                      label: 'Original Price',
+                      label: 'Discount Percentage (e.g., 20)',
+                      controller: _discountPercController,
                       onSaved: (value) =>
-                          _originalPrice = double.tryParse(value!),
-                      inputType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                          _discountPercentage = int.tryParse(value!)!,
+                      inputType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        final perc = int.tryParse(value);
+                        if (perc == null || perc <= 0 || perc > 100) {
+                          return '1-100';
+                        }
+                        return null;
+                      },
                     ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildTextField(
-                      label: 'Discounted Price',
+                      label: 'Total Redemptions (e.g., 100)',
+                      controller: _totalRedemptionsController,
                       onSaved: (value) =>
-                          _discountedPrice = double.tryParse(value!),
-                      inputType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                          _totalRedemptions = int.tryParse(value!)!,
+                      inputType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        if (int.tryParse(value) == null ||
+                            int.tryParse(value)! <= 0) {
+                          return 'Must be > 0';
+                        }
+                        return null;
+                      },
                     ),
-                  ),
-                ],
-              ),
-
-              // --- 6. 数量 ---
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline),
-                    onPressed: () {
-                      if (_quantity > 1) setState(() => _quantity--);
-                    },
-                  ),
-                  Text('$_quantity',
-                      style: const TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.bold)),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline),
-                    onPressed: () {
-                      setState(() => _quantity++);
-                    },
                   ),
                 ],
               ),
               const SizedBox(height: 16),
 
-              // --- 7. 保存按钮 ---
+              // --- 6. (已修改) 保存按钮 ---
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimaryActionColor, // 你的高亮色
+                    backgroundColor: kPrimaryActionColor,
                     foregroundColor: kTextColor,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: _savePromotion,
-                  child: const Text('Save Deal',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  onPressed: _isLoading ? null : _savePromotion,
+                  child: _isLoading
+                      ? const CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(kTextColor))
+                      : const Text('Save Deal',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -377,10 +436,10 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
       groupValue: _selectedProductType,
       onChanged: (String? value) {
         setState(() {
-          _selectedProductType = value;
+          _selectedProductType = value!;
         });
       },
-      activeColor: kPrimaryActionColor, // 你的高亮色
+      activeColor: kPrimaryActionColor,
       contentPadding: EdgeInsets.zero,
     );
   }

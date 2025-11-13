@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
-import '../../util/styles.dart'; // Using your team's styles
+import '../../util/styles.dart';
 import 'add_product_page.dart';
 import 'edit_product_page.dart';
 
-// --- Product Page (Figure 27) ---
+// --- 1. 导入新模型和仓库 ---
+import '../../models/product.dart';
+import '../../repositories/product_repository.dart';
+import '../../models/promotion.dart';
+import '../../repositories/promotion_repository.dart';
+
 class ProductPage extends StatefulWidget {
   final VoidCallback onBackToDashboard;
   const ProductPage({super.key, required this.onBackToDashboard});
@@ -15,62 +20,14 @@ class ProductPage extends StatefulWidget {
 class _ProductPageState extends State<ProductPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
-  // This list holds all products, as if from Firebase
-  List<Product> _allProducts = [];
-
-  // This set tracks which product IDs are currently selected
+  final ProductRepository _productRepo = ProductRepository();
+  final PromotionRepository _promotionRepo = PromotionRepository();
   final Set<String> _selectedProductIds = {};
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    // Load dummy data when the page starts
-    _loadDummyProducts();
-  }
-
-  void _loadDummyProducts() {
-    // This is where you would fetch data from Firebase Firestore
-    setState(() {
-      _allProducts = [
-        Product(
-            id: 'p1',
-            name: 'Mystery Box',
-            type: 'Blind Box',
-            price: 20.00,
-            sold: '100+ sold',
-            imageUrl: ''),
-        Product(
-            id: 'p2',
-            name: 'Fresh Apples',
-            type: 'Grocery Deal',
-            price: 20.00,
-            sold: '100+ sold',
-            imageUrl: ''),
-        Product(
-            id: 'p3',
-            name: 'Fresh Orange',
-            type: 'Grocery Deal',
-            price: 20.00,
-            sold: '100+ sold',
-            imageUrl: ''),
-        Product(
-            id: 'p4',
-            name: 'Fresh Mango',
-            type: 'Grocery Deal',
-            price: 20.00,
-            sold: '100+ sold',
-            imageUrl: ''),
-        Product(
-            id: 'p5',
-            name: 'Fresh Corn',
-            type: 'Grocery Deal',
-            price: 20.00,
-            sold: '100+ sold',
-            imageUrl: ''),
-      ];
-    });
   }
 
   @override
@@ -79,7 +36,6 @@ class _ProductPageState extends State<ProductPage>
     super.dispose();
   }
 
-  // Toggles the selection of a product
   void _toggleSelection(String productId) {
     setState(() {
       if (_selectedProductIds.contains(productId)) {
@@ -90,27 +46,53 @@ class _ProductPageState extends State<ProductPage>
     });
   }
 
-  // Deletes all selected products
-  void _deleteSelectedProducts() {
-    // This is where you would send delete requests to Firebase
-    setState(() {
-      _allProducts.removeWhere((p) => _selectedProductIds.contains(p.id));
-      _selectedProductIds.clear();
-    });
-    // Show a confirmation
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Products deleted')),
-    );
+  Future<void> _deleteSelectedProducts() async {
+    try {
+      final deleteFutures =
+          _selectedProductIds.map((id) => _productRepo.deleteProduct(id));
+      await Future.wait(deleteFutures);
+
+      setState(() {
+        _selectedProductIds.clear();
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Products deleted')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete products: $e')),
+        );
+      }
+    }
   }
 
-  // Builds the list of products based on the selected tab
-  Widget _buildProductList(String filterType) {
-    List<Product> filteredList;
+  Map<String, int> _processPromotions(List<PromotionModel> promos) {
+    Map<String, int> promoMap = {};
+    for (var promo in promos) {
+      final type = promo.productType;
+      if (!promoMap.containsKey(type) ||
+          promo.discountPercentage > promoMap[type]!) {
+        promoMap[type] = promo.discountPercentage;
+      }
+    }
+    return promoMap;
+  }
 
+  Widget _buildProductList(
+    List<Product> allProducts,
+    String filterType,
+    Map<String, int> promotionsMap,
+  ) {
+    List<Product> filteredList;
     if (filterType == 'All') {
-      filteredList = _allProducts;
+      filteredList = allProducts;
     } else {
-      filteredList = _allProducts.where((p) => p.type == filterType).toList();
+      filteredList =
+          allProducts.where((p) => p.productType == filterType).toList();
     }
 
     if (filteredList.isEmpty) {
@@ -122,129 +104,62 @@ class _ProductPageState extends State<ProductPage>
       );
     }
 
-    // Use ListView.builder for performance
-    return ListView.builder(
-      // Add padding to the list itself
-      padding: const EdgeInsets.only(top: 8.0, bottom: 80.0), // Padding for FAB
+    return GridView.builder(
+      padding: const EdgeInsets.all(16.0),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 16.0,
+        mainAxisSpacing: 16.0,
+        childAspectRatio: 0.75,
+      ),
       itemCount: filteredList.length,
       itemBuilder: (context, index) {
         final product = filteredList[index];
-        final bool isSelected = _selectedProductIds.contains(product.id);
+        final bool isSelected = _selectedProductIds.contains(product.id!);
+        final int discount = promotionsMap[product.productType] ?? 0;
 
-        return Container(
-          margin: const EdgeInsets.symmetric(
-              horizontal: 10, vertical: 6), // Increased vertical margin
-          decoration: BoxDecoration(
-            color: kCardColor, // White
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected
-                  ? kPrimaryActionColor
-                  : kTextColor.withOpacity(0.1),
-              width: 1.5,
-            ),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-                vertical: 8.0, horizontal: 8.0), // Increased vertical padding
-            // 1. Checkbox on the left
-            leading: Checkbox(
-              value: isSelected,
-              onChanged: (bool? value) {
-                // This now ONLY controls the checkbox
-                _toggleSelection(product.id);
-              },
-              activeColor: kPrimaryActionColor,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4)),
-            ),
-
-            // 2. Image placeholder on the right
-            trailing: Container(
-              width: 70, // Increased size
-              height: 70, // Increased size
-              decoration: BoxDecoration(
-                color: kAppBackgroundColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.image_outlined,
-                  color: kTextColor, size: 35), // Increased size
-            ),
-
-            // 3. Product Type
-            title: Text(
-              product.type,
-              style: TextStyle(
-                color: kTextColor.withOpacity(0.6),
-                fontSize: 12,
-              ),
-            ),
-
-            // 4. Product Name and Price
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.name,
-                  style: const TextStyle(
-                    color: kTextColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      product.sold,
-                      style: TextStyle(
-                        color: kTextColor.withOpacity(0.6),
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'RM${product.price.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: kTextColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-
-            // 5. This tap is for the whole tile area *except* the checkbox
-            onTap: () {
-              // This is for Figure 29
+        return _ProductCard(
+          product: product,
+          isSelected: isSelected,
+          discountPercentage: discount,
+          onTap: () {
+            // 如果处于选择模式，点击卡片 = 选择
+            if (_selectedProductIds.isNotEmpty) {
+              _toggleSelection(product.id!);
+            } else {
+              // 否则 = 导航到编辑
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => EditProductPage(product: product),
+                  builder: (context) => EditProductPage(
+                    product: product,
+                    // --- ( ✨ 关键修改 ✨ ) ---
+                    // 1. 将折扣传递给详情页
+                    discountPercentage: discount,
+                  ),
                 ),
               );
-            },
-          ),
+            }
+          },
+          onLongPress: () {
+            _toggleSelection(product.id!);
+          },
         );
       },
     );
   }
 
-  // This builds the "X Selected" bar (matches Figure 27)
   Widget _buildSelectionHeader() {
     if (_selectedProductIds.isEmpty) {
-      return const SizedBox
-          .shrink(); // Return an empty box if nothing is selected
+      return const SizedBox.shrink();
     }
     return Container(
-      color: kSecondaryAccentColor.withOpacity(0.5), // Light green
+      color: kPrimaryActionColor.withOpacity(0.1),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Text(
         '${_selectedProductIds.length} Selected',
         style: const TextStyle(
-          color: kTextColor,
+          color: kPrimaryActionColor,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -254,7 +169,7 @@ class _ProductPageState extends State<ProductPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kAppBackgroundColor, // FEFFE1
+      backgroundColor: kAppBackgroundColor,
       appBar: AppBar(
         title: const Text('My Products', style: TextStyle(color: kTextColor)),
         backgroundColor: kAppBackgroundColor,
@@ -264,13 +179,11 @@ class _ProductPageState extends State<ProductPage>
           onPressed: widget.onBackToDashboard,
         ),
         actions: [
-          // Show Delete button ONLY if items are selected
           if (_selectedProductIds.isNotEmpty)
             IconButton(
               icon:
                   const Icon(Icons.delete_outline, color: kPrimaryActionColor),
               onPressed: () {
-                // Show a confirmation dialog before deleting
                 showDialog(
                   context: context,
                   builder: (ctx) => AlertDialog(
@@ -296,9 +209,7 @@ class _ProductPageState extends State<ProductPage>
                 );
               },
             ),
-          // --- REMOVED: Add button IconButton was here ---
         ],
-        // The TabBar for filtering
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: kTextColor,
@@ -306,29 +217,74 @@ class _ProductPageState extends State<ProductPage>
           unselectedLabelColor: kTextColor.withOpacity(0.6),
           tabs: const [
             Tab(text: 'All'),
-            Tab(text: 'Blind Boxes'),
-            Tab(text: 'Grocery deals'),
+            Tab(text: 'Blindbox'),
+            Tab(text: 'Grocery'),
           ],
         ),
       ),
       body: Column(
         children: [
-          // This displays the "X Selected" bar
           _buildSelectionHeader(),
-          // This displays the list of products
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildProductList('All'),
-                _buildProductList('Blind Box'),
-                _buildProductList('Grocery Deal'),
-              ],
+            child: StreamBuilder<List<PromotionModel>>(
+              stream: _promotionRepo.getPromotionsStream(),
+              builder: (context, promoSnapshot) {
+                if (promoSnapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                      child: CircularProgressIndicator(
+                          color: kPrimaryActionColor));
+                }
+                if (promoSnapshot.hasError) {
+                  return Center(
+                      child: Text(
+                          'Error loading promotions: ${promoSnapshot.error}'));
+                }
+
+                final promotions = promoSnapshot.data ?? [];
+                final promotionsMap = _processPromotions(promotions);
+
+                return StreamBuilder<List<Product>>(
+                  stream: _productRepo.getProductsStream(),
+                  builder: (context, productSnapshot) {
+                    if (productSnapshot.connectionState ==
+                        ConnectionState.waiting) {
+                      return const Center(
+                          child: CircularProgressIndicator(
+                              color: kPrimaryActionColor));
+                    }
+                    if (productSnapshot.hasError) {
+                      return Center(
+                          child: Text(
+                              'Error loading products: ${productSnapshot.error}'));
+                    }
+                    if (!productSnapshot.hasData ||
+                        productSnapshot.data!.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'No products found. Tap "+" to create one.',
+                          style: TextStyle(color: kTextColor),
+                        ),
+                      );
+                    }
+
+                    final allProducts = productSnapshot.data!;
+                    return TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildProductList(allProducts, 'All', promotionsMap),
+                        _buildProductList(
+                            allProducts, 'Blindbox', promotionsMap),
+                        _buildProductList(
+                            allProducts, 'Grocery', promotionsMap),
+                      ],
+                    );
+                  },
+                );
+              },
             ),
           ),
         ],
       ),
-      // --- ADDED: Floating Action Button for Add Product ---
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
@@ -338,7 +294,7 @@ class _ProductPageState extends State<ProductPage>
             ),
           );
         },
-        backgroundColor: kSecondaryAccentColor, // Light Green
+        backgroundColor: kSecondaryAccentColor,
         foregroundColor: kTextColor,
         child: const Icon(Icons.add),
       ),
@@ -346,23 +302,163 @@ class _ProductPageState extends State<ProductPage>
   }
 }
 
-// --- Data Model ---
-// A simple class to represent a Product.
-// In a real app, this would have fromJson/toJson methods for Firebase.
-class Product {
-  final String id;
-  final String name;
-  final String type; // 'Blind Box' or 'Grocery Deal'
-  final double price;
-  final String sold;
-  final String imageUrl; // Placeholder for product image
+// --- (产品卡片) ---
+class _ProductCard extends StatelessWidget {
+  final Product product;
+  final bool isSelected;
+  final int discountPercentage;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
-  Product({
-    required this.id,
-    required this.name,
-    required this.type,
-    required this.price,
-    required this.sold,
-    required this.imageUrl,
+  const _ProductCard({
+    required this.product,
+    required this.isSelected,
+    required this.discountPercentage,
+    required this.onTap,
+    required this.onLongPress,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasDiscount = discountPercentage > 0;
+    final double discountedPrice =
+        product.discountedPrice * (1 - discountPercentage / 100);
+
+    return InkWell(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: kCardColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color:
+                isSelected ? kPrimaryActionColor : kTextColor.withOpacity(0.1),
+            width: isSelected ? 3.0 : 1.5,
+          ),
+          boxShadow: [
+            if (isSelected)
+              BoxShadow(
+                color: kPrimaryActionColor.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(11),
+                        topRight: Radius.circular(11),
+                      ),
+                      color: kAppBackgroundColor,
+                      image: product.imageUrl.isNotEmpty
+                          ? DecorationImage(
+                              image: NetworkImage(product.imageUrl),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                    ),
+                    child: product.imageUrl.isEmpty
+                        ? const Center(
+                            child: Icon(Icons.image_outlined,
+                                color: kTextColor, size: 40))
+                        : null,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(10.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product.title,
+                        style: const TextStyle(
+                          color: kTextColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      if (hasDiscount) ...[
+                        Text(
+                          'RM${discountedPrice.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            color: kPrimaryActionColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                        Text(
+                          'RM${product.discountedPrice.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: kTextColor.withOpacity(0.5),
+                            decoration: TextDecoration.lineThrough,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ] else ...[
+                        Text(
+                          'RM${product.discountedPrice.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            color: kTextColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (hasDiscount)
+              Positioned(
+                top: 8,
+                left: 8,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: kPrimaryActionColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$discountPercentage% OFF',
+                    style: const TextStyle(
+                      color: kCardColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ),
+            if (isSelected)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: kPrimaryActionColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check, color: kCardColor, size: 16),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
