@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import '../../util/styles.dart';
-// --- (NEW) 导入模型和仓库 ---
-import '../../models/product.dart';
-import '../../repositories/product_repository.dart';
-import 'modify_product_page.dart'; // Import the page we are navigating to
+import '../../models/product.dart'; // 导入 Product 数据模型
+import 'modify_product_page.dart'; // 导入编辑表单页
+import '../../repositories/product_repository.dart'; // 导入仓库
 
-// --- Edit Product Page (Figure 29 - The Preview) ---
+// --- (已修改) Edit Product Page (Figure 29 - 预览页) ---
 class EditProductPage extends StatelessWidget {
   final Product product;
-  // --- (NEW) ---
+  final int discountPercentage; // <-- 1. 接收折扣
   final ProductRepository _productRepo = ProductRepository();
 
-  EditProductPage({super.key, required this.product});
+  EditProductPage({
+    super.key,
+    required this.product,
+    required this.discountPercentage, // <-- 2. 设为必需
+  });
 
   // Helper widget to build a tag
   Widget _buildTag(String label) {
@@ -27,9 +30,8 @@ class EditProductPage extends StatelessWidget {
     );
   }
 
-  // --- (MODIFIED) Helper for "Delete" button (now async) ---
+  // Helper for "Delete" button
   void _deleteProduct(BuildContext context) {
-    // Show a confirmation dialog
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -44,24 +46,25 @@ class EditProductPage extends StatelessWidget {
             style: TextButton.styleFrom(foregroundColor: kPrimaryActionColor),
             child: const Text('Delete'),
             onPressed: () async {
-              // <-- (MODIFIED) async
               try {
-                // --- (MODIFIED) Call to Firebase Repository ---
                 await _productRepo.deleteProduct(product.id!);
-
-                Navigator.of(ctx).pop(); // Close dialog
-                Navigator.of(context).pop(); // Go back from preview page
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Product deleted'),
-                    backgroundColor: kPrimaryActionColor,
-                  ),
-                );
+                if (context.mounted) {
+                  Navigator.of(ctx).pop(); // 关闭对话框
+                  Navigator.of(context).pop(); // 返回产品列表页
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Product deleted'),
+                      backgroundColor: kPrimaryActionColor,
+                    ),
+                  );
+                }
               } catch (e) {
-                Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to delete: $e')),
-                );
+                if (context.mounted) {
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to delete: $e')),
+                  );
+                }
               }
             },
           ),
@@ -70,12 +73,13 @@ class EditProductPage extends StatelessWidget {
     );
   }
 
-  // Helper for "Edit" button (no change needed)
+  // Helper for "Edit" button
   void _editProduct(BuildContext context) {
-    // Navigate to the ModifyProductPage, passing the product data
     Navigator.push(
       context,
       MaterialPageRoute(
+        // 注意: 我们只传递 product,
+        // modify_product_page 不需要显示折扣
         builder: (context) => ModifyProductPage(product: product),
       ),
     );
@@ -83,6 +87,12 @@ class EditProductPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // --- 3. (新增) 价格计算逻辑 ---
+    final bool hasDiscount = discountPercentage > 0;
+    final double basePrice =
+        product.discountedPrice; // 这是你的 "Discounted Price" 字段
+    final double finalPrice = basePrice * (1 - discountPercentage / 100);
+
     return Scaffold(
       backgroundColor: kAppBackgroundColor,
       extendBodyBehindAppBar: true,
@@ -108,36 +118,59 @@ class EditProductPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- (MODIFIED) Product Image (loads real image) ---
-            Container(
-              height: 300,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: kCardColor,
-                border: Border.all(color: kTextColor.withOpacity(0.1)),
-              ),
-              child: product.imageUrl.isEmpty
-                  ? const Center(
-                      child: Icon(Icons.image_outlined,
-                          color: kTextColor, size: 100))
-                  : Image.network(
-                      product.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                            child: Icon(Icons.error,
-                                color: kPrimaryActionColor, size: 100));
-                      },
+            // --- 4. (已修改) 带折扣徽章的图片 ---
+            Stack(
+              children: [
+                Container(
+                  height: 300,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: kCardColor,
+                    image: product.imageUrl.isNotEmpty
+                        ? DecorationImage(
+                            image: NetworkImage(product.imageUrl),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
+                  ),
+                  child: product.imageUrl.isEmpty
+                      ? const Center(
+                          child: Icon(Icons.image_outlined,
+                              color: kTextColor, size: 100),
+                        )
+                      : null,
+                ),
+                // --- (新增) 折扣徽章 ---
+                if (hasDiscount)
+                  Positioned(
+                    top: 40, // (避开刘海)
+                    left: 16,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: kPrimaryActionColor,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$discountPercentage% OFF',
+                        style: const TextStyle(
+                          color: kCardColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
+                  ),
+              ],
             ),
 
-            // --- Content with padding ---
+            // --- 内容 ---
             Padding(
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- (MODIFIED) Product Details (from model) ---
                   Text(
                     product.title,
                     style: const TextStyle(
@@ -149,74 +182,94 @@ class EditProductPage extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     product.description.isEmpty
-                        ? '(No description)'
+                        ? 'No description provided for this product.'
                         : product.description,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
-                      color: product.description.isEmpty
-                          ? kTextColor.withOpacity(0.5)
-                          : kTextColor,
+                      color: kTextColor,
                       height: 1.5,
                     ),
                   ),
                   const SizedBox(height: 24),
 
-                  // --- (MODIFIED) Price (from model) ---
+                  // --- 5. (已修改) 价格显示 ---
                   const Text('Price',
                       style: TextStyle(fontSize: 14, color: kTextColor)),
-                  Row(
-                    children: [
-                      Text(
-                        'RM${product.originalPrice.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: kTextColor.withOpacity(0.5),
-                          decoration: TextDecoration.lineThrough,
-                        ),
+                  if (hasDiscount) ...[
+                    // 有折扣: 显示最终价格 (大)
+                    Text(
+                      'RM${finalPrice.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 35,
+                        fontWeight: FontWeight.bold,
+                        color: kPrimaryActionColor, // 粉色
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'RM${product.discountedPrice.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 35,
-                          fontWeight: FontWeight.bold,
-                          color: kPrimaryActionColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 35),
-
-                  // --- (MODIFIED) Expiry Date (from model) ---
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: kPrimaryActionColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: kPrimaryActionColor),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    // 显示原价 (划掉) + 百分比
+                    Row(
                       children: [
-                        const Icon(Icons.calendar_today_outlined,
-                            color: kPrimaryActionColor, size: 18),
-                        const SizedBox(width: 10),
                         Text(
-                          product.expiryDate.isEmpty
-                              ? 'No Expiry Date'
-                              : 'Expire Date - ${product.expiryDate}',
+                          'RM${basePrice.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: kTextColor.withOpacity(0.5),
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '($discountPercentage% OFF)',
                           style: const TextStyle(
-                              color: kPrimaryActionColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14),
+                            color: kPrimaryActionColor,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 24),
+                  ] else ...[
+                    // 无折扣: 只显示原价 (大)
+                    Text(
+                      'RM${basePrice.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 35,
+                        fontWeight: FontWeight.bold,
+                        color: kTextColor, // 正常颜色
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 35),
 
-                  // --- (MODIFIED) Dietary Tags (from model) ---
+                  // --- Expiry Date ---
+                  if (product.expiryDate.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: kPrimaryActionColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: kPrimaryActionColor),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.calendar_today_outlined,
+                              color: kPrimaryActionColor, size: 18),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Expire Date - ${product.expiryDate}',
+                            style: const TextStyle(
+                                color: kPrimaryActionColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // --- Dietary Tags ---
                   const Text('Dietary Tags',
                       style: TextStyle(fontSize: 14, color: kTextColor)),
                   const SizedBox(height: 8),
@@ -230,7 +283,7 @@ class EditProductPage extends StatelessWidget {
                       if (!product.isHalal &&
                           !product.isVegan &&
                           !product.isNoPork)
-                        _buildTag('No Tags'),
+                        _buildTag('No tags'),
                     ],
                   ),
                 ],
@@ -239,12 +292,11 @@ class EditProductPage extends StatelessWidget {
           ],
         ),
       ),
-      // --- Bottom Button Bar (no change) ---
+      // --- 底部按钮栏 (保持不变) ---
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Row(
           children: [
-            // --- Delete Button ---
             Expanded(
               child: OutlinedButton(
                 onPressed: () => _deleteProduct(context),
@@ -264,7 +316,6 @@ class EditProductPage extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // --- Edit Button ---
             Expanded(
               child: ElevatedButton(
                 onPressed: () => _editProduct(context),

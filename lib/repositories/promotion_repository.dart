@@ -37,13 +37,15 @@ class PromotionRepository {
   }
 
   // R - Read (读取促销流)
+  // 此函数现在只获取尚未过期的促销活动
   Stream<List<PromotionModel>> getPromotionsStream() {
-    // 按结束日期排序，最新的在前
     return _getPromotionsRef()
-        .orderBy('endDate', descending: true)
+        // 只获取在今天或之后结束的促销
+        .where('endDate', isGreaterThanOrEqualTo: Timestamp.now())
         .snapshots()
         .map((snapshot) {
       return snapshot.docs.map((doc) => doc.data()).toList();
+      // (我们在 marketing_page.dart 中处理 'active'/'expired' 逻辑)
     });
   }
 
@@ -69,4 +71,6 @@ class PromotionRepository {
       rethrow;
     }
   }
+
+  // TODO: 你还需要一个 Firebase Storage 的 uploadBannerImage 函数
 }

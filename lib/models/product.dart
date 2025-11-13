@@ -65,7 +65,6 @@ class Product {
     );
   }
 
-  // CopyWith 帮助我们更新 modify_product_page.dart 中的对象
   Product copyWith({
     String? id,
     String? title,
