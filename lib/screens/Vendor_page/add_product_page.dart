@@ -33,6 +33,22 @@ class _AddProductPageState extends State<AddProductPage> {
   bool _isNoPork = false;
   File? _pickedImage;
 
+  // --- NEW: State variables for categories ---
+  String? _selectedCategory;
+  String? _selectedSubCategory;
+
+  // --- NEW: Category data. You can get this from Firebase later ---
+  final Map<String, List<String>> _categoryMap = {
+    'Frozen': ['All', 'Frozen Meals', 'Ice Cream', 'Frozen Puff & Pastry'],
+    'Baked Goods': ['All', 'Bread', 'Cakes'],
+    'Vegetables': ['All', 'Leafy Greens', 'Root Vegetables'],
+    'Spice': ['All', 'Herbs', 'Ground Spices'],
+    'Beverages': ['All', 'Soft Drinks', 'Juice', 'Coffee & Tea'],
+    'Non-Halal Food': ['All', 'Pork', 'Alcoholic Beverages'],
+  };
+  List<String> _subCategories = [];
+  // --- END NEW ---
+
   void _onTypeChanged(String type) {
     setState(() {
       _productType = type;
@@ -55,10 +71,9 @@ class _AddProductPageState extends State<AddProductPage> {
     });
   }
 
-  // --- (修改) 改回 ImageSource.gallery ---
   Future<void> _onUploadImage() async {
     final XFile? pickedFile = await ImagePicker().pickImage(
-      source: ImageSource.gallery, // <-- 从 .camera 改回 .gallery
+      source: ImageSource.gallery,
       imageQuality: 70,
     );
     if (pickedFile != null) {
@@ -70,12 +85,11 @@ class _AddProductPageState extends State<AddProductPage> {
     }
   }
 
-  // --- (不变) 显示日期选择器的函数 ---
   Future<void> _selectExpiryDate() async {
     final DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
-      firstDate: DateTime.now(), // 只能选今天或之后的日期
+      firstDate: DateTime.now(),
       lastDate: DateTime(2030),
       builder: (context, child) {
         return Theme(
@@ -103,7 +117,7 @@ class _AddProductPageState extends State<AddProductPage> {
     }
   }
 
-  // --- (不变) _onAddProduct 函数 ---
+  // --- MODIFIED: _onAddProduct function ---
   Future<void> _onAddProduct() async {
     if (_titleController.text.isEmpty ||
         _discountedPriceController.text.isEmpty) {
@@ -119,12 +133,24 @@ class _AddProductPageState extends State<AddProductPage> {
       );
       return;
     }
+    // --- NEW: Category validation ---
+    if (_selectedCategory == null || _selectedSubCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a Category and Sub-Category.')),
+      );
+      return;
+    }
+    // --- END NEW ---
+
     setState(() => _isLoading = true);
     try {
+      // --- MODIFIED: Added category and subCategory ---
       final product = Product(
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
         productType: _productType,
+        category: _selectedCategory!,     // NEW
+        subCategory: _selectedSubCategory!, // NEW
         expiryDate: _expiryDateController.text.trim(),
         originalPrice: double.tryParse(_originalPriceController.text) ?? 0.0,
         discountedPrice:
@@ -135,6 +161,8 @@ class _AddProductPageState extends State<AddProductPage> {
         isVegan: _isVegan,
         isNoPork: _isNoPork,
       );
+      // --- END MODIFIED ---
+
       DocumentReference<Product> newDocRef =
           await _productRepo.addProduct(product);
       String imageUrl =
@@ -172,6 +200,36 @@ class _AddProductPageState extends State<AddProductPage> {
     super.dispose();
   }
 
+  // --- NEW: Helper widget for dropdowns ---
+  Widget _buildDropdown(
+      {required String hint,
+      required String? value,
+      required List<String> items,
+      required Function(String?) onChanged}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: kCardColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          hint: Text(hint, style: kHintTextStyle),
+          items: items.map((String item) {
+            return DropdownMenuItem<String>(
+              value: item,
+              child: Text(item, style: const TextStyle(color: kTextColor)),
+            );
+          }).toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -198,29 +256,66 @@ class _AddProductPageState extends State<AddProductPage> {
                         CircularProgressIndicator(color: kPrimaryActionColor)),
               )
             else
-              // --- (不变) ProductForm 调用 ---
-              ProductForm(
-                titleController: _titleController,
-                descriptionController: _descriptionController,
-                expiryDateController: _expiryDateController,
-                originalPriceController: _originalPriceController,
-                discountedPriceController: _discountedPriceController,
-                productType: _productType,
-                initialQuantity: _quantity,
-                isHalal: _isHalal,
-                isVegan: _isVegan,
-                isNoPork: _isNoPork,
-                pickedImage: _pickedImage,
-                existingImageUrl: null,
-                onQuantityChanged: (qty) => setState(() => _quantity = qty),
-                onTagChanged: _onTagChanged,
-                onTypeChanged: _onTypeChanged,
-                onUploadImage: _onUploadImage,
-                onExpiryDateTap: _selectExpiryDate, // 日历功能
+              // --- MODIFIED: Added Column for new dropdowns ---
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // --- NEW: Category Dropdown ---
+                  const Text('Category', style: kLabelTextStyle),
+                  const SizedBox(height: 8),
+                  _buildDropdown(
+                    hint: 'Select Category',
+                    value: _selectedCategory,
+                    items: _categoryMap.keys.toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedCategory = newValue;
+                        _selectedSubCategory = null; // Reset sub-category
+                        _subCategories = _categoryMap[newValue] ?? [];
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // --- NEW: Sub-Category Dropdown ---
+                  const Text('Sub-Category', style: kLabelTextStyle),
+                  const SizedBox(height: 8),
+                  _buildDropdown(
+                    hint: 'Select Sub-Category',
+                    value: _selectedSubCategory,
+                    items: _subCategories,
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedSubCategory = newValue;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // This is your original ProductForm
+                  ProductForm(
+                    titleController: _titleController,
+                    descriptionController: _descriptionController,
+                    expiryDateController: _expiryDateController,
+                    originalPriceController: _originalPriceController,
+                    discountedPriceController: _discountedPriceController,
+                    productType: _productType,
+                    initialQuantity: _quantity,
+                    isHalal: _isHalal,
+                    isVegan: _isVegan,
+                    isNoPork: _isNoPork,
+                    pickedImage: _pickedImage,
+                    existingImageUrl: null,
+                    onQuantityChanged: (qty) => setState(() => _quantity = qty),
+                    onTagChanged: _onTagChanged,
+                    onTypeChanged: _onTypeChanged,
+                    onUploadImage: _onUploadImage,
+                    onExpiryDateTap: _selectExpiryDate, // 日历功能
+                  ),
+                ],
               ),
             const SizedBox(height: 30),
             if (!_isLoading)
-              // --- (不变) 按钮 ---
               ElevatedButton(
                 onPressed: _onAddProduct,
                 style: ElevatedButton.styleFrom(

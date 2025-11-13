@@ -10,6 +10,8 @@ class VendorModel {
   final bool isApproved; // 管理员审批
   final double rating;
   final List<String> storeHours; // e.g., ["Mon: 9-5", "Tue: 9-5"]
+  // --- NEW FIELD ---
+  final bool hasExpiryDeals;
 
   VendorModel({
     required this.uid,
@@ -23,6 +25,7 @@ class VendorModel {
     this.isApproved = false, // 默认未批准
     this.rating = 0.0,
     this.storeHours = const [], // 默认为空
+    this.hasExpiryDeals = false, // Default to false
   });
 
   // 从 Firestore (Map) 转换
@@ -39,6 +42,8 @@ class VendorModel {
       isApproved: map['isApproved'] ?? false,
       rating: (map['rating'] ?? 0.0).toDouble(),
       storeHours: List<String>.from(map['storeHours'] ?? []),
+      // --- NEW FIELD ---
+      hasExpiryDeals: map['hasExpiryDeals'] ?? false,
     );
   }
 
@@ -56,6 +61,8 @@ class VendorModel {
       'isApproved': isApproved,
       'rating': rating,
       'storeHours': storeHours,
+      // --- NEW FIELD ---
+      'hasExpiryDeals': hasExpiryDeals,
     };
   }
 
@@ -72,6 +79,8 @@ class VendorModel {
     bool? isApproved,
     double? rating,
     List<String>? storeHours,
+    // --- NEW FIELD ---
+    bool? hasExpiryDeals,
   }) {
     return VendorModel(
       uid: uid ?? this.uid,
@@ -85,6 +94,8 @@ class VendorModel {
       isApproved: isApproved ?? this.isApproved,
       rating: rating ?? this.rating,
       storeHours: storeHours ?? this.storeHours,
+      // --- NEW FIELD ---
+      hasExpiryDeals: hasExpiryDeals ?? this.hasExpiryDeals,
     );
   }
 }

@@ -4,10 +4,11 @@ import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
 import '../../util/styles.dart';
 import 'marketing_page.dart'; // 导入 Promotion 数据模型
+import '../../models/promotion.dart';
 
 // --- 编辑促销页面 ---
 class EditPromotionPage extends StatefulWidget {
-  final Promotion promotion;
+  final PromotionModel promotion;
   const EditPromotionPage({super.key, required this.promotion});
   @override
   State<EditPromotionPage> createState() => _EditPromotionPageState();
@@ -37,17 +38,18 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
   @override
   void initState() {
     super.initState();
-    // --- 预先填充数据 ---
     final promo = widget.promotion;
+
     _dealTitle = promo.title;
-    _selectedProductType = 'Grocery Deal'; // 假设
-    _startDate = promo.expiryDate.subtract(const Duration(days: 1)); // 假设
-    _endDate = promo.expiryDate;
+    _selectedProductType = promo.productType; // use actual productType
+    _startDate = promo.startDate;
+    _endDate = promo.endDate;
     _startTime = TimeOfDay.fromDateTime(_startDate!);
     _endTime = TimeOfDay.fromDateTime(_endDate!);
-    _originalPrice = 25.00; // 假设
-    _discountedPrice = 20.00; // 假设
-    _quantity = 10; // 假设
+    _originalPrice =
+        promo.discountPercentage.toDouble(); // or map to actual price logic
+    _discountedPrice = 20.00; // placeholder until you wire pricing
+    _quantity = promo.totalRedemptions; // use actual field
 
     // 填充 controllers (除了时间)
     _titleController.text = _dealTitle;

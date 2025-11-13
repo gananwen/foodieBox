@@ -50,7 +50,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const MainPage(),
+      home: const LoginPage(),
       debugShowCheckedModeBanner: false,
     );
   }
