@@ -10,7 +10,7 @@ import 'subpages/my_details_page.dart';
 import 'subpages/delivery_address_page.dart';
 import '../shared/notifications_page.dart';
 import 'subpages/promo_card_page.dart';
-import 'subpages/orders_page.dart';
+import 'subpages/orders_history_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
