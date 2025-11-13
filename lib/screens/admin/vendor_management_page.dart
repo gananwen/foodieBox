@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../util/styles.dart'; // ensure your styles file is correct
+import 'vendor_register_page.dart';
 import 'admin_home_page.dart';
 
 class VendorManagementPage extends StatefulWidget {
@@ -79,13 +79,13 @@ class _VendorManagementPageState extends State<VendorManagementPage>
   Color _statusColor(String status) {
     switch (status) {
       case 'Active':
-        return Colors.green.shade600;
+        return Colors.green.shade700;
       case 'Pending':
-        return Colors.orange.shade600;
+        return Colors.orange.shade700;
       case 'Suspended':
-        return Colors.red.shade600;
+        return Colors.red.shade700;
       default:
-        return Colors.grey;
+        return Colors.grey.shade700;
     }
   }
 
@@ -97,7 +97,6 @@ class _VendorManagementPageState extends State<VendorManagementPage>
     return list.where((e) => e['status'] == _selectedFilter).toList();
   }
 
-  // Pop-up dialog for view/edit actions
   void _showPopupDialog({
     required String title,
     required Widget content,
@@ -119,25 +118,39 @@ class _VendorManagementPageState extends State<VendorManagementPage>
           if (requireConfirm)
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimaryActionColor),
+                backgroundColor: kPrimaryActionColor,
+                foregroundColor: Colors.white,
+              ),
               onPressed: () {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context)
                     .showSnackBar(SnackBar(content: Text('$title confirmed')));
               },
-              child:
-                  const Text('Confirm', style: TextStyle(color: Colors.white)),
+              child: const Text('Confirm'),
             ),
         ],
       ),
     );
   }
 
-  // ------------------- UI -------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kAppBackgroundColor,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: kPrimaryActionColor,
+        icon: const Icon(Icons.person_add_alt_1_rounded, color: Colors.white),
+        label: const Text(
+          "Register Vendor",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const VendorRegisterPage()),
+          );
+        },
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -165,7 +178,7 @@ class _VendorManagementPageState extends State<VendorManagementPage>
                   ),
                   const Center(
                     child: Text(
-                      'Vendor Management &\nCustomer Supports',
+                      'Vendor Management &\nCustomer Support',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           color: kTextColor,
@@ -177,7 +190,7 @@ class _VendorManagementPageState extends State<VendorManagementPage>
               ),
             ),
 
-            // 🔹 Search + Filter Row
+            // 🔹 Search + Filter
             Container(
               color: kCardColor,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -187,13 +200,14 @@ class _VendorManagementPageState extends State<VendorManagementPage>
                     child: Container(
                       height: 40,
                       decoration: BoxDecoration(
-                        color: kAppBackgroundColor,
+                        color: Colors.grey.shade200,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const TextField(
                         decoration: InputDecoration(
                           hintText: "Search vendors or customers",
-                          hintStyle: TextStyle(fontSize: 14),
+                          hintStyle:
+                              TextStyle(fontSize: 14, color: Colors.black54),
                           prefixIcon:
                               Icon(Icons.search, size: 20, color: Colors.grey),
                           border: InputBorder.none,
@@ -204,15 +218,16 @@ class _VendorManagementPageState extends State<VendorManagementPage>
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: Icon(Icons.tune,
-                        color: _showFilter ? kPrimaryActionColor : kTextColor),
+                    icon: Icon(
+                      Icons.tune,
+                      color: _showFilter ? kPrimaryActionColor : kTextColor,
+                    ),
                     onPressed: () => setState(() => _showFilter = !_showFilter),
                   ),
                 ],
               ),
             ),
 
-            // 🔹 Filter Options (Animated)
             AnimatedCrossFade(
               duration: const Duration(milliseconds: 250),
               firstChild: const SizedBox.shrink(),
@@ -223,18 +238,20 @@ class _VendorManagementPageState extends State<VendorManagementPage>
             ),
 
             // 🔹 Tabs
-            TabBar(
-              controller: _tabController,
-              labelColor: kPrimaryActionColor,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: kPrimaryActionColor,
-              tabs: const [
-                Tab(text: 'Vendors'),
-                Tab(text: 'Customers'),
-              ],
+            Container(
+              color: kCardColor,
+              child: TabBar(
+                controller: _tabController,
+                labelColor: kPrimaryActionColor,
+                unselectedLabelColor: Colors.black54,
+                indicatorColor: kPrimaryActionColor,
+                tabs: const [
+                  Tab(text: 'Vendors'),
+                  Tab(text: 'Customers'),
+                ],
+              ),
             ),
 
-            // 🔹 Tab Contents
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -250,7 +267,6 @@ class _VendorManagementPageState extends State<VendorManagementPage>
     );
   }
 
-  // ---------------- Filter Bar ----------------
   Widget _buildFilterOptions() {
     final filters = ['All', 'Active', 'Suspended', 'New'];
     return Container(
@@ -267,11 +283,11 @@ class _VendorManagementPageState extends State<VendorManagementPage>
                 onPressed: () => setState(() => _selectedFilter = filter),
                 style: OutlinedButton.styleFrom(
                   backgroundColor:
-                      selected ? kPrimaryActionColor : Colors.transparent,
+                      selected ? kPrimaryActionColor : Colors.white,
                   side: BorderSide(
                       color: selected
                           ? kPrimaryActionColor
-                          : Colors.grey.withOpacity(0.3)),
+                          : Colors.grey.shade300),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8)),
                   padding: const EdgeInsets.symmetric(vertical: 6),
@@ -292,7 +308,6 @@ class _VendorManagementPageState extends State<VendorManagementPage>
     );
   }
 
-  // ---------------- Vendors ----------------
   Widget _buildVendorsTab() {
     final filtered = _filterList(vendors);
     return ListView.builder(
@@ -347,7 +362,6 @@ class _VendorManagementPageState extends State<VendorManagementPage>
     );
   }
 
-  // ---------------- Customers ----------------
   Widget _buildCustomersTab() {
     final filtered = _filterList(customers);
     return ListView.builder(
@@ -378,7 +392,6 @@ class _VendorManagementPageState extends State<VendorManagementPage>
   }
 }
 
-// ---------------- Vendor Card ----------------
 class _VendorCard extends StatelessWidget {
   final Map<String, dynamic> vendor;
   final Color statusColor;
@@ -403,6 +416,7 @@ class _VendorCard extends StatelessWidget {
       color: kCardColor,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 1,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(children: [
@@ -423,7 +437,8 @@ class _VendorCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(vendor['name'],
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, color: kTextColor)),
                       Text("Vendor ID: ${vendor['id']}",
                           style: const TextStyle(fontSize: 12)),
                       Text("Joined: ${vendor['joined']}",
@@ -447,14 +462,14 @@ class _VendorCard extends StatelessWidget {
               children: [
                 ElevatedButton(
                     onPressed: onApprove,
-                    style:
-                        ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: kPrimaryActionColor),
                     child: const Text("Approve",
                         style: TextStyle(color: Colors.white))),
                 ElevatedButton(
                     onPressed: onDecline,
-                    style:
-                        ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black87),
                     child: const Text("Decline",
                         style: TextStyle(color: Colors.white))),
               ],
@@ -464,14 +479,17 @@ class _VendorCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 IconButton(
-                    icon: const Icon(Icons.remove_red_eye_outlined),
+                    icon: const Icon(Icons.remove_red_eye_outlined,
+                        color: kTextColor),
                     onPressed: onView),
                 IconButton(
-                    icon: const Icon(Icons.edit_outlined), onPressed: onEdit),
+                    icon: const Icon(Icons.edit_outlined, color: kTextColor),
+                    onPressed: onEdit),
                 IconButton(
-                    icon: const Icon(Icons.lock_outline), onPressed: onLock),
+                    icon: const Icon(Icons.lock_outline, color: kTextColor),
+                    onPressed: onLock),
                 IconButton(
-                    icon: const Icon(Icons.delete_outline),
+                    icon: const Icon(Icons.delete_outline, color: kTextColor),
                     onPressed: onDelete),
               ],
             ),
@@ -481,7 +499,6 @@ class _VendorCard extends StatelessWidget {
   }
 }
 
-// ---------------- Customer Card ----------------
 class _CustomerCard extends StatelessWidget {
   final Map<String, dynamic> customer;
   final Color statusColor;
@@ -501,6 +518,7 @@ class _CustomerCard extends StatelessWidget {
       color: kCardColor,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 1,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(children: [
@@ -521,7 +539,8 @@ class _CustomerCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(customer['name'],
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, color: kTextColor)),
                       Text("Customer ID: ${customer['id']}",
                           style: const TextStyle(fontSize: 12)),
                       Text("Joined: ${customer['joined']}",
@@ -543,20 +562,19 @@ class _CustomerCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               IconButton(
-                  icon: const Icon(Icons.remove_red_eye_outlined),
+                  icon: const Icon(Icons.remove_red_eye_outlined,
+                      color: kTextColor),
                   onPressed: onView),
-              IconButton(icon: const Icon(Icons.refresh), onPressed: onRefresh),
               IconButton(
-                  icon: const Icon(Icons.lock_outline), onPressed: onLock),
+                  icon: const Icon(Icons.refresh, color: kTextColor),
+                  onPressed: onRefresh),
+              IconButton(
+                  icon: const Icon(Icons.lock_outline, color: kTextColor),
+                  onPressed: onLock),
             ],
           ),
         ]),
       ),
     );
   }
-}
-
-void main() {
-  runApp(const MaterialApp(
-      debugShowCheckedModeBanner: false, home: VendorManagementPage()));
 }
