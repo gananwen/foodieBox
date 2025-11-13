@@ -49,7 +49,6 @@ class GroceryPage extends StatelessWidget {
     return BasePage(
       currentIndex: 2, // Grocery tab index
       child: Container(
-        color: Colors.white,
         padding: const EdgeInsets.only(bottom: 80),
         child: ListView(
           children: [
