@@ -1,6 +1,7 @@
 // promotions_admin_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'voucher_form_screen.dart'; // keep form separate
 
 class PromotionsAdminPage extends StatefulWidget {
   const PromotionsAdminPage({Key? key}) : super(key: key);
@@ -21,7 +22,9 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
 
   List<Map<String, dynamic>> _allPromotions = [];
   List<Map<String, dynamic>> _filteredAll = [];
-  List<Map<String, dynamic>> _filteredApprovals = [];
+
+  List<Map<String, dynamic>> _allVouchers = [];
+  List<Map<String, dynamic>> _filteredVouchers = [];
 
   static const double _cardRadius = 12.0;
   static const Color _bgColor = Color(0xFFF6F7FB);
@@ -32,22 +35,32 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(_applyFilters);
-    _searchController.addListener(_applyFilters);
+    _tabController.addListener(() {
+      if (_tabController.index == 1) {
+        _fetchAllVouchers();
+      } else {
+        _applyFilters();
+      }
+      setState(() {});
+    });
+    _searchController.addListener(() {
+      if (_tabController.index == 0) {
+        _applyFilters();
+      } else {
+        _applyVoucherFilters();
+      }
+    });
     _fetchAllPromotions();
   }
 
   @override
   void dispose() {
-    _tabController.removeListener(_applyFilters);
-    _searchController.dispose();
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
-  // ---------------------------------------------------------------------------
-  // FETCH ALL PROMOTIONS (FIXED VERSION)
-  // ---------------------------------------------------------------------------
+  // ------------------- FETCH PROMOTIONS -------------------
   Future<void> _fetchAllPromotions() async {
     setState(() {
       _loading = true;
@@ -80,7 +93,7 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
 
           promotions.add({
             'vendor': vendorName,
-            'vendorId': vendorDoc.id, // correct vendor UID
+            'vendorId': vendorDoc.id,
             'id': promoDoc.id,
             'title': raw['title'] ?? raw['promotionTitle'] ?? '',
             'bannerURL': raw['bannerURL'] ?? raw['bannerUrl'],
@@ -99,51 +112,88 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
       setState(() {
         _allPromotions = promotions;
         _filteredAll = List.from(promotions);
-        _filteredApprovals =
-            promotions.where((p) => p['status'] == 'Pending').toList();
         _loading = false;
       });
-    } catch (e, st) {
+    } catch (e) {
       setState(() {
         _loading = false;
         _error = e.toString();
       });
-      debugPrint("Error: $e\n$st");
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // FILTER + SEARCH (FIXED VERSION)
-  // ---------------------------------------------------------------------------
+  // ------------------- FETCH VOUCHERS -------------------
+  Future<void> _fetchAllVouchers() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('vouchers').get();
+
+      final vouchers = snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'name': data['name'] ?? '',
+          'code': data['code'] ?? '',
+          'description': data['description'] ?? '',
+          'discountType': data['discountType'] ?? '',
+          'discountValue': data['discountValue'] ?? 0,
+          'minSpend': data['minSpend'] ?? 0,
+          'applicableOrderType': data['applicableOrderType'] ?? '',
+          'firstTimeOnly': data['firstTimeOnly'] ?? false,
+          'weekendOnly': data['weekendOnly'] ?? false,
+          'startDate': data['startDate'],
+          'endDate': data['endDate'],
+          'active': data['active'] ?? false,
+          'createdAt': data['createdAt'],
+        };
+      }).toList();
+
+      setState(() {
+        _allVouchers = vouchers;
+        _filteredVouchers = List.from(vouchers);
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  // ------------------- FILTERS -------------------
   void _applyFilters() {
     final q = _searchController.text.trim().toLowerCase();
 
-    bool matchesSearch(Map<String, dynamic> p) {
-      return p['vendor'].toString().toLowerCase().contains(q) ||
+    _filteredAll = _allPromotions.where((p) {
+      final matchesSearch = p['vendor'].toString().toLowerCase().contains(q) ||
           p['title'].toString().toLowerCase().contains(q) ||
           p['productType'].toString().toLowerCase().contains(q);
-    }
 
-    bool matchesStatus(Map<String, dynamic> p) {
-      return _selectedFilter == 'All' || p['status'] == _selectedFilter;
-    }
+      final matchesStatus =
+          _selectedFilter == 'All' || p['status'] == _selectedFilter;
 
-    _filteredAll = _allPromotions
-        .where(
-          (p) => matchesStatus(p) && matchesSearch(p),
-        )
-        .toList();
-
-    _filteredApprovals = _allPromotions
-        .where((p) => p['status'] == 'Pending' && matchesSearch(p))
-        .toList();
+      return matchesSearch && matchesStatus;
+    }).toList();
 
     setState(() {});
   }
 
-  // ---------------------------------------------------------------------------
-  // STATUS COLOR
-  // ---------------------------------------------------------------------------
+  void _applyVoucherFilters() {
+    final q = _searchController.text.trim().toLowerCase();
+    _filteredVouchers = _allVouchers.where((v) {
+      return v['name'].toLowerCase().contains(q) ||
+          v['code'].toLowerCase().contains(q) ||
+          v['description'].toLowerCase().contains(q);
+    }).toList();
+    setState(() {});
+  }
+
   Color _statusColor(String status) {
     switch (status) {
       case 'Pending':
@@ -159,9 +209,7 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // UPDATE STATUS / DELETE
-  // ---------------------------------------------------------------------------
+  // ------------------- UPDATE / DELETE -------------------
   Future<void> _updateStatus(
       {required String vendorId,
       required String promoId,
@@ -203,170 +251,60 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // UI HELPERS
-  // ---------------------------------------------------------------------------
-  String _formatDate(dynamic ts) {
-    if (ts == null) return "N/A";
-    if (ts is Timestamp) {
-      final dt = ts.toDate();
-      return "${dt.year}-${_two(dt.month)}-${_two(dt.day)}";
-    }
-    try {
-      final dt = DateTime.parse(ts.toString());
-      return "${dt.year}-${_two(dt.month)}-${_two(dt.day)}";
-    } catch (_) {
-      return ts.toString();
+  Future<void> _deleteVoucher(String id) async {
+    final ok = await _confirmDialog('Delete', 'Delete this voucher?');
+    if (ok == true) {
+      await FirebaseFirestore.instance.collection('vouchers').doc(id).delete();
+      _fetchAllVouchers();
     }
   }
 
-  String _two(int v) => v.toString().padLeft(2, '0');
-
-  void _showPromotionDetails(Map<String, dynamic> promo) {
-    showDialog(
+  Future<bool?> _confirmDialog(String title, String message) {
+    return showDialog<bool>(
       context: context,
-      builder: (context) {
-        final banner = promo['bannerURL'];
-        return Dialog(
-          insetPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            promo['title'],
-                            style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 6),
-                          decoration: BoxDecoration(
-                            color:
-                                _statusColor(promo['status']).withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            promo['status'],
-                            style: TextStyle(
-                                color: _statusColor(promo['status']),
-                                fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    if (banner != null && banner.toString().isNotEmpty)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: AspectRatio(
-                          aspectRatio: 16 / 9,
-                          child: Image.network(banner, fit: BoxFit.cover),
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                    _detailRow("Vendor", promo['vendor']),
-                    _detailRow("Discount", "${promo['discountPercentage']}%"),
-                    _detailRow("Product Type", promo['productType']),
-                    _detailRow("Start", _formatDate(promo['startDate'])),
-                    _detailRow("End", _formatDate(promo['endDate'])),
-                    _detailRow(
-                        "Total Redemptions", "${promo['totalRedemptions']}"),
-                    _detailRow("Claimed", "${promo['claimedRedemptions']}"),
-                    const SizedBox(height: 14),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text("Close"),
-                        ),
-                        const SizedBox(width: 8),
-                        // Only show buttons for Pending promotions
-                        if (promo['status'] == 'Pending') ...[
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green.shade700),
-                            onPressed: () async {
-                              Navigator.pop(context);
-                              await _updateStatus(
-                                  vendorId: promo['vendorId'],
-                                  promoId: promo['id'],
-                                  status: "Active");
-                            },
-                            child: const Text("Approve"),
-                          ),
-                          const SizedBox(width: 8),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red.shade700),
-                            onPressed: () async {
-                              Navigator.pop(context);
-                              await _updateStatus(
-                                  vendorId: promo['vendorId'],
-                                  promoId: promo['id'],
-                                  status: "Declined");
-                            },
-                            child: const Text("Decline"),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _detailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 110,
-            child: Text("$label:",
-                style: const TextStyle(fontWeight: FontWeight.w600)),
-          ),
-          Expanded(child: Text(value)),
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel")),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Confirm")),
         ],
       ),
     );
   }
 
-  Future<bool?> _confirmDialog(String title, String message) {
-    return showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-              title: Text(title),
-              content: Text(message),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text("Cancel")),
-                ElevatedButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text("Confirm")),
-              ],
-            ));
+  // ------------------- TOP RIGHT ICON -------------------
+  Widget _buildTopRightIcon() {
+    if (_tabController.index == 0) {
+      // Promotions
+      return IconButton(
+        icon: Icon(Icons.tune, color: _showFilter ? _primary : Colors.black87),
+        onPressed: () => setState(() => _showFilter = !_showFilter),
+      );
+    } else {
+      // Voucher
+      return IconButton(
+        icon: const Icon(Icons.add, color: Colors.black87),
+        onPressed: () async {
+          // Open voucher form screen
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => VoucherFormScreen(
+                onSaved: _fetchAllVouchers,
+              ),
+            ),
+          );
+        },
+      );
+    }
   }
 
-  // ---------------------------------------------------------------------------
-  // MAIN UI
-  // ---------------------------------------------------------------------------
+  // ------------------- MAIN UI -------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -382,27 +320,29 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.maybePop(context),
         ),
+        actions: [_buildTopRightIcon()],
       ),
       body: SafeArea(
         child: Column(
           children: [
             _buildSearchBar(),
-            AnimatedCrossFade(
-              duration: const Duration(milliseconds: 200),
-              firstChild: const SizedBox.shrink(),
-              secondChild: _buildFilterChips(),
-              crossFadeState: _showFilter
-                  ? CrossFadeState.showSecond
-                  : CrossFadeState.showFirst,
-            ),
+            if (_tabController.index == 0)
+              AnimatedCrossFade(
+                duration: const Duration(milliseconds: 200),
+                firstChild: const SizedBox.shrink(),
+                secondChild: _buildFilterChips(),
+                crossFadeState: _showFilter
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+              ),
             TabBar(
               controller: _tabController,
               labelColor: _primary,
               unselectedLabelColor: Colors.grey,
               indicatorColor: _primary,
               tabs: const [
-                Tab(text: "All"),
-                Tab(text: "Approvals"),
+                Tab(text: "Promotions"),
+                Tab(text: "Voucher"),
               ],
             ),
             Expanded(
@@ -411,12 +351,18 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
                   : _error != null
                       ? Center(child: Text("Error: $_error"))
                       : RefreshIndicator(
-                          onRefresh: _fetchAllPromotions,
+                          onRefresh: () async {
+                            if (_tabController.index == 0) {
+                              await _fetchAllPromotions();
+                            } else {
+                              await _fetchAllVouchers();
+                            }
+                          },
                           child: TabBarView(
                             controller: _tabController,
                             children: [
                               _buildGridView(_filteredAll),
-                              _buildGridView(_filteredApprovals),
+                              _buildVoucherGridView(_filteredVouchers),
                             ],
                           ),
                         ),
@@ -427,6 +373,7 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
     );
   }
 
+  // ------------------- SEARCH BAR -------------------
   Widget _buildSearchBar() {
     return Container(
       color: Colors.white,
@@ -443,7 +390,7 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
               child: TextField(
                 controller: _searchController,
                 decoration: const InputDecoration(
-                    hintText: 'Search promotions',
+                    hintText: 'Search',
                     border: InputBorder.none,
                     prefixIcon: Padding(
                       padding: EdgeInsets.only(left: 12, right: 8),
@@ -452,24 +399,19 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: Icon(Icons.tune,
-                color: _showFilter ? _primary : Colors.black87),
-            onPressed: () => setState(() => _showFilter = !_showFilter),
-          )
         ],
       ),
     );
   }
 
+  // ------------------- FILTER CHIPS -------------------
   Widget _buildFilterChips() {
     final filters = ['All', 'Pending', 'Active', 'Declined'];
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: SizedBox(
-        height: 40, // 👈 fixes chip height
+        height: 40,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: filters.length,
@@ -501,6 +443,7 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
     );
   }
 
+  // ------------------- PROMOTIONS GRID -------------------
   Widget _buildGridView(List<Map<String, dynamic>> items) {
     if (items.isEmpty) {
       return ListView(
@@ -527,6 +470,34 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
     );
   }
 
+  // ------------------- VOUCHERS GRID -------------------
+  Widget _buildVoucherGridView(List<Map<String, dynamic>> items) {
+    if (items.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 40),
+          Center(
+              child: Text('No vouchers found',
+                  style: TextStyle(color: Colors.black54))),
+        ],
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.75,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, i) => _buildVoucherCard(items[i]),
+    );
+  }
+
+  // ------------------- PROMO CARD -------------------
   Widget _buildPromoCard(Map<String, dynamic> promo) {
     final banner = promo['bannerURL'];
     final status = promo['status'];
@@ -537,7 +508,7 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
       color: Colors.white,
       child: InkWell(
         borderRadius: BorderRadius.circular(_cardRadius),
-        onTap: () => _showPromotionDetails(promo),
+        onTap: () {},
         child: Column(
           children: [
             ClipRRect(
@@ -587,7 +558,7 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
                       style:
                           TextStyle(color: Colors.grey.shade700, fontSize: 13),
                     ),
-                    const SizedBox(height: 8),
+                    const Spacer(),
                     Row(
                       children: [
                         Container(
@@ -613,66 +584,6 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
                         ),
                       ],
                     ),
-                    const Spacer(), // 👈 Push buttons to bottom
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        if (status == 'Pending') ...[
-                          _smallButton(
-                            text: "Approve",
-                            color: Colors.green.shade700,
-                            onTap: () async {
-                              final ok = await _confirmDialog(
-                                  "Approve", "Approve this?");
-                              if (ok == true) {
-                                await _updateStatus(
-                                  vendorId: promo['vendorId'],
-                                  promoId: promo['id'],
-                                  status: 'Active',
-                                );
-                              }
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          _smallButton(
-                            text: "Decline",
-                            color: Colors.red.shade700,
-                            onTap: () async {
-                              final ok = await _confirmDialog(
-                                  "Decline", "Decline this?");
-                              if (ok == true) {
-                                await _updateStatus(
-                                  vendorId: promo['vendorId'],
-                                  promoId: promo['id'],
-                                  status: 'Declined',
-                                );
-                              }
-                            },
-                          ),
-                        ] else ...[
-                          _smallButton(
-                            text: "View",
-                            color: Colors.blueGrey.shade700,
-                            onTap: () => _showPromotionDetails(promo),
-                          ),
-                          const SizedBox(width: 8),
-                          _smallButton(
-                            text: "Delete",
-                            color: Colors.red.shade700,
-                            onTap: () async {
-                              final ok = await _confirmDialog(
-                                  "Delete", "Delete this?");
-                              if (ok == true) {
-                                await _deletePromotion(
-                                  vendorId: promo['vendorId'],
-                                  promoId: promo['id'],
-                                );
-                              }
-                            },
-                          ),
-                        ]
-                      ],
-                    )
                   ],
                 ),
               ),
@@ -683,6 +594,77 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
     );
   }
 
+  // ------------------- VOUCHER CARD -------------------
+  Widget _buildVoucherCard(Map<String, dynamic> voucher) {
+    return Material(
+      elevation: _cardElevation,
+      borderRadius: BorderRadius.circular(_cardRadius),
+      color: Colors.white,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(_cardRadius),
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => VoucherFormScreen(
+                voucher: voucher,
+                onSaved: _fetchAllVouchers,
+              ),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(voucher['name'],
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              Text(voucher['code'],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
+              const SizedBox(height: 6),
+              Text(voucher['description'],
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
+              const Spacer(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  _smallButton(
+                      text: 'Edit',
+                      color: Colors.blue.shade700,
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => VoucherFormScreen(
+                              voucher: voucher,
+                              onSaved: _fetchAllVouchers,
+                            ),
+                          ),
+                        );
+                      }),
+                  const SizedBox(width: 8),
+                  _smallButton(
+                      text: 'Delete',
+                      color: Colors.red.shade700,
+                      onTap: () => _deleteVoucher(voucher['id'])),
+                ],
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ------------------- SMALL BUTTON -------------------
   Widget _smallButton({
     required String text,
     required Color color,
@@ -705,31 +687,45 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
       ),
     );
   }
-}
 
-// ---------------------------------------------------------------------------
-// FULLSCREEN IMAGE VIEW
-// ---------------------------------------------------------------------------
-class _FullScreenImagePage extends StatelessWidget {
-  final String imageUrl;
-  const _FullScreenImagePage({required this.imageUrl, Key? key})
-      : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
-      body: Center(
-        child: InteractiveViewer(
-          child: Image.network(
-            imageUrl,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) =>
-                const Icon(Icons.broken_image, size: 48, color: Colors.white),
+  // ------------------- PROMOTION DETAILS DIALOG -------------------
+  void _showPromotionDetails(Map<String, dynamic> promo) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final banner = promo['bannerURL'];
+        return Dialog(
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      promo['title'],
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    if (banner != null && banner.toString().isNotEmpty)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: AspectRatio(
+                          aspectRatio: 16 / 9,
+                          child: Image.network(banner, fit: BoxFit.cover),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
