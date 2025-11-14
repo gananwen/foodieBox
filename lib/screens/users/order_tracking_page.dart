@@ -120,7 +120,25 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
               orderSnapshot.data!.data() as Map<String, dynamic>,
               orderSnapshot.data!.id);
 
-          final LatLng userLocation = LatLng(order.lat, order.lng);
+          // --- FIX: Check for null lat/lng ---
+          // This happens if it's a pickup order
+          if (order.lat == null || order.lng == null) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: Text(
+                  'Tracking is not available for this pickup order.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              ),
+            );
+          }
+          
+          // If not null, we can safely use '!'
+          final LatLng userLocation = LatLng(order.lat!, order.lng!);
+          // --- END FIX ---
+
 
           if (order.items.isEmpty) {
             return const Center(child: Text('Order has no items.'));

@@ -12,7 +12,6 @@ import 'package:provider/provider.dart';
 import 'package:foodiebox/providers/cart_provider.dart';
 import 'package:foodiebox/screens/users/cart_page.dart';
 
-
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
 
@@ -38,7 +37,7 @@ class _MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
-    // --- NEW: Get the cart provider to watch for changes ---
+    // --- Get the cart provider to watch for changes ---
     final cart = context.watch<CartProvider>();
 
     return BasePage(
@@ -48,7 +47,7 @@ class _MainPageState extends State<MainPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // --- Top Bar (MODIFIED) ---
+            // --- Top Bar ---
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 50, 20, 10),
               child: Row(
@@ -83,15 +82,12 @@ class _MainPageState extends State<MainPage> {
                   // --- MODIFIED CART ICON ---
                   IconButton(
                     icon: Badge(
-                      // Show the number of items in the cart
                       label: Text(cart.itemCount.toString()),
-                      // Only show the badge if the cart is not empty
                       isLabelVisible: cart.itemCount > 0,
                       child: const Icon(Icons.shopping_cart_outlined,
                           color: kTextColor),
                     ),
                     onPressed: () {
-                      // Navigate to the new CartPage
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -123,7 +119,7 @@ class _MainPageState extends State<MainPage> {
               ),
             ),
 
-            // --- Search Bar (No Changes) ---
+            // --- Search Bar ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Row(
@@ -165,7 +161,7 @@ class _MainPageState extends State<MainPage> {
               ),
             ),
 
-            // --- Horizontal Scrollable Categories (No Changes) ---
+            // --- Horizontal Scrollable Categories ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
               child: SizedBox(
@@ -189,7 +185,7 @@ class _MainPageState extends State<MainPage> {
               ),
             ),
 
-            // --- Promotions Banner (No Changes) ---
+            // --- Promotions Banner ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Container(
@@ -233,21 +229,24 @@ class _MainPageState extends State<MainPage> {
             ),
             const SizedBox(height: 30),
 
-            // --- "Order snacks from" Section ---
+            // --- MODIFIED "Order snacks from" Section ---
             _buildVendorListSection(
               title: 'Order snacks from',
-              stream:
-                  FirebaseFirestore.instance.collection('vendors').snapshots(),
+              // NOW SHOWS ONLY BLINDBOX VENDORS
+              stream: FirebaseFirestore.instance
+                  .collection('vendors')
+                  .where('vendorType', isEqualTo: 'Blindbox')
+                  .snapshots(),
             ),
             const SizedBox(height: 30),
 
-            // --- "Syok Deals" Section ---
+            // --- MODIFIED "Syok Deals" Section ---
             _buildVendorListSection(
               title: 'Syok Deals: RM10 OFF',
+              // NOW SHOWS ONLY VENDORS WITH PROMOTIONS
               stream: FirebaseFirestore.instance
                   .collection('vendors')
-                  .orderBy('rating', descending: true)
-                  .limit(5)
+                  .where('hasExpiryDeals', isEqualTo: true)
                   .snapshots(),
             ),
           ],
@@ -314,7 +313,6 @@ class _MainPageState extends State<MainPage> {
               children: snapshot.data!.docs.map((doc) {
                 VendorModel vendor =
                     VendorModel.fromMap(doc.data() as Map<String, dynamic>);
-                // --- MODIFIED ---
                 // Pass context to the card builder
                 return _buildShopCard(context, vendor);
               }).toList(),
@@ -325,15 +323,13 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  // --- MODIFIED: This is YOUR UI, now made tappable ---
+  // --- MODIFIED: This card now shows the "HOT DEAL" tag ---
   Widget _buildShopCard(BuildContext context, VendorModel vendor) {
-    // --- WRAPPED IN GESTUREDETECTOR ---
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            // Open the new StoreDetailPage and pass the vendor data
             builder: (context) => StoreDetailPage(vendor: vendor),
           ),
         );
@@ -354,41 +350,69 @@ class _MainPageState extends State<MainPage> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Restaurant Image (Your 100x100 UI) ---
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                bottomLeft: Radius.circular(12),
-              ),
-              child: Image.network(
-                vendor.businessPhotoUrl,
-                width: 100,
-                height: 100,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return Container(
+            // --- Restaurant Image ---
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    bottomLeft: Radius.circular(12),
+                  ),
+                  child: Image.network(
+                    vendor.businessPhotoUrl,
                     width: 100,
                     height: 100,
-                    color: Colors.grey.shade200,
-                    child: const Center(
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return Container(
+                        width: 100,
+                        height: 100,
+                        color: Colors.grey.shade200,
+                        child: const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 100,
+                        height: 100,
+                        color: Colors.grey.shade200,
+                        child: const Icon(Icons.store,
+                            size: 40, color: Colors.grey),
+                      );
+                    },
+                  ),
+                ),
+                // --- "HOT DEAL" Tag ---
+                if (vendor.hasExpiryDeals)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 3),
+                      decoration: const BoxDecoration(
+                        color: Colors.redAccent,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(12),
+                          bottomRight: Radius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'HOT DEAL',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold),
+                      ),
                     ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: 100,
-                    height: 100,
-                    color: Colors.grey.shade200,
-                    child:
-                        const Icon(Icons.store, size: 40, color: Colors.grey),
-                  );
-                },
-              ),
+                  ),
+              ],
             ),
 
-            // --- Restaurant Info (Your UI) ---
+            // --- Restaurant Info ---
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(12),

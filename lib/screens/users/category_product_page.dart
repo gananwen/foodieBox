@@ -3,12 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:foodiebox/models/vendor.dart';
 import 'package:foodiebox/models/product.dart';
 import 'package:foodiebox/util/styles.dart';
-import 'product_detail_page.dart'; // Import the detail page
-
-// --- NEW IMPORTS ---
+import 'product_detail_page.dart'; 
 import 'package:provider/provider.dart';
 import 'package:foodiebox/providers/cart_provider.dart';
-// --- END NEW IMPORTS ---
+
 
 class CategoryProductPage extends StatelessWidget {
   final VendorModel vendor;

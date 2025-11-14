@@ -5,53 +5,35 @@ import 'order_item.model.dart'; // 确保这个 import 路径正确
 class OrderModel {
   final String id;
   final String userId;
-  final String address;
-  final double lat;
-  final double lng;
   final String paymentMethod;
   final double subtotal;
   final double total;
-  final String status;
+  final String status; // e.g., 'received', 'preparing', 'delivering', 'delivered'
   final List<OrderItem> items;
   final Timestamp timestamp;
-  final String? driverId;
+  final String? driverId; // Nullable: will be assigned when driver is found
   final String? contactName;
   final String? contactPhone;
-  final String orderType;
-  final String deliveryOption;
-  final double deliveryFee;
-  final List<String> vendorIds;
-
-  // --- ( ✨ 新增字段 ✨ ) ---
-  // 假定客户 App 在订单完成后会更新这些字段
-  final double? rating; // e.g., 4.5
-  final String? reviewText; // e.g., "Great food!"
-  final Timestamp? reviewTimestamp; // 评价的时间
 
   OrderModel({
     required this.id,
     required this.userId,
-    required this.address,
-    required this.lat,
-    required this.lng,
     required this.paymentMethod,
     required this.subtotal,
     required this.total,
     required this.status,
     required this.items,
     required this.timestamp,
-    this.driverId,
+    required this.vendorName,
+    required this.vendorType,
+    required this.orderType,
+    this.vendorIds = const [], // <-- ADDED with default
+    // Nullable fields
+    this.address,
+    this.lat,
+    this.lng,
     this.contactName,
     this.contactPhone,
-    required this.orderType,
-    this.deliveryOption = 'Standard',
-    this.deliveryFee = 0.0,
-    required this.vendorIds,
-
-    // --- ( ✨ 新增字段 ✨ ) ---
-    this.rating,
-    this.reviewText,
-    this.reviewTimestamp,
   });
 
   factory OrderModel.fromMap(Map<String, dynamic> map, String documentId) {
@@ -62,28 +44,45 @@ class OrderModel {
     return OrderModel(
       id: documentId,
       userId: map['userId'] ?? '',
-      address: map['address'] ?? '',
-      lat: (map['lat'] as num?)?.toDouble() ?? 0.0,
-      lng: (map['lng'] as num?)?.toDouble() ?? 0.0,
       paymentMethod: map['paymentMethod'] ?? '',
       subtotal: (map['subtotal'] as num?)?.toDouble() ?? 0.0,
       total: (map['total'] as num?)?.toDouble() ?? 0.0,
       status: map['status'] ?? 'received',
       items: parsedItems,
       timestamp: map['timestamp'] ?? Timestamp.now(),
-      driverId: map['driverId'],
+      driverId: map['driverId'], // Can be null
       contactName: map['contactName'],
       contactPhone: map['contactPhone'],
-      orderType: map['orderType'] ?? 'Delivery',
-      deliveryOption: map['deliveryOption'] ?? 'Standard',
-      deliveryFee: (map['deliveryFee'] as num?)?.toDouble() ?? 0.0,
-      vendorIds: List<String>.from(map['vendorIds'] ?? []),
+    );
+  }
+}
 
-      // --- ( ✨ 新增字段 ✨ ) ---
-      // (使用 'as num?' 来安全地处理 double 和 int)
-      rating: (map['rating'] as num?)?.toDouble(),
-      reviewText: map['reviewText'],
-      reviewTimestamp: map['reviewTimestamp'],
+// A model for a single item within an order
+class OrderItem {
+  final String name;
+  final double price;
+  final int quantity;
+  final String productId;
+  final String vendorId;
+  final String imageUrl;
+
+  OrderItem({
+    required this.name,
+    required this.price,
+    required this.quantity,
+    required this.productId,
+    required this.vendorId,
+    required this.imageUrl,
+  });
+
+  factory OrderItem.fromMap(Map<String, dynamic> map) {
+    return OrderItem(
+      name: map['name'] ?? '',
+      price: (map['price'] as num?)?.toDouble() ?? 0.0,
+      quantity: (map['quantity'] as num?)?.toInt() ?? 0,
+      productId: map['productId'] ?? '',
+      vendorId: map['vendorId'] ?? '',
+      imageUrl: map['imageUrl'] ?? '',
     );
   }
 }
