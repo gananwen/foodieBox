@@ -1,7 +1,9 @@
+// 路径: lib/pages/vendor_home/add_promotion_page.dart
+import 'dart:io'; // <-- ( ✨ 新增 ✨ )
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart'; // <-- ( ✨ 新增 ✨ )
 import 'package:intl/intl.dart';
 import '../../util/styles.dart';
-// --- 1. 导入新模型和仓库 ---
 import '../../models/promotion.dart';
 import '../../repositories/promotion_repository.dart';
 
@@ -14,25 +16,26 @@ class AddPromotionPage extends StatefulWidget {
 
 class _AddPromotionPageState extends State<AddPromotionPage> {
   final _formKey = GlobalKey<FormState>();
-  final _repo = PromotionRepository(); // <-- 2. 添加仓库
+  final _repo = PromotionRepository();
   bool _isLoading = false;
 
-  // --- 3. (已修改) 更新状态变量 ---
+  // --- ( ✨ 新增状态 ✨ ) ---
+  File? _imageFile;
+  final ImagePicker _picker = ImagePicker();
+
   String _dealTitle = '';
-  String? _selectedProductType; // 'Blindbox' 或 'Grocery'
+  String? _selectedProductType;
   DateTime? _startDate;
   DateTime? _endDate;
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
-  int? _discountPercentage;
-  int? _totalRedemptions;
+  int _discountPercentage = 0;
+  int _totalRedemptions = 0;
 
-  // (新增) 为新字段添加 Controllers
+  // ... (所有 controllers 保持不变) ...
   final TextEditingController _discountPercController = TextEditingController();
   final TextEditingController _totalRedemptionsController =
       TextEditingController();
-
-  // (不变)
   final TextEditingController _startDateController = TextEditingController();
   final TextEditingController _endDateController = TextEditingController();
   final TextEditingController _startTimeController = TextEditingController();
@@ -40,15 +43,11 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
 
   @override
   void dispose() {
-    _startDateController.dispose();
-    _endDateController.dispose();
-    _startTimeController.dispose();
-    _endTimeController.dispose();
-    _discountPercController.dispose();
-    _totalRedemptionsController.dispose();
+    // ... (不变)
     super.dispose();
   }
 
+  // ... (日期/时间选择函数 _selectDate, _selectTime 保持不变) ...
   Future<void> _selectDate(BuildContext context, bool isStartDate) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -87,29 +86,48 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     }
   }
 
-  // --- 4. (已修改) _savePromotion 函数 ---
+  // --- ( ✨ 新增函数：选择图片 ✨ ) ---
+  Future<void> _pickImage() async {
+    try {
+      final XFile? pickedFile =
+          await _picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile != null) {
+        setState(() {
+          _imageFile = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to pick image: $e')),
+        );
+      }
+    }
+  }
+
+  // --- ( ✨ 重大修改：_savePromotion 函数 ✨ ) ---
   Future<void> _savePromotion() async {
     if (_formKey.currentState!.validate()) {
-      // 检查自定义字段
-      if (_selectedProductType == null ||
-          _startDate == null ||
-          _endDate == null ||
-          _startTime == null ||
-          _endTime == null) {
+      _formKey.currentState!.save();
+
+      // 额外验证
+      if (_selectedProductType == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Please fill in all date, time, and type fields.'),
-            backgroundColor: kPrimaryActionColor,
-          ),
+              content: Text('Please select a product type'),
+              backgroundColor: kPrimaryActionColor),
         );
         return;
       }
 
-      _formKey.currentState!.save();
       setState(() => _isLoading = true);
 
+      // ( ✨ 修改的逻辑 ✨ )
+      String? newPromoId;
+      String? bannerUrl;
+
       try {
-        // 组合日期和时间
+        // 步骤 1: 组合日期和时间 (不变)
         final DateTime startDateTime = DateTime(
           _startDate!.year,
           _startDate!.month,
@@ -125,24 +143,26 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           _endTime!.minute,
         );
 
-        // 创建新的 PromotionModel
+        // 步骤 2: 创建模型 (不带 URL)
         final newPromotion = PromotionModel(
           title: _dealTitle,
           productType: _selectedProductType!,
           startDate: startDateTime,
           endDate: endDateTime,
-          discountPercentage: _discountPercentage ?? 0,
-          totalRedemptions: _totalRedemptions ?? 0,
-          // bannerUrl, claimedRedemptions 使用默认值
+          discountPercentage: _discountPercentage,
+          totalRedemptions: _totalRedemptions,
+          bannerUrl: '', // 暂时为空
         );
 
-        // TODO: 在这里添加图片上传逻辑
-        // 1. 上传图片到 Storage (如果 _pickedImage != null)
-        // 2. 获取 downloadUrl
-        // 3. newPromotion.bannerUrl = downloadUrl
+        // 步骤 3: 保存到 Firestore (现在返回 ID)
+        newPromoId = await _repo.addPromotion(newPromotion);
 
-        // 保存到 Firebase
-        await _repo.addPromotion(newPromotion);
+        // 步骤 4: 如果有图片，上传图片
+        if (_imageFile != null) {
+          bannerUrl = await _repo.uploadBannerImage(_imageFile!, newPromoId);
+          // 步骤 5: 更新 Firestore 文档的 bannerUrl
+          await _repo.updatePromotionBannerUrl(newPromoId, bannerUrl);
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -154,12 +174,12 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           Navigator.of(context).pop();
         }
       } catch (e) {
+        // (错误处理)
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to save deal: $e'),
-              backgroundColor: kPrimaryActionColor,
-            ),
+                content: Text('Failed to create deal: $e'),
+                backgroundColor: kPrimaryActionColor),
           );
         }
       } finally {
@@ -170,6 +190,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     }
   }
 
+  // ... (_buildTextField, _buildDateTimePicker, _buildProductTypeRadio 保持不变) ...
   Widget _buildTextField({
     required String label,
     required Function(String?) onSaved,
@@ -179,6 +200,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     bool readOnly = false,
     VoidCallback? onTap,
   }) {
+    // ... (不变)
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -198,16 +220,22 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
             suffixIcon: (controller != null && controller.text.isNotEmpty)
                 ? IconButton(
                     icon: const Icon(Icons.close, size: 18),
-                    onPressed: () => controller.clear(),
+                    onPressed: () {
+                      controller.clear();
+                      if (controller == _startDateController) _startDate = null;
+                      if (controller == _endDateController) _endDate = null;
+                      if (controller == _startTimeController) _startTime = null;
+                      if (controller == _endTimeController) _endTime = null;
+                    },
                   )
                 : null,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: kTextColor.withOpacity(0.2)),
+              borderSide: BorderSide(color: kTextColor.withAlpha(51)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: kTextColor.withOpacity(0.2)),
+              borderSide: BorderSide(color: kTextColor.withAlpha(51)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -250,6 +278,21 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     );
   }
 
+  Widget _buildProductTypeRadio(String title) {
+    return RadioListTile<String>(
+      title: Text(title, style: const TextStyle(color: kTextColor)),
+      value: title,
+      groupValue: _selectedProductType,
+      onChanged: (String? value) {
+        setState(() {
+          _selectedProductType = value!;
+        });
+      },
+      activeColor: kPrimaryActionColor,
+      contentPadding: EdgeInsets.zero,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -269,54 +312,56 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- 1. 上传横幅图片 ---
+              // --- 1. ( ✨ 已修改 ✨ ) 上传横幅图片 ---
               GestureDetector(
-                onTap: () {
-                  // TODO: 实现图片上传逻辑
-                },
+                onTap: _pickImage, // <-- ( ✨ 绑定函数 ✨ )
                 child: Container(
                   height: 150,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: kCardColor,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: kTextColor.withOpacity(0.2), width: 1.5),
+                    border:
+                        Border.all(color: kTextColor.withAlpha(51), width: 1.5),
                   ),
-                  child: const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.cloud_upload_outlined,
-                            size: 40, color: kTextColor),
-                        SizedBox(height: 8),
-                        Text('Upload Banner Image',
-                            style: TextStyle(color: kTextColor)),
-                      ],
-                    ),
-                  ),
+                  // ( ✨ 动态显示 ✨ )
+                  child: _imageFile != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.file(
+                            _imageFile!,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.cloud_upload_outlined,
+                                  size: 40, color: kTextColor),
+                              SizedBox(height: 8),
+                              Text('Upload Banner Image',
+                                  style: TextStyle(color: kTextColor)),
+                            ],
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 24),
 
-              // --- 2. 促销标题 ---
+              // ... (所有其他表单字段保持不变) ...
               _buildTextField(
                 label: 'Deal Title',
                 onSaved: (value) => _dealTitle = value!,
               ),
-
-              // --- 3. (已修改) 选择产品类型 ---
               const Padding(
                 padding: EdgeInsets.only(left: 12.0, bottom: 4.0),
                 child: Text('Choose Products',
                     style: TextStyle(fontSize: 12, color: kTextColor)),
               ),
               _buildProductTypeRadio('Blindbox'),
-              _buildProductTypeRadio('Grocery'), // <-- 移除了 'Deal'
-              // 移除了 'Online Deal'
+              _buildProductTypeRadio('Grocery'),
               const SizedBox(height: 16),
-
-              // --- 4. 开始/结束 时间/日期 (不变) ---
               Row(
                 children: [
                   Expanded(
@@ -355,8 +400,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
                   ),
                 ],
               ),
-
-              // --- 5. (已修改) 价格 -> 百分比 / 总数 ---
               Row(
                 children: [
                   Expanded(
@@ -364,7 +407,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
                       label: 'Discount Percentage (e.g., 20)',
                       controller: _discountPercController,
                       onSaved: (value) =>
-                          _discountPercentage = int.tryParse(value!),
+                          _discountPercentage = int.tryParse(value!)!,
                       inputType: TextInputType.number,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -384,7 +427,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
                       label: 'Total Redemptions (e.g., 100)',
                       controller: _totalRedemptionsController,
                       onSaved: (value) =>
-                          _totalRedemptions = int.tryParse(value!),
+                          _totalRedemptions = int.tryParse(value!)!,
                       inputType: TextInputType.number,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -401,8 +444,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
                 ],
               ),
               const SizedBox(height: 16),
-
-              // --- 7. 保存按钮 ---
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -426,22 +467,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           ),
         ),
       ),
-    );
-  }
-
-  // (辅助) 构建单选按钮
-  Widget _buildProductTypeRadio(String title) {
-    return RadioListTile<String>(
-      title: Text(title, style: const TextStyle(color: kTextColor)),
-      value: title,
-      groupValue: _selectedProductType,
-      onChanged: (String? value) {
-        setState(() {
-          _selectedProductType = value;
-        });
-      },
-      activeColor: kPrimaryActionColor,
-      contentPadding: EdgeInsets.zero,
     );
   }
 }

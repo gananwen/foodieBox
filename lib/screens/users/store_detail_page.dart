@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:foodiebox/models/vendor.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:foodiebox/models/vendor.dart';
 import 'package:foodiebox/models/product.dart';

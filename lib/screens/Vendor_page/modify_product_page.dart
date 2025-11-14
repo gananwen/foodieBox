@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // 导入
-import 'package:intl/intl.dart'; // 导入
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import '../../util/styles.dart';
 import 'widgets/product_form.dart';
 import '../../models/product.dart';
 import '../../repositories/product_repository.dart';
+// --- (新增) 导入类别数据 ---
+import '../../util/categories.dart';
 
 class ModifyProductPage extends StatefulWidget {
   final Product product;
@@ -16,51 +18,97 @@ class ModifyProductPage extends StatefulWidget {
 }
 
 class _ModifyProductPageState extends State<ModifyProductPage> {
-  final ProductRepository _productRepo = ProductRepository();
+  final _formKey = GlobalKey<FormState>();
+  final _productRepo = ProductRepository();
   bool _isLoading = false;
 
+  // Controllers
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
   late TextEditingController _expiryDateController;
   late TextEditingController _originalPriceController;
   late TextEditingController _discountedPriceController;
 
+  // State
+  File? _pickedImage;
   late String _productType;
   late int _quantity;
   late bool _isHalal;
   late bool _isVegan;
   late bool _isNoPork;
-  File? _pickedImage;
-  late String _existingImageUrl; // 存储已存在的 URL
+  late String _existingImageUrl;
+
+  // --- (新增) Category State ---
+  String? _selectedCategory;
+  String? _selectedSubCategory;
+  List<String> _subCategories = [];
+  // ---
 
   @override
   void initState() {
     super.initState();
-    // Pre-fill controllers
-    _titleController = TextEditingController(text: widget.product.title);
-    _descriptionController =
-        TextEditingController(text: widget.product.description);
-    _expiryDateController =
-        TextEditingController(text: widget.product.expiryDate);
-    _originalPriceController = TextEditingController(
-        text: widget.product.originalPrice.toStringAsFixed(2));
-    _discountedPriceController = TextEditingController(
-        text: widget.product.discountedPrice.toStringAsFixed(2));
+    final product = widget.product;
+    _titleController = TextEditingController(text: product.title);
+    _descriptionController = TextEditingController(text: product.description);
+    _expiryDateController = TextEditingController(text: product.expiryDate);
+    _originalPriceController =
+        TextEditingController(text: product.originalPrice.toStringAsFixed(2));
+    _discountedPriceController =
+        TextEditingController(text: product.discountedPrice.toStringAsFixed(2));
+    _existingImageUrl = product.imageUrl;
+    _productType = product.productType;
+    _quantity = product.quantity;
+    _isHalal = product.isHalal;
+    _isVegan = product.isVegan;
+    _isNoPork = product.isNoPork;
 
-    // Set initial state from the product
-    _productType = widget.product.productType;
-    _quantity = widget.product.quantity;
-    _isHalal = widget.product.isHalal;
-    _isVegan = widget.product.isVegan;
-    _isNoPork = widget.product.isNoPork;
-    _existingImageUrl = widget.product.imageUrl; // 存储旧图片 URL
+    // --- (新增) 加载类别 ---
+    if (product.category.isNotEmpty) {
+      _selectedCategory = product.category;
+      _subCategories = kGroceryCategories[product.category] ?? [];
+      if (product.subCategory.isNotEmpty) {
+        _selectedSubCategory = product.subCategory;
+      }
+    }
+    // ---
   }
 
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _expiryDateController.dispose();
+    _originalPriceController.dispose();
+    _discountedPriceController.dispose();
+    super.dispose();
+  }
+
+  // --- (新增) Category Handlers ---
   void _onTypeChanged(String type) {
     setState(() {
       _productType = type;
+      _selectedCategory = null;
+      _selectedSubCategory = null;
+      _subCategories = [];
     });
   }
+
+  void _onCategoryChanged(String? newValue) {
+    if (newValue == null) return;
+    setState(() {
+      _selectedCategory = newValue;
+      _selectedSubCategory = null; // 重置子类别
+      _subCategories = kGroceryCategories[newValue] ?? [];
+    });
+  }
+
+  void _onSubCategoryChanged(String? newValue) {
+    if (newValue == null) return;
+    setState(() {
+      _selectedSubCategory = newValue;
+    });
+  }
+  // ---
 
   void _onTagChanged(String key, bool value) {
     setState(() {
@@ -78,35 +126,22 @@ class _ModifyProductPageState extends State<ModifyProductPage> {
     });
   }
 
-  // --- (修改) 改回 ImageSource.gallery ---
   Future<void> _onUploadImage() async {
-    final XFile? pickedFile = await ImagePicker().pickImage(
-      source: ImageSource.gallery, // <-- 从 .camera 改回 .gallery
-      imageQuality: 70,
-    );
+    final XFile? pickedFile =
+        await ImagePicker().pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
         _pickedImage = File(pickedFile.path);
       });
-    } else {
-      print('No image selected.');
     }
   }
 
-  // --- (不变) 日历功能 ---
   Future<void> _selectExpiryDate() async {
-    // 尝试解析已有的日期，如果失败则使用今天
-    DateTime initialDate =
-        DateFormat('dd MMM yyyy').tryParse(widget.product.expiryDate) ??
-            DateTime.now();
-    // 确保初始日期不早于 firstDate
-    if (initialDate.isBefore(DateTime.now())) {
-      initialDate = DateTime.now();
-    }
-
     final DateTime? pickedDate = await showDatePicker(
       context: context,
-      initialDate: initialDate,
+      initialDate:
+          DateFormat('dd MMM yyyy').tryParse(_expiryDateController.text) ??
+              DateTime.now(),
       firstDate: DateTime.now(),
       lastDate: DateTime(2030),
       builder: (context, child) {
@@ -115,11 +150,6 @@ class _ModifyProductPageState extends State<ModifyProductPage> {
             colorScheme: const ColorScheme.light(
               primary: kPrimaryActionColor,
               onPrimary: kCardColor,
-            ),
-            textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(
-                foregroundColor: kPrimaryActionColor,
-              ),
             ),
           ),
           child: child!,
@@ -135,66 +165,83 @@ class _ModifyProductPageState extends State<ModifyProductPage> {
     }
   }
 
-  // --- (不变) _onUpdateProduct 函数 ---
   Future<void> _onUpdateProduct() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    // --- (新增) 类别验证 ---
+    String finalCategory;
+    String finalSubCategory;
+
+    if (_productType == 'Blindbox') {
+      finalCategory = 'Hot Deals';
+      finalSubCategory = '';
+    } else {
+      if (_selectedCategory == null || _selectedSubCategory == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select a category and sub-category.'),
+            backgroundColor: kPrimaryActionColor,
+          ),
+        );
+        return;
+      }
+      finalCategory = _selectedCategory!;
+      finalSubCategory = _selectedSubCategory!;
+    }
+    // ---
+
     setState(() => _isLoading = true);
-    String newImageUrl = _existingImageUrl; // 默认使用旧图片
 
     try {
-      // 1. 如果有新图片被选中，上传它
+      String newImageUrl = _existingImageUrl;
       if (_pickedImage != null) {
         newImageUrl = await _productRepo.uploadProductImage(
             _pickedImage!, widget.product.id!);
       }
 
-      // 2. 使用 copyWith 创建更新后的对象
       final updatedProduct = widget.product.copyWith(
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
         productType: _productType,
+        // --- (新增) 保存类别 ---
+        category: finalCategory,
+        subCategory: finalSubCategory,
+        // ---
         expiryDate: _expiryDateController.text.trim(),
         originalPrice: double.tryParse(_originalPriceController.text) ?? 0.0,
         discountedPrice:
             double.tryParse(_discountedPriceController.text) ?? 0.0,
+        imageUrl: newImageUrl,
         quantity: _quantity,
         isHalal: _isHalal,
         isVegan: _isVegan,
         isNoPork: _isNoPork,
-        imageUrl: newImageUrl, // 使用新 URL 或旧 URL
       );
 
-      // 3. 将其更新到 Firestore
       await _productRepo.updateProduct(updatedProduct);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Product updated successfully!'),
-            backgroundColor: kCategoryColor, // (修改) 按钮颜色
+            backgroundColor: kSecondaryAccentColor,
           ),
         );
-        // 返回产品列表页 (pop 两次)
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
-      print(e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update product: $e')),
+          SnackBar(
+              content: Text('Failed to update product: $e'),
+              backgroundColor: kPrimaryActionColor),
         );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    _expiryDateController.dispose();
-    _originalPriceController.dispose();
-    _discountedPriceController.dispose();
-    super.dispose();
   }
 
   @override
@@ -213,57 +260,61 @@ class _ModifyProductPageState extends State<ModifyProductPage> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
-        child: Column(
-          children: [
-            if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 100),
-                child: Center(
-                    child:
-                        CircularProgressIndicator(color: kPrimaryActionColor)),
-              )
-            else
-              // --- (不变) ProductForm 调用 ---
-              ProductForm(
-                titleController: _titleController,
-                descriptionController: _descriptionController,
-                expiryDateController: _expiryDateController,
-                originalPriceController: _originalPriceController,
-                discountedPriceController: _discountedPriceController,
-                productType: _productType,
-                initialQuantity: _quantity,
-                isHalal: _isHalal,
-                isVegan: _isVegan,
-                isNoPork: _isNoPork,
-                pickedImage: _pickedImage,
-                existingImageUrl: _existingImageUrl, // 传递旧图片 URL
-                onQuantityChanged: (qty) => setState(() => _quantity = qty),
-                onTagChanged: _onTagChanged,
-                onTypeChanged: _onTypeChanged,
-                onUploadImage: _onUploadImage,
-                onExpiryDateTap: _selectExpiryDate, // 日历功能
-              ),
-            const SizedBox(height: 30),
-            if (!_isLoading)
-              // --- (不变) 按钮 ---
-              ElevatedButton(
-                onPressed: _onUpdateProduct,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kCategoryColor, // 深绿色
-                  foregroundColor: kTextColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.all(32.0),
+                  child: CircularProgressIndicator(color: kPrimaryActionColor),
+                )
+              else
+                ProductForm(
+                  titleController: _titleController,
+                  descriptionController: _descriptionController,
+                  expiryDateController: _expiryDateController,
+                  originalPriceController: _originalPriceController,
+                  discountedPriceController: _discountedPriceController,
+                  pickedImage: _pickedImage,
+                  existingImageUrl: _existingImageUrl,
+                  productType: _productType,
+                  onTypeChanged: _onTypeChanged,
+                  // --- (新增) 传递类别 ---
+                  selectedCategory: _selectedCategory,
+                  selectedSubCategory: _selectedSubCategory,
+                  onCategoryChanged: _onCategoryChanged,
+                  onSubCategoryChanged: _onSubCategoryChanged,
+                  // ---
+                  initialQuantity: _quantity,
+                  isHalal: _isHalal,
+                  isVegan: _isVegan,
+                  isNoPork: _isNoPork,
+                  onQuantityChanged: (qty) => setState(() => _quantity = qty),
+                  onTagChanged: _onTagChanged,
+                  onUploadImage: _onUploadImage,
+                  onExpiryDateTap: _selectExpiryDate,
+                ),
+              const SizedBox(height: 30),
+              if (!_isLoading)
+                ElevatedButton(
+                  onPressed: _onUpdateProduct,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kCategoryColor,
+                    foregroundColor: kTextColor,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    minimumSize: const Size(double.infinity, 50),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  minimumSize: const Size(double.infinity, 50),
+                  child: const Text(
+                    'Update Product',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
                 ),
-                child: const Text(
-                  'Update Product',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                ),
-              ),
-            const SizedBox(height: 20),
-          ],
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );

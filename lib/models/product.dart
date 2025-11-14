@@ -1,14 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Product {
-  final String? id; // 文档 ID
+  final String? id;
   final String title;
   final String description;
-  final String productType; // 'Blind Box' 或 'Grocery Deal'
-  
-  // --- NEW FIELDS ---
-  // You MUST add these to your Firebase data
-  // e.g., category: "Frozen", subCategory: "Ice Cream"
+  final String productType;
   final String category;
   final String subCategory;
   // --- END NEW FIELDS ---
@@ -27,7 +23,7 @@ class Product {
     required this.title,
     required this.description,
     required this.productType,
-    required this.category,     // NEW
+    required this.category, // NEW
     required this.subCategory, // NEW
     required this.expiryDate,
     required this.originalPrice,
@@ -39,13 +35,12 @@ class Product {
     required this.isNoPork,
   });
 
-  // 将 Product 对象转换为 Map (用于写入 Firestore)
   Map<String, dynamic> toMap() {
     return {
       'title': title,
       'description': description,
       'productType': productType,
-      'category': category,     // NEW
+      'category': category, // NEW
       'subCategory': subCategory, // NEW
       'expiryDate': expiryDate,
       'originalPrice': originalPrice,
@@ -65,7 +60,7 @@ class Product {
       title: map['title'] ?? '',
       description: map['description'] ?? '',
       productType: map['productType'] ?? 'Grocery Deal',
-      category: map['category'] ?? '',     // NEW
+      category: map['category'] ?? '', // NEW
       subCategory: map['subCategory'] ?? '', // NEW
       expiryDate: map['expiryDate'] ?? '',
       originalPrice: (map['originalPrice'] ?? 0.0).toDouble(),
@@ -78,13 +73,12 @@ class Product {
     );
   }
 
-  // CopyWith 帮助我们更新 modify_product_page.dart 中的对象
   Product copyWith({
     String? id,
     String? title,
     String? description,
     String? productType,
-    String? category,    // NEW
+    String? category, // NEW
     String? subCategory, // NEW
     String? expiryDate,
     double? originalPrice,
@@ -100,7 +94,7 @@ class Product {
       title: title ?? this.title,
       description: description ?? this.description,
       productType: productType ?? this.productType,
-      category: category ?? this.category,       // NEW
+      category: category ?? this.category, // NEW
       subCategory: subCategory ?? this.subCategory, // NEW
       expiryDate: expiryDate ?? this.expiryDate,
       originalPrice: originalPrice ?? this.originalPrice,

@@ -1,11 +1,13 @@
+// 路径: lib/pages/vendor_home/more_page.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../util/styles.dart';
 import '../auth/vendor_login.dart';
 import 'account_settings_page.dart';
 import '../shared/notifications_page.dart';
-import '../shared/help_page.dart';
+import '../shared/help_page.dart'; // <-- 确保导入了 help_page.dart
 import '../shared/about_page.dart';
+import '../shared/notifications_page.dart';
 // --- 1. 导入 Repository ---
 import '../../repositories/vendor_data_repository.dart';
 
@@ -145,15 +147,21 @@ class MorePage extends StatelessWidget {
             context,
             Icons.notifications_none_outlined,
             'Notifications',
-            () => const NotificationsPage(),
+            () => NotificationsPage(userRole: bundle.user.role), // <-- 传入角色
           ),
           const Divider(height: 1),
+
+          // --- ( ✨ 关键修改在这里 ✨ ) ---
           _buildListTile(
             context,
             Icons.help_outline,
             'Help & Support',
-            () => const HelpPage(),
+            // 之前是: () => const HelpPage(),
+            // 现在是:
+            () => HelpPage(userRole: bundle.user.role), // <-- 像这样传入角色
           ),
+          // --- ( ✨ 结束修改 ✨ ) ---
+
           const Divider(height: 1),
           _buildListTile(
             context,

@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:foodiebox/models/order_model.dart';
 import 'package:foodiebox/models/driver_model.dart';
+import 'package:foodiebox/models/order_item.model.dart';
 import 'package:foodiebox/models/vendor.dart';
 import 'package:foodiebox/screens/users/driver_rate_page.dart';
 
@@ -30,7 +31,7 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
   Future<LatLng>? _vendorLatLngFuture;
 
   // Fixed demo driver
-  final Driver fixedDriver = Driver(
+  final DriverModel fixedDriver = DriverModel(
     id: 'demo-driver',
     name: 'Slamet Rahardjo',
     phone: '012-3456789',
@@ -76,8 +77,10 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
   }
 
   Future<VendorModel> _fetchVendor(String vendorId) async {
-    final doc =
-        await FirebaseFirestore.instance.collection('vendors').doc(vendorId).get();
+    final doc = await FirebaseFirestore.instance
+        .collection('vendors')
+        .doc(vendorId)
+        .get();
     if (!doc.exists) throw Exception('Vendor not found');
     return VendorModel.fromMap(doc.data() as Map<String, dynamic>);
   }
@@ -125,8 +128,8 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
 
           if (_vendorFuture == null) {
             _vendorFuture = _fetchVendor(order.items.first.vendorId);
-            _vendorLatLngFuture = _vendorFuture!.then(
-                (vendor) => _getVendorLatLng(vendor.storeAddress));
+            _vendorLatLngFuture = _vendorFuture!
+                .then((vendor) => _getVendorLatLng(vendor.storeAddress));
           }
 
           return SingleChildScrollView(
@@ -272,8 +275,7 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
                   _steps[index],
                   style: TextStyle(
                     fontSize: 16,
-                    fontWeight:
-                        isCurrent ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                     color: isActive ? Colors.black : Colors.grey.shade500,
                   ),
                 ),
@@ -285,7 +287,7 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
     );
   }
 
-  Widget _buildDriverInfo(Driver driver) {
+  Widget _buildDriverInfo(DriverModel driver) {
     return Row(
       children: [
         CircleAvatar(

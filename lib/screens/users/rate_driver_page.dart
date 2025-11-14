@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:foodiebox/models/driver_model.dart';
 
 class DriverRatePage extends StatefulWidget {
-  final Driver driver;
+  final DriverModel driver;
   const DriverRatePage({super.key, required this.driver});
 
   @override
@@ -17,7 +17,8 @@ class _DriverRatePageState extends State<DriverRatePage> {
 
   Future<void> submitRating() async {
     setState(() => _isSubmitting = true);
-    final docRef = FirebaseFirestore.instance.collection('drivers').doc(widget.driver.id);
+    final docRef =
+        FirebaseFirestore.instance.collection('drivers').doc(widget.driver.id);
     await FirebaseFirestore.instance.runTransaction((transaction) async {
       final snapshot = await transaction.get(docRef);
       final data = snapshot.data()!;
@@ -59,7 +60,8 @@ class _DriverRatePageState extends State<DriverRatePage> {
               allowHalfRating: true,
               itemCount: 5,
               itemSize: 40,
-              itemBuilder: (context, _) => const Icon(Icons.star, color: Colors.amber),
+              itemBuilder: (context, _) =>
+                  const Icon(Icons.star, color: Colors.amber),
               onRatingUpdate: (rating) => _userRating = rating,
             ),
             const SizedBox(height: 24),

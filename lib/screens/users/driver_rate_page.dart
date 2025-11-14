@@ -5,7 +5,7 @@ import 'package:foodiebox/screens/users/main_page.dart'; // To go home
 
 class RateDriverPage extends StatefulWidget {
   final String orderId;
-  final Driver driver;
+  final DriverModel driver;
 
   const RateDriverPage({
     super.key,
@@ -135,7 +135,8 @@ class _RateDriverPageState extends State<RateDriverPage> {
               style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w500,
-                  color: _rating > 0 && _rating < 3 ? Colors.red : Colors.black),
+                  color:
+                      _rating > 0 && _rating < 3 ? Colors.red : Colors.black),
             ),
             const SizedBox(height: 10),
             Row(

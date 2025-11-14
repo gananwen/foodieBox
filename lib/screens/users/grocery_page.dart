@@ -3,11 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:foodiebox/models/vendor.dart';
 import 'package:foodiebox/util/styles.dart';
 import '../../widgets/base_page.dart';
-import 'store_detail_page.dart'; 
+import 'store_detail_page.dart';
 
 class GroceryPage extends StatelessWidget {
   const GroceryPage({super.key});
-
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +20,8 @@ class GroceryPage extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: 20),
             child: Text(
               'Grocery Stores Near You',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kTextColor),
+              style: TextStyle(
+                  fontSize: 22, fontWeight: FontWeight.bold, color: kTextColor),
             ),
           ),
           const SizedBox(height: 12),
@@ -37,8 +37,7 @@ class GroceryPage extends StatelessWidget {
                       prefixIcon: const Icon(Icons.search, color: Colors.grey),
                       filled: true,
                       fillColor: kCardColor, // Use style color
-                      contentPadding:
-                          const EdgeInsets.symmetric(vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide.none,
@@ -78,7 +77,8 @@ class GroceryPage extends StatelessWidget {
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
-                      child: CircularProgressIndicator(color: kPrimaryActionColor));
+                      child: CircularProgressIndicator(
+                          color: kPrimaryActionColor));
                 }
                 if (snapshot.hasError) {
                   return Center(child: Text('Error: ${snapshot.error}'));
@@ -94,7 +94,7 @@ class GroceryPage extends StatelessWidget {
                   children: snapshot.data!.docs.map((doc) {
                     VendorModel vendor =
                         VendorModel.fromMap(doc.data() as Map<String, dynamic>);
-                    
+
                     // Use your new card UI
                     return _buildStoreCard(context, vendor);
                   }).toList(),
@@ -134,7 +134,8 @@ class GroceryPage extends StatelessWidget {
           children: [
             // --- Store Banner Image ---
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(16)),
               child: Image.network(
                 vendor.businessPhotoUrl, // From Firebase
                 height: 180, // This makes the image big
@@ -146,7 +147,8 @@ class GroceryPage extends StatelessWidget {
                     height: 180,
                     width: double.infinity,
                     color: Colors.grey.shade200,
-                    child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    child: const Center(
+                        child: CircularProgressIndicator(strokeWidth: 2)),
                   );
                 },
                 errorBuilder: (context, error, stackTrace) {
@@ -154,22 +156,21 @@ class GroceryPage extends StatelessWidget {
                     height: 180,
                     width: double.infinity,
                     color: Colors.grey.shade200,
-                    child: const Icon(Icons.store, size: 60, color: Colors.grey),
+                    child:
+                        const Icon(Icons.store, size: 60, color: Colors.grey),
                   );
                 },
               ),
             ),
-            
+
             // --- Store Info (All left-aligned) ---
             Padding(
               padding: const EdgeInsets.all(16), // Add padding back here
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    vendor.storeName, // From Firebase
-                    style: kLabelTextStyle.copyWith(fontSize: 18)
-                  ),
+                  Text(vendor.storeName, // From Firebase
+                      style: kLabelTextStyle.copyWith(fontSize: 18)),
                   const SizedBox(height: 4),
                   Text(
                     vendor.storeAddress, // From Firebase
@@ -188,20 +189,22 @@ class GroceryPage extends StatelessWidget {
                       Text(
                         vendor.vendorType, // From Firebase
                         style: kHintTextStyle.copyWith(fontSize: 14),
-                      ), 
+                      ),
                       const Spacer(),
-                      const Icon(Icons.location_on, size: 18, color: Colors.grey),
+                      const Icon(Icons.location_on,
+                          size: 18, color: Colors.grey),
                       const SizedBox(width: 4),
-                      const Text('5.0 km', style: kHintTextStyle), // Placeholder for distance
+                      const Text('5.0 km',
+                          style: kHintTextStyle), // Placeholder for distance
                     ],
                   ),
-            
+
                   // --- Expiry Deals Tag ---
                   if (vendor.hasExpiryDeals) ...[
                     const SizedBox(height: 8),
                     Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.red[100],
                         borderRadius: BorderRadius.circular(6),
