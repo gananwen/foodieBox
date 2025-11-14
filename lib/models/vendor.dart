@@ -5,11 +5,15 @@ class VendorModel {
   final String storePhone;
   final String vendorType; // <-- (来自你的注册页面)
   final String businessPhotoUrl;
+  final String vendorType; // <-- (来自你的注册页面)
+  final String businessPhotoUrl;
   final String businessLicenseUrl;
   final String halalCertificateUrl;
   final bool isApproved; // 管理员审批
   final double rating;
   final List<String> storeHours; // e.g., ["Mon: 9-5", "Tue: 9-5"]
+  // --- NEW FIELD ---
+  final bool hasExpiryDeals;
 
   VendorModel({
     required this.uid,
@@ -17,12 +21,14 @@ class VendorModel {
     required this.storeAddress,
     required this.storePhone,
     required this.vendorType, // <-- (来自你的注册页面)
+    required this.vendorType, // <-- (来自你的注册页面)
     required this.businessPhotoUrl,
     required this.businessLicenseUrl,
     this.halalCertificateUrl = '',
     this.isApproved = false, // 默认未批准
     this.rating = 0.0,
     this.storeHours = const [], // 默认为空
+    this.hasExpiryDeals = false, // Default to false
   });
 
   // 从 Firestore (Map) 转换
@@ -33,12 +39,15 @@ class VendorModel {
       storeAddress: map['storeAddress'] ?? '',
       storePhone: map['storePhone'] ?? '',
       vendorType: map['vendorType'] ?? 'Grocery', // <-- (添加了默认值)
+      vendorType: map['vendorType'] ?? 'Grocery', // <-- (添加了默认值)
       businessPhotoUrl: map['businessPhotoUrl'] ?? '',
       businessLicenseUrl: map['businessLicenseUrl'] ?? '',
       halalCertificateUrl: map['halalCertificateUrl'] ?? '',
       isApproved: map['isApproved'] ?? false,
       rating: (map['rating'] ?? 0.0).toDouble(),
       storeHours: List<String>.from(map['storeHours'] ?? []),
+      // --- NEW FIELD ---
+      hasExpiryDeals: map['hasExpiryDeals'] ?? false,
     );
   }
 
@@ -50,12 +59,15 @@ class VendorModel {
       'storeAddress': storeAddress,
       'storePhone': storePhone,
       'vendorType': vendorType, // <-- (添加)
+      'vendorType': vendorType, // <-- (添加)
       'businessPhotoUrl': businessPhotoUrl,
       'businessLicenseUrl': businessLicenseUrl,
       'halalCertificateUrl': halalCertificateUrl,
       'isApproved': isApproved,
       'rating': rating,
       'storeHours': storeHours,
+      // --- NEW FIELD ---
+      'hasExpiryDeals': hasExpiryDeals,
     };
   }
 
