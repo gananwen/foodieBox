@@ -1,3 +1,4 @@
+// 路径: lib/screens/users/profile_page.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -5,12 +6,13 @@ import '../../util/styles.dart';
 import '../../widgets/base_page.dart';
 import '../auth/user_login.dart';
 import '../shared/about_page.dart';
-import '../shared/help_page.dart';
+import '../shared/help_page.dart'; // <-- 确保导入了 help_page.dart
 import 'subpages/my_details_page.dart';
 import 'subpages/delivery_address_page.dart';
 import '../shared/notifications_page.dart';
 import 'subpages/promo_card_page.dart';
 import 'subpages/orders_history_page.dart';
+import '../shared/notifications_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -32,7 +34,7 @@ class ProfilePage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Yellow Header with Profile Info ---
+            // --- Yellow Header with Profile Info (不变) ---
             Stack(
               children: [
                 ClipPath(
@@ -58,6 +60,9 @@ class ProfilePage extends StatelessWidget {
 
                       final data =
                           snapshot.data!.data() as Map<String, dynamic>;
+                      // ( ✨ 提示 ✨ )
+                      // 我们在这里假设了用户的 'role' 字段是 'User'
+                      // 因为这是用户的个人资料页面
                       final name = data['name'] ?? 'Your Name';
                       final email = data['email'] ?? 'your@email.com';
                       final imageUrl = data['profilePic'];
@@ -140,8 +145,6 @@ class ProfilePage extends StatelessWidget {
                       label: 'Delivery Address',
                       targetPage: DeliveryAddressPage()),
                   Divider(height: 1, thickness: 1),
-                  //_ProfileItem(icon: Icons.credit_card, label: 'Payment Methods', targetPage: PaymentMethodsPage()),
-                  //Divider(height: 1, thickness: 1),
                   _ProfileItem(
                       icon: Icons.card_giftcard,
                       label: 'Promo Card',
@@ -150,12 +153,21 @@ class ProfilePage extends StatelessWidget {
                   _ProfileItem(
                       icon: Icons.notifications_none,
                       label: 'Notifications',
-                      targetPage: NotificationsPage()),
+                      targetPage:
+                          NotificationsPage(userRole: 'User') // <-- 传入角色
+                      ),
                   Divider(height: 1, thickness: 1),
+
+                  // --- ( ✨ 关键修改在这里 ✨ ) ---
                   _ProfileItem(
-                      icon: Icons.help_outline,
-                      label: 'Help',
-                      targetPage: HelpPage()),
+                    icon: Icons.help_outline,
+                    label: 'Help',
+                    // 之前是: targetPage: HelpPage(),
+                    // 现在是:
+                    targetPage: HelpPage(userRole: 'User'), // <-- 传入 'User' 角色
+                  ),
+                  // --- ( ✨ 结束修改 ✨ ) ---
+
                   Divider(height: 1, thickness: 1),
                   _ProfileItem(
                       icon: Icons.info_outline,
@@ -167,7 +179,7 @@ class ProfilePage extends StatelessWidget {
 
             const SizedBox(height: 40),
 
-            // --- Log Out Button ---
+            // --- Log Out Button (不变) ---
             Center(
               child: SizedBox(
                 width: MediaQuery.of(context).size.width * 0.85,
@@ -209,6 +221,7 @@ class ProfilePage extends StatelessWidget {
   }
 }
 
+// --- _ProfileItem (不变) ---
 class _ProfileItem extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -236,6 +249,7 @@ class _ProfileItem extends StatelessWidget {
   }
 }
 
+// --- _HeaderClipper (不变) ---
 class _HeaderClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {

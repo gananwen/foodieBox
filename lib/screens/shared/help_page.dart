@@ -1,9 +1,19 @@
+// 路径: lib/pages/vendor_home/help_page.dart (或你的用户 App 路径)
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../util/styles.dart';
 
+// --- ( ✨ 新增导入 ✨ ) ---
+import '../../repositories/feedback_repository.dart';
+// (确保你的 user.dart 路径正确，如果需要)
+// import '../../models/user.dart';
+
 class HelpPage extends StatefulWidget {
-  const HelpPage({super.key});
+  // --- ( ✨ 已修改 ✨ ) ---
+  // 页面现在需要知道用户的角色
+  final String userRole; // 应该是 'User' 或 'Vendor'
+
+  const HelpPage({super.key, required this.userRole});
 
   @override
   State<HelpPage> createState() => _HelpPageState();
@@ -14,37 +24,105 @@ class _HelpPageState extends State<HelpPage> {
   final TextEditingController _messageController = TextEditingController();
   final TextEditingController _feedbackController = TextEditingController();
 
+  // --- ( ✨ 新增 ✨ ) ---
+  final FeedbackRepository _feedbackRepo = FeedbackRepository();
+  bool _isSubmittingFeedback = false;
+
+  // --- ( ✨ 已修改：FAQ 逻辑 ✨ ) ---
+  late List<Map<String, String>> _allFaqs;
+  List<Map<String, String>> _filteredFaqs = []; // 默认在 initState 中填充
+
   String _searchQuery = '';
-  final List<Map<String, String>> messages = [];
+  final List<Map<String, String>> messages = []; // (聊天机器人逻辑保持不变)
 
-  final List<Map<String, String>> faqs = [
-    {
-      'question': 'What is a FoodieBox blindbox?',
-      'answer':
-          'A surprise box of curated food items—great value, always fresh, and sometimes near expiry.'
-    },
-    {
-      'question': 'How do I track my order?',
-      'answer':
-          'Go to the Orders tab in your profile. You’ll see live updates and estimated delivery time.'
-    },
-    {
-      'question': 'Can I return items?',
-      'answer':
-          'Due to the nature of blindboxes and expiry-sensitive items, returns are not supported.'
-    },
-    {
-      'question': 'How does FoodieBox help reduce waste?',
-      'answer':
-          'We partner with suppliers to rescue surplus and near-expiry groceries, giving them a second chance.'
-    },
-    {
-      'question': 'How do I apply a promo code?',
-      'answer':
-          'You can enter promo codes at checkout before confirming your order.'
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _initializeFaqs();
+    _updateFilteredFaqs(); // 初始加载所有 FAQs
+  }
 
+  // ( ✨ 新增 ✨ ) 根据角色设置 FAQs
+  void _initializeFaqs() {
+    // 1. 每个人都能看到的通用问题
+    final List<Map<String, String>> baseFaqs = [
+      {
+        'question': 'How do I contact support?',
+        'answer':
+            'You can use the chat assistant above or send us feedback below. Our team monitors these channels closely.'
+      },
+    ];
+
+    // 2. 仅用户可见的问题
+    final List<Map<String, String>> userFaqs = [
+      {
+        'question': 'What is a FoodieBox blindbox?',
+        'answer':
+            'A surprise box of curated food items—great value, always fresh, and sometimes near expiry.'
+      },
+      {
+        'question': 'How do I track my order?',
+        'answer':
+            'Go to the Orders tab in your profile. You’ll see live updates and estimated delivery time.'
+      },
+      {
+        'question': 'Can I return items?',
+        'answer':
+            'Due to the nature of blindboxes and expiry-sensitive items, returns are not supported.'
+      },
+    ];
+
+    // 3. 仅供应商可见的问题
+    final List<Map<String, String>> vendorFaqs = [
+      {
+        'question': 'How do I see my earnings?',
+        'answer':
+            'Your earnings summary is available on the main Dashboard. For detailed reports, visit the Analytics page.'
+      },
+      {
+        'question': 'How do I update my store hours?',
+        'answer':
+            'Navigate to More > Account Settings > Edit Store Details. You can update your operating hours there.'
+      },
+      {
+        'question': 'What are the photo requirements for products?',
+        'answer':
+            'Photos should be well-lit, clear, and show the product accurately. Minimum 800x800 pixels is recommended.'
+      },
+      {
+        'question': 'How do promotions work?',
+        'answer':
+            'You can create % discounts for "Blindbox" or "Grocery" items in the "Promotions" tab. These will be shown to customers.'
+      },
+    ];
+
+    // 4. 根据角色组合列表
+    if (widget.userRole == 'Vendor') {
+      _allFaqs = [...baseFaqs, ...vendorFaqs];
+    } else {
+      // 默认为 'User'
+      _allFaqs = [...baseFaqs, ...userFaqs];
+    }
+  }
+
+  // ( ✨ 新增 ✨ ) 更新过滤后的 FAQ 列表
+  void _updateFilteredFaqs() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _searchQuery = query; // (保持搜索词状态)
+      if (query.isEmpty) {
+        _filteredFaqs = _allFaqs;
+      } else {
+        _filteredFaqs = _allFaqs
+            .where((faq) =>
+                faq['question']!.toLowerCase().contains(query) ||
+                faq['answer']!.toLowerCase().contains(query))
+            .toList();
+      }
+    });
+  }
+
+  // ... (聊天机器人函数 _sendMessage, _generateBotReply 保持不变) ...
   void _sendMessage(String text) {
     setState(() {
       messages.add({'from': 'user', 'text': text});
@@ -68,16 +146,55 @@ class _HelpPageState extends State<HelpPage> {
     }
   }
 
+  // --- ( ✨ 新增函数：提交反馈 ✨ ) ---
+  Future<void> _submitFeedback() async {
+    final feedback = _feedbackController.text.trim();
+    if (feedback.isEmpty) return;
+
+    setState(() => _isSubmittingFeedback = true);
+
+    try {
+      // 使用 repository 提交
+      await _feedbackRepo.submitFeedback(
+        message: feedback,
+        role: widget.userRole, // 传递当前用户的角色
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Thanks for your feedback!'),
+            backgroundColor: kSecondaryAccentColor, // (假设你有这个颜色)
+          ),
+        );
+      }
+      _feedbackController.clear();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send feedback: $e'),
+            backgroundColor: kPrimaryActionColor, // (假设你有这个颜色)
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmittingFeedback = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final filteredFaqs = faqs
-        .where((faq) =>
-            faq['question']!.toLowerCase().contains(_searchQuery.toLowerCase()))
-        .toList();
+    // ( ✨ 已修改 ✨ )
+    // 不再在 build 方法中计算
+    // final filteredFaqs = ...
 
     return Scaffold(
       backgroundColor: kAppBackgroundColor,
       appBar: AppBar(
+        // ... (不变) ...
         backgroundColor: kCardColor,
         elevation: 0,
         leading: IconButton(
@@ -91,10 +208,11 @@ class _HelpPageState extends State<HelpPage> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
         children: [
-          // --- Chatbot Assistant ---
+          // --- Chatbot Assistant (不变) ---
           const Text('Assistant', style: kLabelTextStyle),
           const SizedBox(height: 10),
           ...messages.map((msg) {
+            // ... (不变)
             final isUser = msg['from'] == 'user';
             return Align(
               alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -116,6 +234,7 @@ class _HelpPageState extends State<HelpPage> {
           }),
           const SizedBox(height: 10),
           Row(
+            // ... (不变)
             children: [
               Expanded(
                 child: TextField(
@@ -150,9 +269,11 @@ class _HelpPageState extends State<HelpPage> {
           const SizedBox(height: 10),
           TextField(
             controller: _searchController,
-            onChanged: (value) => setState(() => _searchQuery = value),
+            // ( ✨ 已修改 ✨ )
+            onChanged: (value) => _updateFilteredFaqs(),
             decoration: InputDecoration(
               hintText: 'Type a question...',
+              // ... (不变)
               prefixIcon: const Icon(Icons.search),
               filled: true,
               fillColor: kCardColor,
@@ -167,7 +288,9 @@ class _HelpPageState extends State<HelpPage> {
             ),
           ),
           const SizedBox(height: 20),
-          ...filteredFaqs.map((faq) => ExpansionTile(
+          // ( ✨ 已修改 ✨ )
+          // 使用新的状态变量 _filteredFaqs
+          ..._filteredFaqs.map((faq) => ExpansionTile(
                 tilePadding: const EdgeInsets.symmetric(horizontal: 0),
                 childrenPadding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -189,6 +312,7 @@ class _HelpPageState extends State<HelpPage> {
             maxLines: 4,
             decoration: InputDecoration(
               hintText: 'Tell us what you think...',
+              // ... (不变)
               filled: true,
               fillColor: kCardColor,
               border: OutlineInputBorder(
@@ -198,22 +322,23 @@ class _HelpPageState extends State<HelpPage> {
             ),
           ),
           const SizedBox(height: 10),
+          // --- ( ✨ 已修改 ✨ ) ---
           ElevatedButton(
-            onPressed: () {
-              final feedback = _feedbackController.text.trim();
-              if (feedback.isNotEmpty) {
-                // TODO: Send to backend or store locally
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Thanks for your feedback!')),
-                );
-                _feedbackController.clear();
-              }
-            },
+            onPressed: _isSubmittingFeedback ? null : _submitFeedback,
             style: ElevatedButton.styleFrom(
               backgroundColor: kYellowSoft,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
-            child: const Text('Submit', style: TextStyle(color: kTextColor)),
+            child: _isSubmittingFeedback
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: kTextColor,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Text('Submit', style: TextStyle(color: kTextColor)),
           ),
           const SizedBox(height: 20),
         ],

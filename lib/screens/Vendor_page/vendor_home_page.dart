@@ -1,15 +1,21 @@
+// 路径: lib/pages/vendor_home/vendor_home_page.dart
 import 'package:flutter/material.dart';
 import '../../util/styles.dart';
 
-// --- 1. 导入所需文件 ---
 import 'product_page.dart';
 import 'orders_page.dart';
 import 'marketing_page.dart';
 import 'more_page.dart';
-import '../../repositories/vendor_data_repository.dart'; // <-- 导入 Repository
-import '../../models/user.dart'; // <-- 导入 Models
-import '../../models/vendor.dart'; // <-- 导入 Models
+import '../../repositories/vendor_data_repository.dart';
+import '../../models/user.dart';
+import '../../models/vendor.dart';
+import '../../repositories/order_repository.dart';
+import 'package:intl/intl.dart';
 
+import '../../repositories/notification_repository.dart';
+import '../shared/notifications_page.dart';
+
+// (VendorHomePage 类保持不变)
 class VendorHomePage extends StatefulWidget {
   const VendorHomePage({super.key});
 
@@ -18,20 +24,17 @@ class VendorHomePage extends StatefulWidget {
 }
 
 class _VendorHomePageState extends State<VendorHomePage> {
+  // ... (所有变量和函数 _currentIndex, _repo, _dataFuture, initState, _reloadData, _goToDashboard, _onTabTapped 保持不变) ...
   int _currentIndex = 0;
-  // --- 2. 为 FutureBuilder 创建 Repository 实例和 Future ---
   final VendorDataRepository _repo = VendorDataRepository();
   late Future<VendorDataBundle> _dataFuture;
 
-  // --- 3. 在 initState 中加载数据 ---
   @override
   void initState() {
     super.initState();
     _dataFuture = _repo.getVendorData();
   }
 
-  // --- (新增) 重新加载数据的函数 ---
-  // 当我们从编辑页面返回时，我们将调用它
   void _reloadData() {
     setState(() {
       _dataFuture = _repo.getVendorData();
@@ -54,16 +57,14 @@ class _VendorHomePageState extends State<VendorHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kAppBackgroundColor,
-      // --- 4. 使用 FutureBuilder 包装你的 body ---
       body: FutureBuilder<VendorDataBundle>(
         future: _dataFuture,
         builder: (context, snapshot) {
-          // --- 状态 A: 正在加载 ---
+          // ... (FutureBuilder 的 loading/error/data 逻辑不变) ...
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
                 child: CircularProgressIndicator(color: kPrimaryActionColor));
           }
-          // --- 状态 B: 出错 ---
           if (snapshot.hasError) {
             return Center(
               child: Padding(
@@ -73,11 +74,9 @@ class _VendorHomePageState extends State<VendorHomePage> {
               ),
             );
           }
-          // --- 状态 C: 成功 ---
           if (snapshot.hasData) {
-            final bundle = snapshot.data!; // 这就是我们的数据！
+            final bundle = snapshot.data!;
 
-            // 5. 将 'bundle' 传递给子页面
             final List<Widget> pages = [
               VendorHomePageContent(onTabTapped: _onTabTapped, bundle: bundle),
               ProductPage(onBackToDashboard: _goToDashboard),
@@ -86,21 +85,20 @@ class _VendorHomePageState extends State<VendorHomePage> {
               MorePage(
                 onBackToDashboard: _goToDashboard,
                 bundle: bundle,
-                onProfileUpdated: _reloadData, // <-- 传递刷新函数
+                onProfileUpdated: _reloadData,
               ),
             ];
 
-            // 6. 返回你的 IndexedStack
             return IndexedStack(
               index: _currentIndex,
               children: pages,
             );
           }
-          // --- 默认状态 (不应该到这里) ---
           return const Center(child: Text('Something went wrong.'));
         },
       ),
       bottomNavigationBar: BottomNavigationBar(
+        // ... (BottomNavigationBar 逻辑不变) ...
         type: BottomNavigationBarType.fixed,
         currentIndex: _currentIndex,
         backgroundColor: kCardColor,
@@ -136,42 +134,67 @@ class _VendorHomePageState extends State<VendorHomePage> {
   }
 }
 
-// --- (已修改) Dashboard 子 Widget ---
-class VendorHomePageContent extends StatelessWidget {
+// --- ( VendorHomePageContent ) ---
+
+class VendorHomePageContent extends StatefulWidget {
   final Function(int) onTabTapped;
-  final VendorDataBundle bundle; // <-- 1. 接收数据
+  final VendorDataBundle bundle;
   const VendorHomePageContent(
       {super.key, required this.onTabTapped, required this.bundle});
 
-  Widget _buildStatCard(String title, dynamic value) {
-    int todaysOrders = 25;
-    double todaysSales = 300.00;
+  @override
+  State<VendorHomePageContent> createState() => _VendorHomePageContentState();
+}
+
+class _VendorHomePageContentState extends State<VendorHomePageContent> {
+  // (所有 initState 和辅助函数 _buildStatCard, _buildActionBlock, _buildNotificationBell 保持不变)
+  late OrderRepository _orderRepo;
+  late Stream<Map<String, dynamic>> _statsStream;
+  final _currencyFormat = NumberFormat.currency(locale: 'en_MY', symbol: 'RM');
+  late NotificationRepository _notificationRepo;
+  late Stream<int> _unreadCountStream;
+  late String _userRole;
+
+  @override
+  void initState() {
+    super.initState();
+    _orderRepo = OrderRepository();
+    _statsStream = _orderRepo.getTodaysStatsStream();
+    _notificationRepo = NotificationRepository();
+    _userRole = widget.bundle.user.role;
+    _unreadCountStream = _notificationRepo.getUnreadNotificationCountStream();
+  }
+
+  Widget _buildStatCard(
+      String title, String value, IconData icon, Color color) {
+    // ... (不变)
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: kSecondaryAccentColor,
-        borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(color: kTextColor.withAlpha(26), width: 3.0),
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16.0),
+        border: Border.all(color: color.withOpacity(0.3), width: 1.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
+          Icon(icon, size: 28.0, color: color),
+          const SizedBox(height: 12.0),
           Text(
             title,
             style: TextStyle(
               fontSize: 14.0,
-              color: kTextColor.withAlpha(179),
+              color: kTextColor.withAlpha(200),
             ),
           ),
-          const SizedBox(height: 8.0),
+          const SizedBox(height: 4.0),
           Text(
-            title.contains("Sales")
-                ? 'RM${todaysSales.toStringAsFixed(2)}'
-                : todaysOrders.toString(),
-            style: const TextStyle(
-              fontSize: 24.0,
+            value,
+            style: TextStyle(
+              fontSize: 22.0,
               fontWeight: FontWeight.bold,
-              color: kTextColor,
+              color: color,
             ),
           ),
         ],
@@ -181,31 +204,42 @@ class VendorHomePageContent extends StatelessWidget {
 
   Widget _buildActionBlock(String actionType, String description, IconData icon,
       VoidCallback onTap) {
-    return GestureDetector(
+    // ... (不变)
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(16.0),
       child: Container(
-        padding: const EdgeInsets.all(16.0),
-        margin: const EdgeInsets.only(bottom: 16.0),
+        padding: const EdgeInsets.all(20.0),
         decoration: BoxDecoration(
-          color: kSecondaryAccentColor,
-          borderRadius: BorderRadius.circular(12.0),
-          border: Border.all(color: kTextColor.withAlpha(26), width: 3.0),
+          color: kCardColor,
+          borderRadius: BorderRadius.circular(16.0),
+          boxShadow: [
+            BoxShadow(
+              color: kTextColor.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            )
+          ],
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: kSecondaryAccentColor.withOpacity(0.8),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 24.0,
+                color: kTextColor,
+              ),
+            ),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(
-                    'ADD NEW' == actionType ? 'ADD NEW' : 'VIEW',
-                    style: TextStyle(
-                      fontSize: 12.0,
-                      color: kTextColor.withAlpha(153),
-                    ),
-                  ),
-                  const SizedBox(height: 4.0),
                   Text(
                     actionType,
                     style: const TextStyle(
@@ -219,15 +253,15 @@ class VendorHomePageContent extends StatelessWidget {
                     description,
                     style: TextStyle(
                       fontSize: 14.0,
-                      color: kTextColor.withAlpha(204),
+                      color: kTextColor.withAlpha(180),
                     ),
                   ),
                 ],
               ),
             ),
             Icon(
-              icon,
-              size: 40.0,
+              Icons.arrow_forward_ios,
+              size: 16.0,
               color: kTextColor.withAlpha(179),
             ),
           ],
@@ -236,110 +270,252 @@ class VendorHomePageContent extends StatelessWidget {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // --- 2. 使用真实数据 ---
-    final user = bundle.user;
-    final vendor = bundle.vendor;
-    final String vendorName = "${user.firstName} ${user.lastName}";
-    final String vendorId = vendor.uid;
-    final String photoUrl = vendor.businessPhotoUrl;
+  Widget _buildNotificationBell() {
+    // ... (不变)
+    return StreamBuilder<int>(
+      stream: _unreadCountStream,
+      builder: (context, snapshot) {
+        final int unreadCount = snapshot.data ?? 0;
 
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            // --- 3. (已修改) Header/Profile Section ---
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      // --- (已修改) 使用真实图片 ---
-                      CircleAvatar(
-                        radius: 30,
-                        backgroundColor: kSecondaryAccentColor,
-                        backgroundImage:
-                            photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
-                        child: photoUrl.isEmpty
-                            ? const Icon(Icons.store,
-                                size: 40, color: kTextColor)
-                            : null,
-                      ),
-                      const SizedBox(width: 12.0),
-                      Flexible(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // --- (已修改) 使用真实姓名 ---
-                            Text(
-                              vendorName,
-                              style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: kTextColor),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              'Vendor ID: ${vendorId.substring(0, 6)}...', // 缩短 ID
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  color: kTextColor.withAlpha(153)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+        return Stack(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.notifications_outlined,
+                  color: kTextColor, size: 28),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        NotificationsPage(userRole: _userRole),
+                  ),
+                );
+              },
+            ),
+            if (unreadCount > 0)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: Text(
+                    unreadCount.toString(),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
                   ),
                 ),
-                IconButton(
-                  icon:
-                      const Icon(Icons.settings, size: 28.0, color: kTextColor),
-                  onPressed: () => onTabTapped(4), // 跳转到 "More"
-                ),
-              ],
-            ),
-            const SizedBox(height: 30.0),
-            const Text(
-              'Quick Stats',
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = widget.bundle.user;
+    final vendor = widget.bundle.vendor;
+    final String vendorName = "${user.firstName} ${user.lastName}";
+    final String photoUrl = vendor.businessPhotoUrl;
+
+    return Scaffold(
+      backgroundColor: kAppBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: kAppBackgroundColor,
+        elevation: 0,
+
+        // --- ( ✨ 关键修复 ✨ ) ---
+        centerTitle: false, // <-- 添加这一行
+        // --- ( ✨ 结束修复 ✨ ) ---
+
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Welcome back,',
               style: TextStyle(
-                  fontSize: 20, fontWeight: FontWeight.w600, color: kTextColor),
+                fontSize: 22,
+                color: kTextColor.withAlpha(180),
+              ),
             ),
-            const SizedBox(height: 16.0),
-            GridView.count(
-              crossAxisCount: 2,
-              crossAxisSpacing: 16.0,
-              mainAxisSpacing: 16.0,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              children: <Widget>[
-                _buildStatCard('Today\'s Orders', 0),
-                _buildStatCard('Today\'s Sales', 0.0),
-              ],
-            ),
-            const SizedBox(height: 30.0),
-            const Text(
-              'Actions',
-              style: TextStyle(
-                  fontSize: 20, fontWeight: FontWeight.w600, color: kTextColor),
-            ),
-            const SizedBox(height: 16.0),
-            _buildActionBlock(
-              'Product',
-              'Expand your business',
-              Icons.inventory_2_outlined,
-              () => onTabTapped(1),
-            ),
-            _buildActionBlock(
-              'Orders',
-              'Manage incoming requests',
-              Icons.receipt_long_outlined,
-              () => onTabTapped(3),
+            Text(
+              vendorName,
+              style: const TextStyle(
+                  fontSize: 28, fontWeight: FontWeight.bold, color: kTextColor),
+              overflow: TextOverflow.ellipsis,
             ),
           ],
+        ),
+        titleSpacing: 20.0,
+        toolbarHeight: 100,
+        actions: [
+          _buildNotificationBell(),
+          const SizedBox(width: 10),
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20.0, 0, 20.0, 20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              // ... (所有剩下的 body 内容, _buildProfileHeader, _buildStatCard, _buildActionBlock 等都保持不变) ...
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0, vertical: 12.0),
+                decoration: BoxDecoration(
+                  color: kCardColor,
+                  borderRadius: BorderRadius.circular(16.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kTextColor.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    )
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: kSecondaryAccentColor,
+                      backgroundImage:
+                          photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+                      child: photoUrl.isEmpty
+                          ? const Icon(Icons.store, size: 24, color: kTextColor)
+                          : null,
+                    ),
+                    const SizedBox(width: 12.0),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            vendor.storeName,
+                            style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: kTextColor),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'Vendor ID: ${vendor.uid.substring(0, 6)}...',
+                            style: TextStyle(
+                                fontSize: 13, color: kTextColor.withAlpha(153)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.settings_outlined,
+                          size: 24.0, color: kTextColor),
+                      onPressed: () => widget.onTabTapped(4), // "More"
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 30.0),
+              const Text(
+                'Quick Stats',
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: kTextColor),
+              ),
+              const SizedBox(height: 16.0),
+              StreamBuilder<Map<String, dynamic>>(
+                stream: _statsStream,
+                builder: (context, snapshot) {
+                  String formattedSales = "RM0.00";
+                  String orderCount = "0";
+                  Widget? overlay;
+
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    overlay = const Center(
+                        child: CircularProgressIndicator(
+                      color: kPrimaryActionColor,
+                      strokeWidth: 2,
+                    ));
+                  } else if (snapshot.hasError) {
+                    formattedSales = "Error";
+                    orderCount = "Error";
+                    print("Stats Stream Error: ${snapshot.error}");
+                  } else if (snapshot.hasData) {
+                    final stats = snapshot.data!;
+                    orderCount = (stats['orderCount'] ?? 0).toString();
+                    formattedSales =
+                        _currencyFormat.format(stats['totalSales'] ?? 0.0);
+                  }
+
+                  return GridView.count(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 16.0,
+                    mainAxisSpacing: 16.0,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: <Widget>[
+                      _buildStatCard(
+                        'Today\'s Orders',
+                        orderCount,
+                        Icons.receipt_long_outlined,
+                        Colors.blue.shade300,
+                      ),
+                      _buildStatCard(
+                        'Today\'s Sales',
+                        formattedSales,
+                        Icons.attach_money_outlined,
+                        Colors.green.shade300,
+                      ),
+                      if (overlay != null)
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: kAppBackgroundColor.withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: overlay,
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 30.0),
+              const Text(
+                'Actions',
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: kTextColor),
+              ),
+              const SizedBox(height: 16.0),
+              _buildActionBlock(
+                'Manage Products',
+                'Add, edit, or remove items',
+                Icons.inventory_2_outlined,
+                () => widget.onTabTapped(1),
+              ),
+              const SizedBox(height: 16.0),
+              _buildActionBlock(
+                'Manage Orders',
+                'View and process new requests',
+                Icons.receipt_long_outlined,
+                () => widget.onTabTapped(3),
+              ),
+            ],
+          ),
         ),
       ),
     );

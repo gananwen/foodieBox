@@ -1,8 +1,9 @@
+// 路径: lib/pages/vendor_home/order_details_page.dart
 import 'package:flutter/material.dart';
 import '../../util/styles.dart';
-import '../../models/order.dart';
-import '../../models/order_item.dart';
-import '../../repositories/order_repository.dart';
+import '../../models/order_model.dart';
+import '../../models/order_item.model.dart'; // ( ✨ 确保 import 路径正确 ✨ )
+import '../../repositories/order_repository.dart'; // ( ✨ 确保 import 路径正确 ✨ )
 
 class OrderDetailsPage extends StatefulWidget {
   final OrderModel order;
@@ -23,7 +24,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     _currentStatus = widget.order.status;
   }
 
-  // --- ( ✨ 已修改 ✨ ) ---
+  // --- ( ✨ 这是你的核心逻辑 ✨ ) ---
   Future<void> _updateOrderStatus(String newStatus) async {
     setState(() => _isLoading = true);
 
@@ -165,8 +166,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  // --- (不变) _buildOrderItemList ---
-  Widget _buildOrderItemList(List<OrderItemModel> items) {
+  // --- ( ✨ 已修改 ✨ ) _buildOrderItemList ---
+  Widget _buildOrderItemList(List<OrderItem> items) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16.0),
       decoration: BoxDecoration(
@@ -211,6 +212,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // ( ✨ 已修改 ✨ )
+    // 我们现在从更新后的 OrderModel 中获取这些值
     final double total = widget.order.total;
     final double subtotal = widget.order.subtotal;
     final double deliveryFee = widget.order.deliveryFee;
@@ -251,6 +254,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                       fontWeight: FontWeight.bold, color: kTextColor),
                 ),
                 subtitle: Text(
+                  // ( ✨ 已修改 ✨ ) 使用新的 'orderType' 字段
                   widget.order.orderType == 'Pickup'
                       ? 'Self-Pickup Order'
                       : '${widget.order.address}\nDelivery: ${widget.order.deliveryOption}',
@@ -293,6 +297,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             // (我们假设 'received' 是初始状态)
             _buildStatusButton('Preparing', 'Preparing'),
 
+            // ( ✨ 已修改 ✨ ) 使用新的 'orderType' 字段来决定显示哪个按钮
             if (widget.order.orderType == 'Pickup') ...[
               _buildStatusButton('Ready for Pickup', 'Ready for Pickup'),
             ] else ...[
@@ -301,6 +306,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   'Ready for Pickup (Request Lalamove)', 'Ready for Pickup'),
               _buildStatusButton(
                   'Delivering',
+                  // ( ✨ 已修改 ✨ ) 检查 driverId 是否存在
                   (widget.order.driverId != null &&
                           widget.order.driverId!.isNotEmpty)
                       ? 'Delivering'

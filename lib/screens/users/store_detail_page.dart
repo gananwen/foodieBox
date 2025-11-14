@@ -4,7 +4,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:foodiebox/models/vendor.dart';
 import 'package:foodiebox/models/product.dart';
 import 'package:foodiebox/util/styles.dart';
-import 'category_product_page.dart'; // N, required VendorModel vendorEW: navigate on category tap
+import 'category_product_page.dart';
+import 'product_detail_page.dart'; // NEW: Import product detail page
+
+// --- NEW IMPORTS ---
+import 'package:provider/provider.dart';
+import 'package:foodiebox/providers/cart_provider.dart';
+import 'package:foodiebox/screens/users/cart_page.dart'; // <-- ADDED THIS IMPORT
+// --- END NEW IMPORTS ---
 
 // --- Category model (unchanged) ---
 class GroceryCategory {
@@ -50,8 +57,6 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
     GroceryCategory(name: 'View All', imagePath: 'assets/images/view_all.png'),
   ];
 
-  // NOTE: We no longer need _selectedProductCategory for filtering inline.
-  // It can be kept if you want to highlight selected UI later, but we won't use it for filtering.
   String? _selectedProductCategory;
 
   @override
@@ -97,27 +102,56 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // CHANGE: base to white
+      backgroundColor: Colors.white,
       body: CustomScrollView(
         slivers: [
           _buildSliverAppBar(context),
           _buildStoreHeader(),
-
-          // --- Category grid (design preserved) ---
           if (widget.vendor.vendorType == 'Grocery')
             _buildCategoryGrid()
           else
             _buildSectionTitle('All Products'),
-
-          // --- Title below grid stays "All Products" always ---
           _buildSectionTitle('All Products'),
-
-          // --- Always show all products (no inline filtering anymore) ---
           _buildProductList(),
         ],
       ),
+      // --- NEW FLOATING CART BUTTON ---
+      floatingActionButton: _buildFloatingCartButton(context),
+      // --- END NEW BUTTON ---
     );
   }
+
+  // --- NEW WIDGET FOR THE FLOATING CART BUTTON ---
+  Widget _buildFloatingCartButton(BuildContext context) {
+    // Watch the cart provider for real-time changes
+    final cart = context.watch<CartProvider>();
+    final itemCount = cart.itemCount;
+
+    // Use AnimatedOpacity for a smooth show/hide transition
+    return AnimatedOpacity(
+      opacity: itemCount > 0 ? 1.0 : 0.0, // Show only if items > 0
+      duration: const Duration(milliseconds: 300),
+      child: itemCount > 0
+          ? FloatingActionButton(
+              onPressed: () {
+                // Navigate to the CartPage
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CartPage()),
+                );
+              },
+              backgroundColor:
+                  kPrimaryActionColor, // Use your app's theme color
+              child: Badge(
+                // Show the item count
+                label: Text(itemCount.toString()),
+                child: const Icon(Icons.shopping_cart, color: kTextColor),
+              ),
+            )
+          : null, // Render nothing if cart is empty
+    );
+  }
+  // --- END NEW WIDGET ---
 
   Widget _buildSliverAppBar(BuildContext context) {
     return SliverAppBar(
@@ -236,7 +270,6 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
     );
   }
 
-  // --- Category grid: same visuals, logic changes to navigate instead of filter ---
   Widget _buildCategoryGrid() {
     return SliverToBoxAdapter(
       child: Container(
@@ -253,8 +286,6 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           physics: const NeverScrollableScrollPhysics(),
           itemBuilder: (context, index) {
             final category = _groceryCategories[index];
-
-            // Preserve your selected highlight logic if desired
             final bool isSelected = (_selectedProductCategory == null &&
                     category.name == 'View All') ||
                 (_selectedProductCategory == category.name);
@@ -263,13 +294,9 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
               onTap: () {
                 setState(() {
                   if (category.name == 'View All') {
-                    // View All should just show all categories; do not filter products
                     _selectedProductCategory = null;
-                    // No navigation
                   } else {
-                    _selectedProductCategory =
-                        category.name; // if you want tile highlight
-                    // Navigate to dedicated category products page
+                    _selectedProductCategory = category.name;
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -402,7 +429,6 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
   }
 
   Widget _buildProductList() {
-    // Always show all products for this vendor; no inline filtering
     final productQuery = FirebaseFirestore.instance
         .collection('vendors')
         .doc(widget.vendor.uid)
@@ -459,75 +485,110 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
   }
 
   Widget _buildProductCard(Product product) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: kCardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black12, blurRadius: 3, offset: const Offset(0, 1))
-        ],
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              product.imageUrl,
-              width: 70,
-              height: 70,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
+    return InkWell(
+      // --- NEW: Wrap in InkWell to go to detail page ---
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetailPage(
+              product: product,
+              vendor: widget.vendor, // Pass the vendor
+            ),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: kCardColor,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black12,
+                blurRadius: 3,
+                offset: const Offset(0, 1))
+          ],
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                product.imageUrl,
                 width: 70,
                 height: 70,
-                color: Colors.grey.shade200,
-                child:
-                    const Icon(Icons.image_not_supported, color: Colors.grey),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  width: 70,
+                  height: 70,
+                  color: Colors.grey.shade200,
+                  child:
+                      const Icon(Icons.image_not_supported, color: Colors.grey),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(product.title,
-                    style: kLabelTextStyle.copyWith(fontSize: 16)),
-                const SizedBox(height: 4),
-                Text(product.description,
-                    style: kHintTextStyle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Text(
-                      'RM${product.discountedPrice.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: kPrimaryActionColor),
-                    ),
-                    const SizedBox(width: 8),
-                    if (product.originalPrice > product.discountedPrice)
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(product.title,
+                      style: kLabelTextStyle.copyWith(fontSize: 16)),
+                  const SizedBox(height: 4),
+                  Text(product.description,
+                      style: kHintTextStyle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
                       Text(
-                        'RM${product.originalPrice.toStringAsFixed(2)}',
+                        'RM${product.discountedPrice.toStringAsFixed(2)}',
                         style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey,
-                          decoration: TextDecoration.lineThrough,
-                        ),
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: kPrimaryActionColor),
                       ),
-                  ],
-                ),
-              ],
+                      const SizedBox(width: 8),
+                      if (product.originalPrice > product.discountedPrice)
+                        Text(
+                          'RM${product.originalPrice.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Icon(Icons.add_circle_outline,
-              color: kPrimaryActionColor, size: 30),
-        ],
+            // --- MODIFIED: Add to Cart Button ---
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline,
+                  color: kPrimaryActionColor, size: 30),
+              onPressed: () {
+                // Get the cart provider (don't listen, just read)
+                final cart = context.read<CartProvider>();
+                // Add 1 of this product
+                cart.addItem(product, widget.vendor, 1);
+
+                // Show a confirmation snackbar
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${product.title} added to cart!'),
+                    backgroundColor: kPrimaryActionColor,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+            // --- END MODIFICATION ---
+          ],
+        ),
       ),
     );
   }
