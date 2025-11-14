@@ -4,9 +4,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:foodiebox/screens/users/order_confirmation_page.dart';
 import 'package:foodiebox/screens/users/order_failure_page.dart';
+import 'package:provider/provider.dart';
+import 'package:foodiebox/providers/cart_provider.dart';
+import '../users/subpages/delivery_address_page.dart';
+import 'package:foodiebox/util/styles.dart';
 
 class CheckoutPage extends StatefulWidget {
-  const CheckoutPage({super.key});
+  final double subtotal;
+  final List<CartItem> items;
+
+  const CheckoutPage({
+    super.key,
+    required this.subtotal,
+    required this.items,
+  });
 
   @override
   State<CheckoutPage> createState() => _CheckoutPageState();
@@ -17,10 +28,20 @@ class _CheckoutPageState extends State<CheckoutPage> {
   bool agreedToTerms = true;
   String selectedPayment = 'Credit/Debit Card';
 
-  String address = 'Jalan Teknologi 5, Kuala Lumpur, 57000';
-  LatLng addressLatLng = const LatLng(3.1390, 101.6869);
+  // --- MODIFIED: Address State ---
+  // We will store the selected address details here
+  // They are nullable because no address is selected initially
+  String? _selectedAddressString;
+  LatLng? _selectedAddressLatLng;
+  String? _selectedContactName;
+  String? _selectedContactPhone;
+  String? _selectedAddressLabel;
 
-  double subtotal = 16.97;
+  // We need the current user to fetch addresses
+  User? _user;
+  // --- END MODIFICATION ---
+
+  late double subtotal;
   double discount = 0.0;
   double deliveryFee = 5.00;
   double deliveryDiscount = 3.00;
@@ -29,7 +50,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
   String promoError = '';
 
   final List<Map<String, dynamic>> availablePromos = [
-    {
+    // ... your promo list remains unchanged ...
+        {
       'title': '14% Additional Groceries Discount',
       'code': 'VLZKOW7',
       'minSpend': 45.00,
@@ -49,29 +71,70 @@ class _CheckoutPageState extends State<CheckoutPage> {
     },
   ];
 
-  double getTotal() {
-    return subtotal - discount + deliveryFee - deliveryDiscount;
+  @override
+  void initState() {
+    super.initState();
+    subtotal = widget.subtotal;
+    // --- NEW: Get user and load their default address ---
+    _user = FirebaseAuth.instance.currentUser;
+    _loadDefaultAddress();
+    // --- END NEW ---
   }
 
-  double _getPromoMinSpend(String code) {
-    final promo = availablePromos.firstWhere(
-      (p) => p['code'] == code,
-      orElse: () => {},
-    );
-    return promo['minSpend'] ?? 0.0;
-  }
+  // --- NEW METHOD: Load the user's most recent address ---
+  Future<void> _loadDefaultAddress() async {
+    if (_user == null) return;
 
-  Future<void> _editAddress() async {
-    final result =
-        await Navigator.pushNamed(context, '/map') as Map<String, dynamic>?;
-    if (result != null) {
-      setState(() {
-        address = result['address'];
-        addressLatLng = LatLng(result['lat'], result['lng']);
-      });
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_user!.uid)
+          .collection('addresses')
+          .orderBy('timestamp', descending: true) // Get the latest one
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final defaultAddress = snapshot.docs.first.data();
+        // Use our new helper to set the state
+        _updateSelectedAddress(defaultAddress);
+      }
+    } catch (e) {
+      // Handle error, e.g., show a snackbar
+      print("Error loading default address: $e");
     }
   }
 
+  // --- NEW HELPER METHOD: Update state with selected address ---
+  void _updateSelectedAddress(Map<String, dynamic> addressData) {
+    setState(() {
+      _selectedAddressString = addressData['address'];
+      _selectedContactName = addressData['contactName'];
+      _selectedContactPhone = addressData['contactPhone'];
+      _selectedAddressLabel = addressData['label'] ?? 'Address';
+      if (addressData['lat'] != null && addressData['lng'] != null) {
+        _selectedAddressLatLng =
+            LatLng(addressData['lat'], addressData['lng']);
+      }
+    });
+  }
+
+  // --- NEW METHOD: Navigate to address selection page ---
+  Future<void> _selectAddress() async {
+    // Navigate to the DeliveryAddressPage
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const DeliveryAddressPage()),
+    );
+
+    // This page will pop back with the selected address data
+    if (result != null && result is Map<String, dynamic>) {
+      // Update the checkout page's state with the selected address
+      _updateSelectedAddress(result);
+    }
+  }
+
+  // --- (buildOrderSummary, _loadLastPromo, _selectPaymentMethod, _showPromoSelector, buildDeliveryOption methods remain unchanged) ---
   Widget buildOrderSummary() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -106,13 +169,19 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  @override
-  void initState() {
-    super.initState();
-    // Removed _loadLastPromo() to prevent auto-selecting the last used promo.
+  double getTotal() {
+    return subtotal - discount + deliveryFee - deliveryDiscount;
   }
 
-  // NOTE: This method is kept but no longer called by initState.
+  double _getPromoMinSpend(String code) {
+    final promo = availablePromos.firstWhere(
+      (p) => p['code'] == code,
+      orElse: () => {},
+    );
+    return promo['minSpend'] ?? 0.0;
+  }
+
+  // --- _loadLastPromo ---
   Future<void> _loadLastPromo() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -145,6 +214,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
   }
 
+  // --- _selectPaymentMethod ---
   void _selectPaymentMethod() {
     showModalBottomSheet(
       context: context,
@@ -185,6 +255,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
+  // --- _showPromoSelector ---
   void _showPromoSelector() {
     showModalBottomSheet(
       context: context,
@@ -351,6 +422,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
+  // --- buildDeliveryOption ---
   Widget buildDeliveryOption(String label, String time, double price) {
     final isSelected = selectedDelivery == label;
     return GestureDetector(
@@ -360,7 +432,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: Colors.white,
-          // ✅ FIX: Apply amber border when selected
           border: Border.all(
             color: isSelected ? Colors.amber : Colors.black12,
             width: isSelected ? 2.0 : 1.0,
@@ -389,10 +460,91 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
+  // --- NEW WIDGET: Replaces the old hardcoded address section ---
+  Widget _buildAddressSection() {
+    // Case 1: No address has been selected or loaded yet
+    if (_selectedAddressString == null) {
+      return InkWell(
+        onTap: _selectAddress,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: kYellowLight, // Use your style
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: kPrimaryActionColor, width: 1.5), // Use your style
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Select Delivery Address',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: kTextColor), // Use your style
+              ),
+              Icon(Icons.arrow_forward_ios, size: 16, color: kTextColor), // Use your style
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Case 2: An address is selected
+    IconData iconData = Icons.location_on;
+    if (_selectedAddressLabel == 'Home') {
+      iconData = Icons.home;
+    } else if (_selectedAddressLabel == 'Office') {
+      iconData = Icons.work;
+    }
+
+    return InkWell(
+      onTap: _selectAddress, // Tap to change address
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(color: Colors.grey.shade200, blurRadius: 4)
+          ],
+          border: Border.all(color: Colors.grey.shade300)
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(iconData, color: kPrimaryActionColor, size: 28), // Use your style
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$_selectedAddressLabel - $_selectedContactName',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _selectedAddressString ?? 'No address',
+                    style: const TextStyle(fontSize: 14, color: Colors.black54),
+                  ),
+                   const SizedBox(height: 4),
+                  Text(
+                    _selectedContactPhone ?? 'No phone',
+                    style: const TextStyle(fontSize: 14, color: Colors.black54),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.edit_location_alt_outlined, size: 20, color: Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -410,60 +562,27 @@ class _CheckoutPageState extends State<CheckoutPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Delivery Address', style: TextStyle(fontSize: 16)),
+            // --- MODIFIED: Delivery Address ---
+            const Text('Delivery Address',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            GestureDetector(
-              onTap: _editAddress,
-              child: Container(
-                height: 160,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(color: Colors.grey.shade200, blurRadius: 4),
-                  ],
-                ),
-                child: Stack(
-                  children: [
-                    GoogleMap(
-                      initialCameraPosition: CameraPosition(
-                        target: addressLatLng,
-                        zoom: 15,
-                      ),
-                      markers: {
-                        Marker(
-                          markerId: const MarkerId('address'),
-                          position: addressLatLng,
-                          infoWindow: InfoWindow(title: address),
-                        ),
-                      },
-                      zoomControlsEnabled: false,
-                      myLocationButtonEnabled: false,
-                    ),
-                    const Align(
-                      alignment: Alignment.topCenter,
-                      child: Padding(
-                        padding: EdgeInsets.all(8),
-                        child: Icon(
-                          Icons.edit_location_alt,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(address, style: const TextStyle(fontSize: 14)),
+            // Use our new dynamic widget
+            _buildAddressSection(),
             const SizedBox(height: 20),
-            const Text('Delivery Option', style: TextStyle(fontSize: 16)),
+            // --- END MODIFICATION ---
+
+            // --- Delivery Option ---
+            const Text('Delivery Option',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             buildDeliveryOption('Express', '20 min', 4.99),
             buildDeliveryOption('Standard', '40 min', 2.99),
             buildDeliveryOption('Saver', '60 min', 0.99),
             const SizedBox(height: 20),
-            const Text('Payment Method', style: TextStyle(fontSize: 16)),
+
+            // --- Payment Method ---
+            const Text('Payment Method',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             GestureDetector(
               onTap: _selectPaymentMethod,
@@ -478,18 +597,22 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   boxShadow: [
                     BoxShadow(color: Colors.grey.shade200, blurRadius: 4),
                   ],
+                   border: Border.all(color: Colors.grey.shade300)
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(selectedPayment, style: const TextStyle(fontSize: 14)),
+                    Text(selectedPayment, style: const TextStyle(fontSize: 16)),
                     const Icon(Icons.arrow_forward_ios, size: 16),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            const Text('Promo Code', style: TextStyle(fontSize: 16)),
+
+            // --- Promo Code ---
+            const Text('Promo Code',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             TweenAnimationBuilder<double>(
               tween: Tween<double>(
@@ -589,44 +712,16 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 ),
               ),
             const SizedBox(height: 20),
-            const Text('Order Summary', style: TextStyle(fontSize: 16)),
+
+            // --- Order Summary ---
+            const Text('Order Summary',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(color: Colors.grey.shade200, blurRadius: 4),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Subtotal: RM${subtotal.toStringAsFixed(2)}'),
-                  Text('Total discount: -RM${discount.toStringAsFixed(2)}'),
-                  Text('Delivery fee: RM${deliveryFee.toStringAsFixed(2)}'),
-                  Text(
-                    'Delivery fee discount: -RM${deliveryDiscount.toStringAsFixed(2)}',
-                  ),
-                  if (promoCode.isNotEmpty)
-                    Text(
-                      discount > 0
-                          ? "Promo Applied: $promoLabel"
-                          : "Promo '$promoCode' cannot be used (min RM${_getPromoMinSpend(promoCode).toStringAsFixed(2)})",
-                      style: TextStyle(
-                        color: discount > 0 ? Colors.green : Colors.red,
-                      ),
-                    ),
-                  const Divider(),
-                  Text(
-                    'Total: RM${getTotal().toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
+            // Use the reusable buildOrderSummary method
+            buildOrderSummary(),
             const SizedBox(height: 20),
+
+            // --- Terms and Conditions ---
             Row(
               children: [
                 Checkbox(
@@ -651,13 +746,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
               ],
             ),
             const SizedBox(height: 20),
+
+            // --- Place Order Button ---
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: agreedToTerms ? _placeOrder : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.amber,
-                  foregroundColor: Colors.black,
+                  backgroundColor: kPrimaryActionColor, // Use your style
+                  foregroundColor: kTextColor, // Use your style
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -665,7 +762,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 ),
                 child: const Text(
                   'Place Order',
-                  style: TextStyle(fontSize: 16),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -676,6 +773,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Future<void> _placeOrder() async {
+    // --- MODIFIED: Check for address first ---
+    if (_selectedAddressString == null || _selectedAddressLatLng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a delivery address.')),
+      );
+      return;
+    }
+    // --- END MODIFICATION ---
+
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -684,8 +790,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       return;
     }
 
-    // ✅ FIX: If an ineligible promo is active, show the dialog.
-    // If the user clears the promo, recursively call _placeOrder to immediately retry.
+    // ... (Promo validation logic remains unchanged) ...
     if (promoCode.isNotEmpty && discount == 0.0) {
       final minSpend = _getPromoMinSpend(promoCode).toStringAsFixed(2);
 
@@ -721,20 +826,30 @@ class _CheckoutPageState extends State<CheckoutPage> {
           promoLabel = '';
           promoError = '';
         });
-        // ✅ Rerun the function immediately now that the promo is cleared
         return _placeOrder();
       }
-      // If user cancels the dialog, stop the order attempt
       return;
     }
 
-    // --- Proceed with order placement if validation passes ---
+    final itemsData = widget.items.map((item) {
+      return {
+        'name': item.product.title,
+        'price': item.product.discountedPrice,
+        'quantity': item.quantity,
+        'productId': item.product.id,
+        'vendorId': item.vendorId,
+        'imageUrl': item.product.imageUrl,
+      };
+    }).toList();
 
+    // --- MODIFIED: Use dynamic address data in the order ---
     final orderData = {
-      'userId': user.uid, // ✅ add this line
-      'address': address,
-      'lat': addressLatLng.latitude,
-      'lng': addressLatLng.longitude,
+      'userId': user.uid,
+      'address': _selectedAddressString, // Use state variable
+      'lat': _selectedAddressLatLng!.latitude, // Use state variable
+      'lng': _selectedAddressLatLng!.longitude, // Use state variable
+      'contactName': _selectedContactName, // Add contact name
+      'contactPhone': _selectedContactPhone, // Add contact phone
       'deliveryOption': selectedDelivery,
       'paymentMethod': selectedPayment,
       'subtotal': subtotal,
@@ -745,12 +860,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
       'promoCode': promoCode,
       'promoLabel': promoLabel,
       'status': 'received',
-      'items': [
-        {'name': 'Tacos', 'price': 12.49},
-        {'name': 'Cheese Quesadillas', 'price': 2.49},
-      ],
+      'items': itemsData,
       'timestamp': FieldValue.serverTimestamp(),
     };
+    // --- END MODIFICATION ---
 
     try {
       final docRef =
@@ -758,7 +871,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       final orderId = docRef.id;
 
       if (promoCode.isNotEmpty) {
-        // Update user's promo usage history
+        // ... (Promo usage update logic remains unchanged) ...
         final promoRef = FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
@@ -771,7 +884,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
           'count': FieldValue.increment(1),
         }, SetOptions(merge: true));
 
-        // Save last used promo code data to the user's root document
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'lastPromo': {
             'code': promoCode,
@@ -781,33 +893,39 @@ class _CheckoutPageState extends State<CheckoutPage> {
         }, SetOptions(merge: true));
       }
 
+      if (mounted) {
+        context.read<CartProvider>().clearCart();
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Order placed successfully!')),
       );
 
-      // Use pushReplacement for successful order
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => OrderConfirmationPage(
-            address: address,
-            location: addressLatLng,
-            total: getTotal(),
-            promoLabel: promoLabel,
-            orderId: orderId,
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => OrderConfirmationPage(
+              address: _selectedAddressString!, // Pass the selected address
+              location: _selectedAddressLatLng!, // Pass the selected lat/lng
+              total: getTotal(),
+              promoLabel: promoLabel,
+              orderId: orderId,
+            ),
           ),
-        ),
-      );
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to place order: $e')));
 
-      // Use pushReplacement for failed order
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const OrderFailurePage()),
-      );
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const OrderFailurePage()),
+        );
+      }
     }
   }
 }

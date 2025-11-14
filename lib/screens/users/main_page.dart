@@ -5,9 +5,13 @@ import '../users/store_detail_page.dart';
 import '../../util/styles.dart';
 import '../../widgets/base_page.dart';
 import 'map_page.dart';
-import 'profile_page.dart'; // Assuming profile_page is in the same folder
+import 'profile_page.dart';
 import 'filter_page.dart';
 import '../../api/api_config.dart';
+import 'package:provider/provider.dart';
+import 'package:foodiebox/providers/cart_provider.dart';
+import 'package:foodiebox/screens/users/cart_page.dart';
+
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -34,6 +38,9 @@ class _MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
+    // --- NEW: Get the cart provider to watch for changes ---
+    final cart = context.watch<CartProvider>();
+
     return BasePage(
       currentIndex: 0,
       child: SingleChildScrollView(
@@ -41,7 +48,7 @@ class _MainPageState extends State<MainPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // --- Top Bar (No Changes) ---
+            // --- Top Bar (MODIFIED) ---
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 50, 20, 10),
               child: Row(
@@ -73,11 +80,26 @@ class _MainPageState extends State<MainPage> {
                         const Icon(Icons.notifications_none, color: kTextColor),
                     onPressed: () {},
                   ),
+                  // --- MODIFIED CART ICON ---
                   IconButton(
-                    icon: const Icon(Icons.shopping_cart_outlined,
-                        color: kTextColor),
-                    onPressed: () {},
+                    icon: Badge(
+                      // Show the number of items in the cart
+                      label: Text(cart.itemCount.toString()),
+                      // Only show the badge if the cart is not empty
+                      isLabelVisible: cart.itemCount > 0,
+                      child: const Icon(Icons.shopping_cart_outlined,
+                          color: kTextColor),
+                    ),
+                    onPressed: () {
+                      // Navigate to the new CartPage
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const CartPage()),
+                      );
+                    },
                   ),
+                  // --- END MODIFIED CART ICON ---
                   GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -190,10 +212,10 @@ class _MainPageState extends State<MainPage> {
                           const Icon(Icons.image, size: 40, color: Colors.grey),
                     ),
                     const SizedBox(width: 16),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text('Promotions',
                               style: TextStyle(
                                   fontSize: 18,
@@ -246,7 +268,7 @@ class _MainPageState extends State<MainPage> {
               image: AssetImage(imagePath),
               fit: BoxFit.cover,
             ),
-            boxShadow: [
+            boxShadow: const [
               BoxShadow(
                 color: Colors.black12,
                 blurRadius: 4,
@@ -321,11 +343,11 @@ class _MainPageState extends State<MainPage> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
+          boxShadow: const [
             BoxShadow(
               color: Colors.black12,
               blurRadius: 6,
-              offset: const Offset(2, 2),
+              offset: Offset(2, 2),
             ),
           ],
         ),

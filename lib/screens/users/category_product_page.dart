@@ -3,7 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:foodiebox/models/vendor.dart';
 import 'package:foodiebox/models/product.dart';
 import 'package:foodiebox/util/styles.dart';
-import 'product_detail_page.dart'; // NEW: Import the detail page
+import 'product_detail_page.dart'; // Import the detail page
+
+// --- NEW IMPORTS ---
+import 'package:provider/provider.dart';
+import 'package:foodiebox/providers/cart_provider.dart';
+// --- END NEW IMPORTS ---
 
 class CategoryProductPage extends StatelessWidget {
   final VendorModel vendor;
@@ -65,8 +70,13 @@ class CategoryProductPage extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>
-                          ProductDetailPage(product: product),
+                      // --- MODIFIED ---
+                      // Pass both product and vendor to the detail page
+                      builder: (context) => ProductDetailPage(
+                        product: product,
+                        vendor: vendor,
+                      ),
+                      // --- END MODIFIED ---
                     ),
                   );
                 },
@@ -143,21 +153,28 @@ class CategoryProductPage extends StatelessWidget {
                           ],
                         ),
                       ),
-                      // NEW: Changed to an IconButton to separate tap targets
+                      // --- MODIFIED: Add to Cart Button ---
                       IconButton(
                         icon: const Icon(Icons.add_circle_outline,
                             color: kPrimaryActionColor, size: 30),
                         onPressed: () {
-                          // TODO: Implement Add to Cart logic here
+                          // Get the cart provider (don't listen, just read)
+                          final cart = context.read<CartProvider>();
+                          // Add 1 of this product
+                          cart.addItem(product, vendor, 1);
+
+                          // Show a confirmation snackbar
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content:
-                                  Text('${product.title} added to cart! (stub)'),
+                                  Text('${product.title} added to cart!'),
+                              backgroundColor: kPrimaryActionColor,
                               duration: const Duration(seconds: 1),
                             ),
                           );
                         },
                       ),
+                      // --- END MODIFICATION ---
                     ],
                   ),
                 ),

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:foodiebox/models/driver_model.dart';
-import 'package:foodiebox/screens/users/main_page.dart';
-import 'package:confetti/confetti.dart';
+import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:foodiebox/models/driver_model.dart';
 
 class RateDriverPage extends StatefulWidget {
   final String orderId;
@@ -15,100 +14,37 @@ class RateDriverPage extends StatefulWidget {
   });
 
   @override
-  State<RateDriverPage> createState() => _RateDriverPageState();
+  State<DriverRatePage> createState() => _DriverRatePageState();
 }
 
-class _RateDriverPageState extends State<RateDriverPage> {
-  late ConfettiController _confettiController;
-  int _rating = 0;
+class _DriverRatePageState extends State<DriverRatePage> {
+  double _userRating = 5.0;
   bool _isSubmitting = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _confettiController =
-        ConfettiController(duration: const Duration(seconds: 1));
-  }
+  Future<void> submitRating() async {
+    setState(() => _isSubmitting = true);
+    final docRef =
+        FirebaseFirestore.instance.collection('drivers').doc(widget.driver.id);
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      final snapshot = await transaction.get(docRef);
+      final data = snapshot.data()!;
+      final oldRating = (data['rating'] as num).toDouble();
+      final oldCount = (data['ratingsCount'] as num).toInt();
 
-  @override
-  void dispose() {
-    _confettiController.dispose();
-    super.dispose();
-  }
+      final newCount = oldCount + 1;
+      final newRating = ((oldRating * oldCount) + _userRating) / newCount;
 
-  /// Builds a single star for the rating
-  Widget _buildStar(int index) {
-    IconData icon = _rating > index ? Icons.star : Icons.star_border;
-    Color color = _rating > index ? Colors.amber : Colors.grey;
-    return IconButton(
-      onPressed: () {
-        if (_isSubmitting) return; // Disable if already submitting
-        setState(() {
-          _rating = index + 1;
-        });
-      },
-      icon: Icon(icon, color: color, size: 40),
-    );
-  }
-
-  /// Saves data to Firebase and plays animation
-  Future<void> _submitRating() async {
-    if (_rating == 0) return; // Shouldn't be possible, but good to check
-
-    setState(() {
-      _isSubmitting = true;
+      transaction.update(docRef, {
+        'rating': newRating,
+        'ratingsCount': newCount,
+      });
     });
 
-    // --- MODIFIED: Save to Firebase (UNCOMMENTED) ---
-    try {
-      // 1. Update the order with the rating and mark as completed
-      await FirebaseFirestore.instance
-          .collection('orders')
-          .doc(widget.orderId)
-          .update({
-        'rating': _rating,
-        'status': 'completed', // Final status (was 'Success' in your prompt)
-      });
-
-      // 2. (Optional) Add to a driver's subcollection of ratings
-      await FirebaseFirestore.instance
-          .collection('drivers')
-          .doc(widget.driver.id)
-          .collection('ratings')
-          .add({'rating': _rating, 'timestamp': FieldValue.serverTimestamp()});
-    } catch (e) {
-      // Handle error
-      print('Firebase update failed: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save rating: $e')),
-        );
-      }
-      // Don't continue if saving failed
-      setState(() {
-        _isSubmitting = false;
-      });
-      return;
-    }
-    // --- End Firebase Block ---
-
-    // Play confetti if 5 stars
-    if (_rating == 5) {
-      _confettiController.play();
-    }
-
-    // Wait for animation, then navigate
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (!mounted) return;
-    // --- MODIFIED ---
-    // This now navigates back to the main page as requested, clearing all
-    // previous pages from the stack.
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const MainPage()),
-      (route) => false,
+    setState(() => _isSubmitting = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Rating submitted!')),
     );
+    Navigator.pop(context);
   }
 
   @override
