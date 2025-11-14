@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import 'registration_pending_page.dart';
 
 // ====== STYLE CONSTANTS ======
 const kPrimaryActionColor = Color(0xFF4A47A3);
@@ -87,7 +88,6 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
   final _formKey1 = GlobalKey<FormState>();
   final _formKey2 = GlobalKey<FormState>();
   final _formKey3 = GlobalKey<FormState>();
-
   late PageController _pageController;
   int _currentPage = 0;
 
@@ -202,23 +202,31 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
         isLocked: false,
         rating: 0,
         vendorType: 'Restaurant',
-        createdAt: DateTime.now(),
+        createdAt: null, // Use Firestore server time
         approvedAt: null,
       );
 
       // Save to Firestore
       await vendorRef.set(vendor.toMap());
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text(
-                'Registration submitted successfully! Please wait for admin approval.')),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content:
+                  Text('Registration submitted! Awaiting admin approval.')),
+        );
 
-      Navigator.pop(context);
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const RegistrationPendingPage(),
+          ),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error submitting registration: $e')));
+        SnackBar(content: Text('Error submitting registration: $e')),
+      );
     }
   }
 

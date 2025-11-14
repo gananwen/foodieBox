@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../util/styles.dart';
 import '../../repositories/auth_repository.dart';
 import '../../repositories/user_repository.dart';
-import '../Admin/admin_home_page.dart'; // Create your admin home page
+import '../Admin/admin_home_page.dart';
 
 class AdminLoginPage extends StatefulWidget {
   const AdminLoginPage({super.key});

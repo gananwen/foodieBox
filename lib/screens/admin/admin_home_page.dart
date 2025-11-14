@@ -235,7 +235,7 @@ class _AdminDrawer extends StatelessWidget {
                         ),
                         _DrawerItem(
                           icon: Icons.people_alt_outlined,
-                          title: "Vendor Management & Customer Support",
+                          title: "Vendor Management",
                           onTap: () {
                             Navigator.push(
                               context,
@@ -251,7 +251,7 @@ class _AdminDrawer extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) => const PromotionsPage()),
+                                  builder: (_) => const PromotionsAdminPage()),
                             );
                           },
                         ),
