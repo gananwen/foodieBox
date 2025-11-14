@@ -2,11 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:foodiebox/models/product.dart';
 import 'package:foodiebox/util/styles.dart';
 
+// --- NEW IMPORTS ---
+import 'package:provider/provider.dart';
+import 'package:foodiebox/models/vendor.dart';
+import 'package:foodiebox/providers/cart_provider.dart';
+// --- END NEW IMPORTS ---
 
 class ProductDetailPage extends StatefulWidget {
   final Product product;
+  // --- MODIFICATION: Vendor is required to add to cart ---
+  final VendorModel vendor;
 
-  const ProductDetailPage({super.key, required this.product});
+  const ProductDetailPage({
+    super.key,
+    required this.product,
+    required this.vendor, // Added vendor
+  });
+  // --- END MODIFICATION ---
 
   @override
   State<ProductDetailPage> createState() => _ProductDetailPageState();
@@ -77,8 +89,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     ),
                   ),
                   IconButton(
-                    icon:
-                        const Icon(Icons.favorite_border, color: kTextColor, size: 28),
+                    icon: const Icon(Icons.favorite_border,
+                        color: kTextColor, size: 28),
                     onPressed: () {
                       // TODO: Handle favorite action
                     },
@@ -104,7 +116,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     child: Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.remove, size: 20, color: kTextColor),
+                          icon: const Icon(Icons.remove,
+                              size: 20, color: kTextColor),
                           onPressed: () {
                             setState(() {
                               if (_quantity > 1) _quantity--;
@@ -116,7 +129,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                           style: kLabelTextStyle.copyWith(fontSize: 18),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.add, size: 20, color: kTextColor),
+                          icon: const Icon(Icons.add,
+                              size: 20, color: kTextColor),
                           onPressed: () {
                             setState(() {
                               _quantity++;
@@ -186,7 +200,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               const SizedBox(height: 24),
 
               // --- Product Detail ---
-              Text('Product Detail', style: kLabelTextStyle.copyWith(fontSize: 18)),
+              Text('Product Detail',
+                  style: kLabelTextStyle.copyWith(fontSize: 18)),
               const SizedBox(height: 8),
               Text(
                 widget.product.description,
@@ -200,7 +215,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Nutritions', style: kLabelTextStyle.copyWith(fontSize: 18)),
+                  Text('Nutritions',
+                      style: kLabelTextStyle.copyWith(fontSize: 18)),
                   Row(
                     children: [
                       Text('100gr', style: kHintTextStyle),
@@ -213,10 +229,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: kCardColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200)
-                ),
+                    color: kCardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200)),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -252,14 +267,28 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
         child: ElevatedButton(
+          // --- MODIFICATION: Add to cart logic ---
           onPressed: () {
-            // TODO: Add to cart logic
+            // 1. Get the cart provider
+            final cart = context.read<CartProvider>();
+            
+            // 2. Add the item with the correct vendor and quantity
+            cart.addItem(widget.product, widget.vendor, _quantity);
+
+            // 3. Show confirmation
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                  content: Text(
-                      '${_quantity}x ${widget.product.title} added to cart! (stub)')),
+                content: Text(
+                    'Added $_quantity x ${widget.product.title} to cart!'),
+                backgroundColor: kPrimaryActionColor, // Use your theme color
+                duration: const Duration(seconds: 2),
+              ),
             );
+
+            // 4. Go back to the previous screen
+            Navigator.of(context).pop();
           },
+          // --- END MODIFICATION ---
           style: ElevatedButton.styleFrom(
             backgroundColor: kPrimaryActionColor,
             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -272,7 +301,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Colors.white, // Assuming you want white text on primary color
             ),
           ),
         ),

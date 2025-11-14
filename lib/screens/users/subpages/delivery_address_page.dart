@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../users/map_page.dart';
+import 'package:foodiebox/util/styles.dart';
 
 class DeliveryAddressPage extends StatefulWidget {
   const DeliveryAddressPage({super.key});
@@ -52,14 +53,10 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
 
   // --- Autocomplete/Suggestion Stub ---
   void _onAddressChanged() {
-    // In a real app, this method would trigger an API call
-    // to Google Places or similar service when text length > 3.
-    // We update the state to conceptually show suggestions.
+    // ... (this logic remains the same) ...
     final input = _addressController.text;
     if (input.length > 2) {
-      // CONCEPTUAL: Filter mock data or trigger API
       setState(() {
-        // Mock suggestion logic:
         _autocompleteSuggestions = [
           '${input}th Street, New York',
           '${input}0 Jalan Raja, Kuala Lumpur',
@@ -76,7 +73,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   }
 
   void _selectSuggestion(String suggestion) {
-    // When a suggestion is tapped, fill the text field and trigger geocoding
+    // ... (this logic remains the same) ...
     _addressController.text = suggestion;
     setState(() {
       _autocompleteSuggestions = []; // Hide suggestions
@@ -86,7 +83,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
 
   // --- Geocoding (Manual Input) ---
   Future<void> _geocodeAddress() async {
-    final address = _addressController.text.trim();
+    // ... (this logic remains the same) ...
+        final address = _addressController.text.trim();
     if (address.isEmpty) return;
 
     // Clear suggestions before geocoding
@@ -134,7 +132,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
 
   // --- Map Picker (Visual Selection) ---
   Future<void> _openMapPicker() async {
-    final result = await Navigator.push(
+    // ... (this logic remains the same) ...
+        final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const MapPage()),
     );
@@ -162,7 +161,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
 
   // --- Save/Edit/Delete/Reset methods (Unchanged from previous revision) ---
   Future<void> _saveAddress() async {
-    final userId = FirebaseAuth.instance.currentUser!.uid;
+    // ... (this logic remains the same) ...
+        final userId = FirebaseAuth.instance.currentUser!.uid;
     final address = _addressController.text.trim();
     final name = _nameController.text.trim();
     final phone = _phoneController.text.trim();
@@ -223,7 +223,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   }
 
   void _startEditing(String docId, Map<String, dynamic> data) {
-    setState(() {
+    // ... (this logic remains the same) ...
+        setState(() {
       editingId = docId;
       _addressController.text = data['address'] ?? '';
       _nameController.text = data['contactName'] ?? '';
@@ -243,7 +244,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   }
 
   void _resetForm() {
-    setState(() {
+    // ... (this logic remains the same) ...
+        setState(() {
       editingId = null;
       _addressController.clear();
       _nameController.clear();
@@ -260,7 +262,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   }
 
   Future<void> _deleteAddress(String docId) async {
-    final userId = FirebaseAuth.instance.currentUser!.uid;
+    // ... (this logic remains the same) ...
+        final userId = FirebaseAuth.instance.currentUser!.uid;
     await FirebaseFirestore.instance
         .collection('users')
         .doc(userId)
@@ -271,14 +274,15 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         .showSnackBar(const SnackBar(content: Text('Address deleted')));
   }
 
-  void _goToCheckout() {
-    Navigator.pushNamed(context, '/checkout');
-  }
+  // --- REMOVED ---
+  // void _goToCheckout() { ... }
+  // --- END REMOVED ---
 
   // --- UI Helper Functions ---
 
   InputDecoration _inputDecoration(String labelText,
       {String? hintText, Widget? suffixIcon}) {
+    // ... (this logic remains the same) ...
     return InputDecoration(
       labelText: labelText,
       hintText: hintText,
@@ -324,17 +328,14 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
+          // MODIFIED: Just pop the screen
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Delivery Address',
             style: TextStyle(color: Colors.black)),
         centerTitle: true,
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.amber,
-        onPressed: _goToCheckout,
-        child: const Icon(Icons.shopping_cart, color: Colors.white),
-      ),
+      // --- REMOVED FloatingActionButton ---
       body: Column(
         children: [
           // --- Map Preview (Always showing) ---
@@ -562,14 +563,9 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                                       ),
                                     ],
                                   ),
+                                  // --- MODIFIED: Pop with the selected address data ---
                                   onTap: () {
-                                    Navigator.pop(context, {
-                                      'label': label,
-                                      'contactName': name,
-                                      'address': address,
-                                      'lat': data['lat'],
-                                      'lng': data['lng'],
-                                    });
+                                    Navigator.pop(context, data);
                                   }),
                             );
                           }).toList(),
@@ -589,7 +585,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                       elevation: 4,
                       borderRadius: BorderRadius.circular(10),
                       child: Container(
-                        decoration: BoxDecoration(
+                        // ... (autocomplete UI remains the same) ...
+                         decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: Colors.amber.shade100)),
