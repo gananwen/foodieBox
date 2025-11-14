@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RateDriverPage extends StatefulWidget {
   final String orderId;
-  final Driver driver;
+  final DriverModel driver;
 
   const RateDriverPage({
     super.key,
@@ -168,8 +168,8 @@ class _RateDriverPageState extends State<RateDriverPage> {
                         borderRadius: BorderRadius.circular(30),
                       ),
                     ),
-                    child:
-                        const Text('Submit Rating', style: TextStyle(fontSize: 16)),
+                    child: const Text('Submit Rating',
+                        style: TextStyle(fontSize: 16)),
                   ),
               ],
             ),

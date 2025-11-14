@@ -5,8 +5,6 @@ class VendorModel {
   final String storePhone;
   final String vendorType; // <-- (来自你的注册页面)
   final String businessPhotoUrl;
-  final String vendorType; // <-- (来自你的注册页面)
-  final String businessPhotoUrl;
   final String businessLicenseUrl;
   final String halalCertificateUrl;
   final bool isApproved; // 管理员审批
@@ -20,7 +18,6 @@ class VendorModel {
     required this.storeName,
     required this.storeAddress,
     required this.storePhone,
-    required this.vendorType, // <-- (来自你的注册页面)
     required this.vendorType, // <-- (来自你的注册页面)
     required this.businessPhotoUrl,
     required this.businessLicenseUrl,
@@ -38,7 +35,6 @@ class VendorModel {
       storeName: map['storeName'] ?? '',
       storeAddress: map['storeAddress'] ?? '',
       storePhone: map['storePhone'] ?? '',
-      vendorType: map['vendorType'] ?? 'Grocery', // <-- (添加了默认值)
       vendorType: map['vendorType'] ?? 'Grocery', // <-- (添加了默认值)
       businessPhotoUrl: map['businessPhotoUrl'] ?? '',
       businessLicenseUrl: map['businessLicenseUrl'] ?? '',
@@ -58,7 +54,6 @@ class VendorModel {
       'storeName': storeName,
       'storeAddress': storeAddress,
       'storePhone': storePhone,
-      'vendorType': vendorType, // <-- (添加)
       'vendorType': vendorType, // <-- (添加)
       'businessPhotoUrl': businessPhotoUrl,
       'businessLicenseUrl': businessLicenseUrl,
@@ -84,6 +79,8 @@ class VendorModel {
     bool? isApproved,
     double? rating,
     List<String>? storeHours,
+    // --- NEW FIELD ---
+    bool? hasExpiryDeals,
   }) {
     return VendorModel(
       uid: uid ?? this.uid,
@@ -97,6 +94,8 @@ class VendorModel {
       isApproved: isApproved ?? this.isApproved,
       rating: rating ?? this.rating,
       storeHours: storeHours ?? this.storeHours,
+      // --- NEW FIELD ---
+      hasExpiryDeals: hasExpiryDeals ?? this.hasExpiryDeals,
     );
   }
 }

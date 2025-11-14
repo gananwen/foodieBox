@@ -5,12 +5,6 @@ import '../../util/styles.dart';
 import '../../models/promotion.dart';
 import '../../repositories/promotion_repository.dart';
 
-import 'package:intl/intl.dart';
-import '../../util/styles.dart';
-// --- 1. 导入新模型和仓库 ---
-import '../../models/promotion.dart';
-import '../../repositories/promotion_repository.dart';
-
 class AddPromotionPage extends StatefulWidget {
   const AddPromotionPage({super.key});
 
@@ -20,8 +14,6 @@ class AddPromotionPage extends StatefulWidget {
 
 class _AddPromotionPageState extends State<AddPromotionPage> {
   final _formKey = GlobalKey<FormState>();
-  final _repo = PromotionRepository(); // <-- 2. 添加仓库
-  bool _isLoading = false;
   final _repo = PromotionRepository(); // <-- 2. 添加仓库
   bool _isLoading = false;
 
@@ -52,8 +44,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     _endDateController.dispose();
     _startTimeController.dispose();
     _endTimeController.dispose();
-    _discountPercController.dispose();
-    _totalRedemptionsController.dispose();
     _discountPercController.dispose();
     _totalRedemptionsController.dispose();
     super.dispose();
@@ -90,7 +80,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
         if (isStartTime) {
           _startTime = picked;
           _startTimeController.text = picked.format(context);
-          _startTimeController.text = picked.format(context);
         } else {
           _endTime = picked;
           _endTimeController.text = picked.format(context);
@@ -99,8 +88,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     }
   }
 
-  // --- 4. (已修改) _savePromotion 函数 ---
-  Future<void> _savePromotion() async {
   // --- 4. (已修改) _savePromotion 函数 ---
   Future<void> _savePromotion() async {
     if (_formKey.currentState!.validate()) {
@@ -201,7 +188,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
             fillColor: kCardColor,
             filled: true,
             suffixIcon: (controller != null && controller.text.isNotEmpty)
-            suffixIcon: (controller != null && controller.text.isNotEmpty)
                 ? IconButton(
                     icon: const Icon(Icons.close, size: 18),
                     onPressed: () {
@@ -251,7 +237,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
   }) {
     return _buildTextField(
       label: label,
-      onSaved: (value) {},
+      onSaved: (value) {}, // 不需要 onSaved，因为我们直接用 controller
       controller: controller,
       readOnly: true,
       onTap: onTap,
@@ -370,13 +356,10 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
               ),
 
               // --- 5. (已修改) 价格 -> 百分比 / 总数 ---
-              // --- 5. (已修改) 价格 -> 百分比 / 总数 ---
               Row(
                 children: [
                   Expanded(
                     child: _buildTextField(
-                      label: 'Discount Percentage (e.g., 20)',
-                      controller: _discountPercController,
                       label: 'Discount Percentage (e.g., 20)',
                       controller: _discountPercController,
                       onSaved: (value) =>
@@ -397,8 +380,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildTextField(
-                      label: 'Total Redemptions (e.g., 100)',
-                      controller: _totalRedemptionsController,
                       label: 'Total Redemptions (e.g., 100)',
                       controller: _totalRedemptionsController,
                       onSaved: (value) =>
@@ -426,19 +407,12 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kPrimaryActionColor,
-                    backgroundColor: kPrimaryActionColor,
                     foregroundColor: kTextColor,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: _isLoading ? null : _savePromotion,
-                  child: _isLoading
-                      ? const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(kTextColor))
-                      : const Text('Save Deal',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
                   onPressed: _isLoading ? null : _savePromotion,
                   child: _isLoading
                       ? const CircularProgressIndicator(
@@ -465,7 +439,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           _selectedProductType = value!;
         });
       },
-      activeColor: kPrimaryActionColor,
       activeColor: kPrimaryActionColor,
       contentPadding: EdgeInsets.zero,
     );

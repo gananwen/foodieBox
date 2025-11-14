@@ -45,31 +45,20 @@ class _MarketingPageState extends State<MarketingPage> {
         border: Border.all(
           color: isActive ? kPrimaryActionColor : kTextColor.withAlpha(51),
           width: isActive ? 2.0 : 1.5,
-          color: isActive ? kPrimaryActionColor : kTextColor.withAlpha(51),
-          width: isActive ? 2.0 : 1.5,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 1. 横幅图片
-          // 1. 横幅图片
           Container(
             height: 120,
             decoration: BoxDecoration(
-              color: kAppBackgroundColor.withAlpha(128),
               color: kAppBackgroundColor.withAlpha(128),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(10),
                 topRight: Radius.circular(10),
               ),
-              // (可选) 加载真实图片
-              // image: promo.bannerUrl.isNotEmpty
-              //     ? DecorationImage(
-              //         image: NetworkImage(promo.bannerUrl),
-              //         fit: BoxFit.cover,
-              //       )
-              //     : null,
               // (可选) 加载真实图片
               // image: promo.bannerUrl.isNotEmpty
               //     ? DecorationImage(
@@ -84,7 +73,6 @@ class _MarketingPageState extends State<MarketingPage> {
                         Icon(Icons.image_outlined, size: 50, color: kTextColor))
                 : null,
           ),
-          // 2. 详情
           // 2. 详情
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -119,9 +107,7 @@ class _MarketingPageState extends State<MarketingPage> {
                 ),
                 const SizedBox(height: 4),
                 // (已修改) 使用新字段动态生成描述
-                // (已修改) 使用新字段动态生成描述
                 Text(
-                  '${promo.discountPercentage}% off all ${promo.productType} products.',
                   '${promo.discountPercentage}% off all ${promo.productType} products.',
                   style: const TextStyle(
                     color: kTextColor,
@@ -154,7 +140,6 @@ class _MarketingPageState extends State<MarketingPage> {
                       foregroundColor: kTextColor,
                       side: BorderSide(
                           color: kTextColor.withAlpha(77), width: 1.5),
-                          color: kTextColor.withAlpha(77), width: 1.5),
                     ),
                     // --- 4. (已修改) 导航到新的 EditPromotionPage ---
                     onPressed: () {
@@ -178,7 +163,6 @@ class _MarketingPageState extends State<MarketingPage> {
   }
 
   // --- (不变) 构建 Analytics 卡片 ---
-  // --- (不变) 构建 Analytics 卡片 ---
   Widget _buildAnalyticsCard() {
     return GestureDetector(
       onTap: () {
@@ -195,7 +179,6 @@ class _MarketingPageState extends State<MarketingPage> {
           color: kSecondaryAccentColor,
           borderRadius: BorderRadius.circular(12.0),
           border: Border.all(
-            color: kTextColor.withAlpha(26),
             color: kTextColor.withAlpha(26),
             width: 1.5,
           ),
@@ -236,7 +219,6 @@ class _MarketingPageState extends State<MarketingPage> {
             ),
             const Icon(
               Icons.bar_chart,
-              Icons.bar_chart,
               size: 40.0,
               color: kTextColor,
             ),
@@ -263,7 +245,6 @@ class _MarketingPageState extends State<MarketingPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- 5. (已修改) 使用 StreamBuilder 动态加载促销 ---
             // --- 5. (已修改) 使用 StreamBuilder 动态加载促销 ---
             const Text(
               'Current Deals',
@@ -332,7 +313,6 @@ class _MarketingPageState extends State<MarketingPage> {
           ],
         ),
       ),
-      // --- (不变) 添加新促销的按钮 ---
       // --- (不变) 添加新促销的按钮 ---
       floatingActionButton: FloatingActionButton(
         heroTag: null,
