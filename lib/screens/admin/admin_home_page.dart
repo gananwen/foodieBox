@@ -246,7 +246,7 @@ class _AdminDrawer extends StatelessWidget {
                         ),
                         _DrawerItem(
                           icon: Icons.campaign_outlined,
-                          title: "Promotions & Ads",
+                          title: "Promotions & Vouchers",
                           onTap: () {
                             Navigator.push(
                               context,
