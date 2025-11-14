@@ -1,11 +1,9 @@
+// 路径: lib/pages/vendor_home/orders_page.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // 导入 intl
 import '../../util/styles.dart';
 import 'order_details_page.dart';
-
-// --- 1. 导入新模型和仓库 ---
-import '../../models/order.dart';
-import '../../models/order_item.dart';
+import '../../models/order_model.dart';
 import '../../repositories/order_repository.dart';
 
 class OrdersPage extends StatefulWidget {
@@ -21,10 +19,6 @@ class _OrdersPageState extends State<OrdersPage>
   late TabController _tabController;
   // --- 2. 实例化仓库 ---
   final OrderRepository _repo = OrderRepository();
-
-  // --- 3. (移除) 虚拟数据 ---
-  // List<Order> _allOrders = [];
-  // void _loadDummyOrders() { ... }
 
   @override
   void initState() {
@@ -149,9 +143,13 @@ class _OrdersPageState extends State<OrdersPage>
               child: CircularProgressIndicator(color: kPrimaryActionColor));
         }
         if (snapshot.hasError) {
+          // ( ✨ 提示 ✨ ) 这里是你的 Firebase 权限错误最先出现的地方
           return Center(
-              child: Text('Error: ${snapshot.error}',
-                  style: const TextStyle(color: kPrimaryActionColor)));
+              child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text('Error: ${snapshot.error}',
+                style: const TextStyle(color: kPrimaryActionColor)),
+          ));
         }
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return Center(
@@ -210,7 +208,3 @@ class _OrdersPageState extends State<OrdersPage>
     );
   }
 }
-
-// --- 7. (移除) ---
-// (旧的虚拟数据 Order 和 OrderItem 类已移除)
-// (我们现在使用 lib/models/ 中的新模型)

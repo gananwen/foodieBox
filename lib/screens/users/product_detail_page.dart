@@ -271,15 +271,15 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           onPressed: () {
             // 1. Get the cart provider
             final cart = context.read<CartProvider>();
-            
+
             // 2. Add the item with the correct vendor and quantity
             cart.addItem(widget.product, widget.vendor, _quantity);
 
             // 3. Show confirmation
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(
-                    'Added $_quantity x ${widget.product.title} to cart!'),
+                content:
+                    Text('Added $_quantity x ${widget.product.title} to cart!'),
                 backgroundColor: kPrimaryActionColor, // Use your theme color
                 duration: const Duration(seconds: 2),
               ),
@@ -301,7 +301,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.white, // Assuming you want white text on primary color
+              color:
+                  Colors.white, // Assuming you want white text on primary color
             ),
           ),
         ),

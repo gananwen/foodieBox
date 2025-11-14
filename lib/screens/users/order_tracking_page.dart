@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:foodiebox/models/order_model.dart';
 import 'package:foodiebox/models/driver_model.dart';
+import 'package:foodiebox/models/order_item.model.dart';
 import 'package:foodiebox/models/vendor.dart';
 import 'package:foodiebox/screens/users/driver_rate_page.dart';
 
@@ -30,7 +31,7 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
   Future<LatLng>? _vendorLatLngFuture;
 
   // Fixed demo driver
-  final Driver fixedDriver = Driver(
+  final DriverModel fixedDriver = DriverModel(
     id: 'demo-driver',
     name: 'Slamet Rahardjo',
     phone: '012-3456789',
@@ -286,7 +287,7 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
     );
   }
 
-  Widget _buildDriverInfo(Driver driver) {
+  Widget _buildDriverInfo(DriverModel driver) {
     return Row(
       children: [
         CircleAvatar(

@@ -3,15 +3,9 @@ import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:foodiebox/models/driver_model.dart';
 
-class RateDriverPage extends StatefulWidget {
-  final String orderId;
+class DriverRatePage extends StatefulWidget {
   final DriverModel driver;
-
-  const RateDriverPage({
-    super.key,
-    required this.orderId,
-    required this.driver,
-  });
+  const DriverRatePage({super.key, required this.driver});
 
   @override
   State<DriverRatePage> createState() => _DriverRatePageState();
@@ -50,87 +44,35 @@ class _DriverRatePageState extends State<DriverRatePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Driver Details
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Colors.grey.shade200,
-                  backgroundImage: AssetImage(widget.driver.imageUrl),
-                  onBackgroundImageError: (_, __) {},
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  widget.driver.name,
-                  style: const TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  widget.driver.licensePlate,
-                  style: const TextStyle(fontSize: 16, color: Colors.grey),
-                ),
-                const SizedBox(height: 32),
-                const Text(
-                  'Rate your driver',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 16),
-
-                // Star Rating
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (index) => _buildStar(index)),
-                ),
-                const SizedBox(height: 40),
-
-                // Submit Button
-                if (_isSubmitting)
-                  const CircularProgressIndicator(color: Colors.amber)
-                else
-                  ElevatedButton(
-                    onPressed: _rating == 0 ? null : _submitRating,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber,
-                      foregroundColor: Colors.black,
-                      disabledBackgroundColor: Colors.grey.shade200,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 50, vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    child: const Text('Submit Rating',
-                        style: TextStyle(fontSize: 16)),
-                  ),
-              ],
+      appBar: AppBar(title: Text('Rate ${widget.driver.name}')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Image.network(widget.driver.imageUrl, height: 150),
+            const SizedBox(height: 16),
+            Text(widget.driver.name, style: const TextStyle(fontSize: 22)),
+            const SizedBox(height: 16),
+            RatingBar.builder(
+              initialRating: 5,
+              minRating: 1,
+              direction: Axis.horizontal,
+              allowHalfRating: true,
+              itemCount: 5,
+              itemSize: 40,
+              itemBuilder: (context, _) =>
+                  const Icon(Icons.star, color: Colors.amber),
+              onRatingUpdate: (rating) => _userRating = rating,
             ),
-          ),
-
-          // --- Confetti Animation ---
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConfettiWidget(
-              confettiController: _confettiController,
-              blastDirectionality: BlastDirectionality.explosive,
-              shouldLoop: false,
-              colors: const [
-                Colors.red,
-                Colors.blue,
-                Colors.green,
-                Colors.yellow,
-                Colors.pink,
-                Colors.orange
-              ],
-              emissionFrequency: 0.05,
-              numberOfParticles: 20,
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _isSubmitting ? null : submitRating,
+              child: _isSubmitting
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('Submit Rating'),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
