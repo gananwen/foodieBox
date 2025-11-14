@@ -1,35 +1,18 @@
 import 'package:flutter/material.dart';
 import '../../util/styles.dart';
-// --- (NEW) 导入模型和仓库 ---
 import '../../models/product.dart';
+import 'modify_product_page.dart';
 import '../../repositories/product_repository.dart';
-import 'modify_product_page.dart'; // Import the page we are navigating to
+import 'dart:math' as math; // 用于计算
 
-// --- Edit Product Page (Figure 29 - The Preview) ---
 class EditProductPage extends StatelessWidget {
   final Product product;
-  // --- (NEW) ---
-  final ProductRepository _productRepo = ProductRepository();
+  final int discountPercentage; // <-- 1. 接收折扣
+  const EditProductPage(
+      {super.key, required this.product, this.discountPercentage = 0});
 
-  EditProductPage({super.key, required this.product});
-
-  // Helper widget to build a tag
-  Widget _buildTag(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: kCardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kTextColor.withOpacity(0.3)),
-      ),
-      child:
-          Text(label, style: const TextStyle(color: kTextColor, fontSize: 12)),
-    );
-  }
-
-  // --- (MODIFIED) Helper for "Delete" button (now async) ---
+  // Helper for "Delete" button
   void _deleteProduct(BuildContext context) {
-    // Show a confirmation dialog
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -44,24 +27,26 @@ class EditProductPage extends StatelessWidget {
             style: TextButton.styleFrom(foregroundColor: kPrimaryActionColor),
             child: const Text('Delete'),
             onPressed: () async {
-              // <-- (MODIFIED) async
               try {
-                // --- (MODIFIED) Call to Firebase Repository ---
-                await _productRepo.deleteProduct(product.id!);
-
-                Navigator.of(ctx).pop(); // Close dialog
-                Navigator.of(context).pop(); // Go back from preview page
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Product deleted'),
-                    backgroundColor: kPrimaryActionColor,
-                  ),
-                );
+                // --- (已修改) 调用 Repository ---
+                await ProductRepository().deleteProduct(product.id!);
+                if (context.mounted) {
+                  Navigator.of(ctx).pop(); // Close dialog
+                  Navigator.of(context).pop(); // Go back from preview page
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Product deleted'),
+                      backgroundColor: kPrimaryActionColor,
+                    ),
+                  );
+                }
               } catch (e) {
-                Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to delete: $e')),
-                );
+                if (context.mounted) {
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to delete: $e')),
+                  );
+                }
               }
             },
           ),
@@ -70,9 +55,8 @@ class EditProductPage extends StatelessWidget {
     );
   }
 
-  // Helper for "Edit" button (no change needed)
+  // Helper for "Edit" button
   void _editProduct(BuildContext context) {
-    // Navigate to the ModifyProductPage, passing the product data
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -108,36 +92,33 @@ class EditProductPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- (MODIFIED) Product Image (loads real image) ---
+            // --- 2. (已修改) Product Image ---
             Container(
               height: 300,
               width: double.infinity,
               decoration: BoxDecoration(
                 color: kCardColor,
-                border: Border.all(color: kTextColor.withOpacity(0.1)),
+                image: product.imageUrl.isNotEmpty
+                    ? DecorationImage(
+                        image: NetworkImage(product.imageUrl),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
               ),
               child: product.imageUrl.isEmpty
                   ? const Center(
                       child: Icon(Icons.image_outlined,
-                          color: kTextColor, size: 100))
-                  : Image.network(
-                      product.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                            child: Icon(Icons.error,
-                                color: kPrimaryActionColor, size: 100));
-                      },
-                    ),
+                          color: kTextColor, size: 100),
+                    )
+                  : null,
             ),
 
-            // --- Content with padding ---
+            // --- 3. (已修改) Content with padding ---
             Padding(
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- (MODIFIED) Product Details (from model) ---
                   Text(
                     product.title,
                     style: const TextStyle(
@@ -148,75 +129,58 @@ class EditProductPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    product.description.isEmpty
-                        ? '(No description)'
-                        : product.description,
-                    style: TextStyle(
+                    product.description,
+                    style: const TextStyle(
                       fontSize: 14,
-                      color: product.description.isEmpty
-                          ? kTextColor.withOpacity(0.5)
-                          : kTextColor,
+                      color: kTextColor,
                       height: 1.5,
                     ),
                   ),
                   const SizedBox(height: 24),
 
-                  // --- (MODIFIED) Price (from model) ---
+                  // --- 4. (已修改) Price Info ---
                   const Text('Price',
                       style: TextStyle(fontSize: 14, color: kTextColor)),
-                  Row(
-                    children: [
-                      Text(
-                        'RM${product.originalPrice.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: kTextColor.withOpacity(0.5),
-                          decoration: TextDecoration.lineThrough,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'RM${product.discountedPrice.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 35,
-                          fontWeight: FontWeight.bold,
-                          color: kPrimaryActionColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 35),
-
-                  // --- (MODIFIED) Expiry Date (from model) ---
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: kPrimaryActionColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: kPrimaryActionColor),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.calendar_today_outlined,
-                            color: kPrimaryActionColor, size: 18),
-                        const SizedBox(width: 10),
-                        Text(
-                          product.expiryDate.isEmpty
-                              ? 'No Expiry Date'
-                              : 'Expire Date - ${product.expiryDate}',
-                          style: const TextStyle(
-                              color: kPrimaryActionColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14),
-                        ),
-                      ],
-                    ),
+                  _PriceInfo(
+                    originalPrice: product.discountedPrice,
+                    discountPercentage: discountPercentage,
                   ),
                   const SizedBox(height: 24),
 
-                  // --- (MODIFIED) Dietary Tags (from model) ---
+                  // --- 5. (新增) Category Info ---
+                  if (product.category.isNotEmpty) ...[
+                    const Text('Category',
+                        style: TextStyle(fontSize: 14, color: kTextColor)),
+                    const SizedBox(height: 4),
+                    Text(
+                      product.category,
+                      style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: kTextColor),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  if (product.subCategory.isNotEmpty) ...[
+                    const Text('Sub-Category',
+                        style: TextStyle(fontSize: 14, color: kTextColor)),
+                    const SizedBox(height: 4),
+                    Text(
+                      product.subCategory,
+                      style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: kTextColor),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                  // ---
+
+                  // --- 6. (已修改) Expiry Date ---
+                  _ExpiryInfo(date: product.expiryDate),
+                  const SizedBox(height: 24),
+
+                  // --- 7. (已修改) Dietary Tags ---
                   const Text('Dietary Tags',
                       style: TextStyle(fontSize: 14, color: kTextColor)),
                   const SizedBox(height: 8),
@@ -227,10 +191,6 @@ class EditProductPage extends StatelessWidget {
                       if (product.isHalal) _buildTag('Halal'),
                       if (product.isVegan) _buildTag('Vegan'),
                       if (product.isNoPork) _buildTag('No Pork'),
-                      if (!product.isHalal &&
-                          !product.isVegan &&
-                          !product.isNoPork)
-                        _buildTag('No Tags'),
                     ],
                   ),
                 ],
@@ -239,12 +199,10 @@ class EditProductPage extends StatelessWidget {
           ],
         ),
       ),
-      // --- Bottom Button Bar (no change) ---
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Row(
           children: [
-            // --- Delete Button ---
             Expanded(
               child: OutlinedButton(
                 onPressed: () => _deleteProduct(context),
@@ -253,7 +211,7 @@ class EditProductPage extends StatelessWidget {
                   side:
                       const BorderSide(color: kPrimaryActionColor, width: 1.5),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
@@ -264,15 +222,14 @@ class EditProductPage extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // --- Edit Button ---
             Expanded(
               child: ElevatedButton(
                 onPressed: () => _editProduct(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kSecondaryAccentColor,
+                  backgroundColor: kCategoryColor,
                   foregroundColor: kTextColor,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
@@ -284,6 +241,104 @@ class EditProductPage extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // (辅助) 标签
+  Widget _buildTag(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: kCardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: kTextColor.withOpacity(0.3)),
+      ),
+      child:
+          Text(label, style: const TextStyle(color: kTextColor, fontSize: 12)),
+    );
+  }
+}
+
+// (辅助) 价格 Widget
+class _PriceInfo extends StatelessWidget {
+  final double originalPrice;
+  final int discountPercentage;
+
+  const _PriceInfo(
+      {required this.originalPrice, required this.discountPercentage});
+
+  @override
+  Widget build(BuildContext context) {
+    if (discountPercentage == 0) {
+      return Text(
+        'RM${originalPrice.toStringAsFixed(2)}',
+        style: const TextStyle(
+          color: kTextColor,
+          fontWeight: FontWeight.bold,
+          fontSize: 28,
+        ),
+      );
+    }
+
+    final double discountedPrice =
+        originalPrice * (1 - (discountPercentage / 100));
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Text(
+          'RM${discountedPrice.toStringAsFixed(2)}',
+          style: const TextStyle(
+            color: kPrimaryActionColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 28,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          'RM${originalPrice.toStringAsFixed(2)}',
+          style: TextStyle(
+            color: kTextColor.withOpacity(0.5),
+            fontWeight: FontWeight.normal,
+            fontSize: 18,
+            decoration: TextDecoration.lineThrough,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// (辅助) 过期日
+class _ExpiryInfo extends StatelessWidget {
+  final String date;
+  const _ExpiryInfo({required this.date});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: kPrimaryActionColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kPrimaryActionColor),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.calendar_today_outlined,
+              color: kPrimaryActionColor, size: 18),
+          const SizedBox(width: 10),
+          Text(
+            'Expire Date - $date',
+            style: const TextStyle(
+                color: kPrimaryActionColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 14),
+          ),
+        ],
       ),
     );
   }

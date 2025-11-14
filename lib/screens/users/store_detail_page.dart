@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:foodiebox/models/vendor.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:foodiebox/models/vendor.dart';
 import 'package:foodiebox/models/product.dart';
 import 'package:foodiebox/util/styles.dart';
-import 'category_product_page.dart'; // NEW: navigate on category tap
+import 'category_product_page.dart'; // N, required VendorModel vendorEW: navigate on category tap
 
 // --- Category model (unchanged) ---
 class GroceryCategory {
@@ -39,10 +40,13 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
   final List<GroceryCategory> _groceryCategories = [
     GroceryCategory(name: 'Frozen', imagePath: 'assets/images/frozen.png'),
     GroceryCategory(name: 'Baked Goods', imagePath: 'assets/images/bakery.png'),
-    GroceryCategory(name: 'Vegetables', imagePath: 'assets/images/vegetables.png'),
+    GroceryCategory(
+        name: 'Vegetables', imagePath: 'assets/images/vegetables.png'),
     GroceryCategory(name: 'Spice', imagePath: 'assets/images/spice.png'),
-    GroceryCategory(name: 'Beverages', imagePath: 'assets/images/beverages.png'),
-    GroceryCategory(name: 'Non-Halal Food', imagePath: 'assets/images/non_halal.png'),
+    GroceryCategory(
+        name: 'Beverages', imagePath: 'assets/images/beverages.png'),
+    GroceryCategory(
+        name: 'Non-Halal Food', imagePath: 'assets/images/non_halal.png'),
     GroceryCategory(name: 'View All', imagePath: 'assets/images/view_all.png'),
   ];
 
@@ -65,7 +69,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
         .map((hour) => _formatHour(hour))
         .toList();
 
-    _availableTomorrowSlots = _allPickupHours.map((hour) => _formatHour(hour)).toList();
+    _availableTomorrowSlots =
+        _allPickupHours.map((hour) => _formatHour(hour)).toList();
 
     if (_availableTodaySlots.isEmpty) {
       _selectedDay = 'Tomorrow';
@@ -85,6 +90,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
       if (h < 12) return '$h:00 AM';
       return '${h - 12}:00 PM';
     }
+
     return '${formatNum(hour)} – ${formatNum(hour + 1)}';
   }
 
@@ -132,7 +138,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
             if (progress == null) return child;
             return Container(
               color: kYellowLight,
-              child: const Center(child: CircularProgressIndicator(color: kPrimaryActionColor)),
+              child: const Center(
+                  child: CircularProgressIndicator(color: kPrimaryActionColor)),
             );
           },
           errorBuilder: (context, error, stackTrace) {
@@ -158,17 +165,22 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                 bottomLeft: Radius.circular(16),
                 bottomRight: Radius.circular(16),
               ),
-              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   widget.vendor.storeName,
-                  style: kLabelTextStyle.copyWith(fontSize: 24, fontWeight: FontWeight.bold),
+                  style: kLabelTextStyle.copyWith(
+                      fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                Text(widget.vendor.storeAddress, style: kHintTextStyle.copyWith(fontSize: 14)),
+                Text(widget.vendor.storeAddress,
+                    style: kHintTextStyle.copyWith(fontSize: 14)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -188,7 +200,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                         'Delivery',
                         Icons.delivery_dining,
                         _selectedOption == DeliveryOption.delivery,
-                        () => setState(() => _selectedOption = DeliveryOption.delivery),
+                        () => setState(
+                            () => _selectedOption = DeliveryOption.delivery),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -197,7 +210,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                         'Pickup',
                         Icons.store,
                         _selectedOption == DeliveryOption.pickup,
-                        () => setState(() => _selectedOption = DeliveryOption.pickup),
+                        () => setState(
+                            () => _selectedOption = DeliveryOption.pickup),
                       ),
                     ),
                   ],
@@ -241,8 +255,9 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
             final category = _groceryCategories[index];
 
             // Preserve your selected highlight logic if desired
-            final bool isSelected = (_selectedProductCategory == null && category.name == 'View All') ||
-                                    (_selectedProductCategory == category.name);
+            final bool isSelected = (_selectedProductCategory == null &&
+                    category.name == 'View All') ||
+                (_selectedProductCategory == category.name);
 
             return GestureDetector(
               onTap: () {
@@ -252,7 +267,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                     _selectedProductCategory = null;
                     // No navigation
                   } else {
-                    _selectedProductCategory = category.name; // if you want tile highlight
+                    _selectedProductCategory =
+                        category.name; // if you want tile highlight
                     // Navigate to dedicated category products page
                     Navigator.push(
                       context,
@@ -279,8 +295,10 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                       width: 40,
                       height: 40,
                       fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.category, size: 40, color: Colors.grey),
+                      errorBuilder: (context, error, stackTrace) => const Icon(
+                          Icons.category,
+                          size: 40,
+                          color: Colors.grey),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -289,7 +307,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                       style: kHintTextStyle.copyWith(
                         fontSize: 12,
                         color: kTextColor,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -325,7 +344,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text('Pickup Time',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: kTextColor)),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, color: kTextColor)),
                     const SizedBox(height: 2),
                     Text(
                       _selectedTime == 'No slots available'
@@ -344,7 +364,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
     );
   }
 
-  Widget _buildToggleButton(String text, IconData icon, bool isSelected, VoidCallback onTap) {
+  Widget _buildToggleButton(
+      String text, IconData icon, bool isSelected, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -354,7 +375,12 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           borderRadius: BorderRadius.circular(10),
           border: isSelected ? null : Border.all(color: Colors.grey.shade300),
           boxShadow: isSelected
-              ? [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))]
+              ? [
+                  BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 4,
+                      offset: Offset(0, 2))
+                ]
               : [],
         ),
         child: Row(
@@ -410,7 +436,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
             child: Center(
               child: Padding(
                 padding: EdgeInsets.all(32.0),
-                child: Text('No products found for this shop.', style: kHintTextStyle),
+                child: Text('No products found for this shop.',
+                    style: kHintTextStyle),
               ),
             ),
           );
@@ -420,7 +447,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           delegate: SliverChildBuilderDelegate(
             (context, index) {
               final doc = snapshot.data!.docs[index];
-              final product = Product.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+              final product =
+                  Product.fromMap(doc.data() as Map<String, dynamic>, doc.id);
               return _buildProductCard(product);
             },
             childCount: snapshot.data!.docs.length,
@@ -437,7 +465,10 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
       decoration: BoxDecoration(
         color: kCardColor,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 3, offset: const Offset(0, 1))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black12, blurRadius: 3, offset: const Offset(0, 1))
+        ],
       ),
       child: Row(
         children: [
@@ -452,7 +483,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                 width: 70,
                 height: 70,
                 color: Colors.grey.shade200,
-                child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                child:
+                    const Icon(Icons.image_not_supported, color: Colors.grey),
               ),
             ),
           ),
@@ -461,15 +493,22 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(product.title, style: kLabelTextStyle.copyWith(fontSize: 16)),
+                Text(product.title,
+                    style: kLabelTextStyle.copyWith(fontSize: 16)),
                 const SizedBox(height: 4),
-                Text(product.description, style: kHintTextStyle, maxLines: 2, overflow: TextOverflow.ellipsis),
+                Text(product.description,
+                    style: kHintTextStyle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     Text(
                       'RM${product.discountedPrice.toStringAsFixed(2)}',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: kPrimaryActionColor),
+                      style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: kPrimaryActionColor),
                     ),
                     const SizedBox(width: 8),
                     if (product.originalPrice > product.discountedPrice)
@@ -486,7 +525,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
               ],
             ),
           ),
-          const Icon(Icons.add_circle_outline, color: kPrimaryActionColor, size: 30),
+          const Icon(Icons.add_circle_outline,
+              color: kPrimaryActionColor, size: 30),
         ],
       ),
     );
@@ -499,7 +539,9 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
       builder: (context) {
         String localDay = _selectedDay;
         String localTime = _selectedTime;
-        List<String> currentSlots = (localDay == 'Today') ? _availableTodaySlots : _availableTomorrowSlots;
+        List<String> currentSlots = (localDay == 'Today')
+            ? _availableTodaySlots
+            : _availableTomorrowSlots;
 
         if (!currentSlots.contains(localTime) && currentSlots.isNotEmpty) {
           localTime = currentSlots.first;
@@ -549,7 +591,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                               setModalState(() {
                                 localDay = 'Tomorrow';
                                 currentSlots = _availableTomorrowSlots;
-                                if (!currentSlots.contains(localTime) && currentSlots.isNotEmpty) {
+                                if (!currentSlots.contains(localTime) &&
+                                    currentSlots.isNotEmpty) {
                                   localTime = currentSlots.first;
                                 } else if (currentSlots.isEmpty) {
                                   localTime = 'No slots available';
@@ -566,7 +609,9 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                     SizedBox(
                       height: 200,
                       child: currentSlots.isEmpty
-                          ? const Center(child: Text('No slots available for this day.', style: kHintTextStyle))
+                          ? const Center(
+                              child: Text('No slots available for this day.',
+                                  style: kHintTextStyle))
                           : ListView(
                               children: currentSlots.map((slot) {
                                 final isSelected = localTime == slot;
@@ -574,12 +619,19 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                                   contentPadding: EdgeInsets.zero,
                                   title: Text(slot,
                                       style: TextStyle(
-                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                                          fontWeight: isSelected
+                                              ? FontWeight.bold
+                                              : FontWeight.normal)),
                                   leading: Icon(
-                                    isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                                    color: isSelected ? kYellowMedium : Colors.grey,
+                                    isSelected
+                                        ? Icons.radio_button_checked
+                                        : Icons.radio_button_unchecked,
+                                    color: isSelected
+                                        ? kYellowMedium
+                                        : Colors.grey,
                                   ),
-                                  onTap: () => setModalState(() => localTime = slot),
+                                  onTap: () =>
+                                      setModalState(() => localTime = slot),
                                 );
                               }).toList(),
                             ),
@@ -599,9 +651,12 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                         backgroundColor: kYellowMedium,
                         disabledBackgroundColor: Colors.grey.shade300,
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: const Center(child: Text('Confirm', style: TextStyle(color: kTextColor))),
+                      child: const Center(
+                          child: Text('Confirm',
+                              style: TextStyle(color: kTextColor))),
                     ),
                   ],
                 ),
@@ -613,13 +668,18 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
     );
   }
 
-  Widget _buildDayChip(String label, bool isSelected, StateSetter setModalState, VoidCallback? onTap) {
+  Widget _buildDayChip(String label, bool isSelected, StateSetter setModalState,
+      VoidCallback? onTap) {
     return ActionChip(
       onPressed: onTap,
       label: Text(label),
-      backgroundColor: isSelected ? kYellowMedium : (onTap == null ? Colors.grey.shade400 : Colors.grey[200]),
+      backgroundColor: isSelected
+          ? kYellowMedium
+          : (onTap == null ? Colors.grey.shade400 : Colors.grey[200]),
       labelStyle: TextStyle(
-        color: isSelected ? kTextColor : (onTap == null ? Colors.grey.shade600 : Colors.black),
+        color: isSelected
+            ? kTextColor
+            : (onTap == null ? Colors.grey.shade600 : Colors.black),
         fontWeight: FontWeight.bold,
       ),
       side: BorderSide.none,

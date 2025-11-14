@@ -51,4 +51,29 @@ class PromotionModel {
       'claimedRedemptions': claimedRedemptions,
     };
   }
+
+  // CopyWith 帮助我们更新 edit 页面
+  PromotionModel copyWith({
+    String? id,
+    String? title,
+    String? bannerUrl,
+    String? productType,
+    DateTime? startDate,
+    DateTime? endDate,
+    int? discountPercentage,
+    int? totalRedemptions,
+    int? claimedRedemptions,
+  }) {
+    return PromotionModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      bannerUrl: bannerUrl ?? this.bannerUrl,
+      productType: productType ?? this.productType,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      discountPercentage: discountPercentage ?? this.discountPercentage,
+      totalRedemptions: totalRedemptions ?? this.totalRedemptions,
+      claimedRedemptions: claimedRedemptions ?? this.claimedRedemptions,
+    );
+  }
 }
