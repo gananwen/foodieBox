@@ -1,12 +1,12 @@
+// 路径: lib/pages/vendor_home/marketing_page.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../util/styles.dart';
 import 'add_promotion_page.dart';
 import 'analytics_page.dart';
-// --- 1. 导入新模型、仓库和编辑页面 ---
 import '../../models/promotion.dart';
 import '../../repositories/promotion_repository.dart';
-import 'edit_promotion_page.dart'; // <-- (新增)
+import 'edit_promotion_page.dart';
 
 class MarketingPage extends StatefulWidget {
   final VoidCallback onBackToDashboard;
@@ -16,24 +16,20 @@ class MarketingPage extends StatefulWidget {
 }
 
 class _MarketingPageState extends State<MarketingPage> {
-  // --- 2. 实例化仓库 ---
   final PromotionRepository _repo = PromotionRepository();
 
-  // --- 3. (已修改) 构建促销卡片 ---
   Widget _buildPromotionCard(PromotionModel promo) {
+    // ... (状态和日期逻辑不变) ...
     final bool isActive = promo.startDate.isBefore(DateTime.now()) &&
         promo.endDate.isAfter(DateTime.now());
-
     final String statusText = isActive
         ? 'Active'
         : (promo.endDate.isBefore(DateTime.now()) ? 'Expired' : 'Scheduled');
-
     final Color statusColor = isActive
         ? Colors.green
         : (promo.endDate.isBefore(DateTime.now())
             ? kTextColor.withAlpha(100)
             : Colors.blue);
-
     final String dateRange =
         '${DateFormat('dd MMM').format(promo.startDate)} - ${DateFormat('dd MMM yyyy').format(promo.endDate)}';
 
@@ -50,36 +46,56 @@ class _MarketingPageState extends State<MarketingPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. 横幅图片
+          // --- 1. ( ✨ 已修改 ✨ ) 横幅图片 ---
           Container(
             height: 120,
+            width: double.infinity, // 确保容器填满宽度
             decoration: BoxDecoration(
               color: kAppBackgroundColor.withAlpha(128),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(10),
                 topRight: Radius.circular(10),
               ),
-              // (可选) 加载真实图片
-              // image: promo.bannerUrl.isNotEmpty
-              //     ? DecorationImage(
-              //         image: NetworkImage(promo.bannerUrl),
-              //         fit: BoxFit.cover,
-              //       )
-              //     : null,
             ),
-            child: promo.bannerUrl.isEmpty
-                ? const Center(
-                    child:
-                        Icon(Icons.image_outlined, size: 50, color: kTextColor))
-                : null,
+            // ( ✨ 动态显示 ✨ )
+            child: ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(10),
+                topRight: Radius.circular(10),
+              ),
+              child: promo.bannerUrl.isEmpty
+                  // A. 如果没有 URL，显示占位符
+                  ? const Center(
+                      child: Icon(Icons.image_outlined,
+                          size: 50, color: kTextColor),
+                    )
+                  // B. 如果有 URL，显示网络图片
+                  : Image.network(
+                      promo.bannerUrl,
+                      fit: BoxFit.cover,
+                      // (可选) 添加加载和错误处理
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const Center(
+                            child: CircularProgressIndicator(
+                                color: kPrimaryActionColor, strokeWidth: 2.0));
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Center(
+                            child: Icon(Icons.error_outline,
+                                color: kPrimaryActionColor));
+                      },
+                    ),
+            ),
           ),
-          // 2. 详情
+
+          // 2. 详情 (不变)
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // (新增) 状态徽章
+                // ... (状态徽章) ...
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -105,8 +121,8 @@ class _MarketingPageState extends State<MarketingPage> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                // ... (所有其他详情不变) ...
                 const SizedBox(height: 4),
-                // (已修改) 使用新字段动态生成描述
                 Text(
                   '${promo.discountPercentage}% off all ${promo.productType} products.',
                   style: const TextStyle(
@@ -123,7 +139,6 @@ class _MarketingPageState extends State<MarketingPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                // (已修改) 显示兑换进度
                 Text(
                   'Redemptions: ${promo.claimedRedemptions} / ${promo.totalRedemptions}',
                   style: const TextStyle(
@@ -141,7 +156,6 @@ class _MarketingPageState extends State<MarketingPage> {
                       side: BorderSide(
                           color: kTextColor.withAlpha(77), width: 1.5),
                     ),
-                    // --- 4. (已修改) 导航到新的 EditPromotionPage ---
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -162,8 +176,9 @@ class _MarketingPageState extends State<MarketingPage> {
     );
   }
 
-  // --- (不变) 构建 Analytics 卡片 ---
+  // ... (_buildAnalyticsCard, build, StreamBuilder 保持不变) ...
   Widget _buildAnalyticsCard() {
+    // ... (不变)
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -230,6 +245,7 @@ class _MarketingPageState extends State<MarketingPage> {
 
   @override
   Widget build(BuildContext context) {
+    // ... (不变)
     return Scaffold(
       backgroundColor: kAppBackgroundColor,
       appBar: AppBar(
@@ -245,7 +261,6 @@ class _MarketingPageState extends State<MarketingPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- 5. (已修改) 使用 StreamBuilder 动态加载促销 ---
             const Text(
               'Current Deals',
               style: TextStyle(
@@ -256,7 +271,7 @@ class _MarketingPageState extends State<MarketingPage> {
             ),
             const SizedBox(height: 12),
             StreamBuilder<List<PromotionModel>>(
-              stream: _repo.getPromotionsStream(), // (使用已更新的 repo)
+              stream: _repo.getPromotionsStream(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
@@ -283,8 +298,6 @@ class _MarketingPageState extends State<MarketingPage> {
                     ),
                   );
                 }
-
-                // 我们有数据了，构建列表
                 final promos = snapshot.data!;
                 return ListView.builder(
                   itemCount: promos.length,
@@ -296,10 +309,7 @@ class _MarketingPageState extends State<MarketingPage> {
                 );
               },
             ),
-
             const SizedBox(height: 24),
-
-            // --- 2. 数据分析 (Analytics) ---
             const Text(
               'Analytics',
               style: TextStyle(
@@ -313,7 +323,6 @@ class _MarketingPageState extends State<MarketingPage> {
           ],
         ),
       ),
-      // --- (不变) 添加新促销的按钮 ---
       floatingActionButton: FloatingActionButton(
         heroTag: null,
         onPressed: () {

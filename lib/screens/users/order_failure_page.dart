@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:foodiebox/screens/users/checkout_page.dart'; // Make sure this import is correct
+// --- MODIFIED IMPORT ---
+// We will import the CartPage instead of the CheckoutPage
+import 'package:foodiebox/screens/users/cart_page.dart';
+import 'package:foodiebox/screens/users/main_page.dart'; // To go back home
+// --- END MODIFIED IMPORT ---
 
 class OrderFailurePage extends StatelessWidget {
   const OrderFailurePage({super.key});
@@ -41,10 +45,14 @@ class OrderFailurePage extends StatelessWidget {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
+                      // --- MODIFIED NAVIGATION ---
+                      // Go back to the Cart Page to try again
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (context) => const CheckoutPage()),
+                        MaterialPageRoute(
+                            builder: (context) => const CartPage()),
                       );
+                      // --- END MODIFIED NAVIGATION ---
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.amber,
@@ -60,7 +68,15 @@ class OrderFailurePage extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => Navigator.pushNamed(context, '/home'),
+                    onPressed: () {
+                      // Navigate back to the main page
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const MainPage()),
+                        (route) => false,
+                      );
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey.shade300,
                       foregroundColor: Colors.black,

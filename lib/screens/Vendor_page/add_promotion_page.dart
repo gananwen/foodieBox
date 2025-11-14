@@ -1,7 +1,9 @@
+// 路径: lib/pages/vendor_home/add_promotion_page.dart
+import 'dart:io'; // <-- ( ✨ 新增 ✨ )
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart'; // <-- ( ✨ 新增 ✨ )
 import 'package:intl/intl.dart';
 import '../../util/styles.dart';
-// --- 1. 导入新模型和仓库 ---
 import '../../models/promotion.dart';
 import '../../repositories/promotion_repository.dart';
 
@@ -14,12 +16,15 @@ class AddPromotionPage extends StatefulWidget {
 
 class _AddPromotionPageState extends State<AddPromotionPage> {
   final _formKey = GlobalKey<FormState>();
-  final _repo = PromotionRepository(); // <-- 2. 添加仓库
+  final _repo = PromotionRepository();
   bool _isLoading = false;
 
-  // --- 3. (已修改) 表单状态变量 ---
+  // --- ( ✨ 新增状态 ✨ ) ---
+  File? _imageFile;
+  final ImagePicker _picker = ImagePicker();
+
   String _dealTitle = '';
-  String? _selectedProductType; // 'Blindbox', 'Grocery'
+  String? _selectedProductType;
   DateTime? _startDate;
   DateTime? _endDate;
   TimeOfDay? _startTime;
@@ -27,12 +32,10 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
   int _discountPercentage = 0;
   int _totalRedemptions = 0;
 
-  // --- (新增) 为新字段添加 Controllers ---
+  // ... (所有 controllers 保持不变) ...
   final TextEditingController _discountPercController = TextEditingController();
   final TextEditingController _totalRedemptionsController =
       TextEditingController();
-
-  // (不变)
   final TextEditingController _startDateController = TextEditingController();
   final TextEditingController _endDateController = TextEditingController();
   final TextEditingController _startTimeController = TextEditingController();
@@ -40,16 +43,11 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
 
   @override
   void dispose() {
-    _startDateController.dispose();
-    _endDateController.dispose();
-    _startTimeController.dispose();
-    _endTimeController.dispose();
-    _discountPercController.dispose();
-    _totalRedemptionsController.dispose();
+    // ... (不变)
     super.dispose();
   }
 
-  // --- (不变) 日期/时间选择函数 ---
+  // ... (日期/时间选择函数 _selectDate, _selectTime 保持不变) ...
   Future<void> _selectDate(BuildContext context, bool isStartDate) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -88,12 +86,31 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     }
   }
 
-  // --- 4. (已修改) _savePromotion 函数 ---
+  // --- ( ✨ 新增函数：选择图片 ✨ ) ---
+  Future<void> _pickImage() async {
+    try {
+      final XFile? pickedFile =
+          await _picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile != null) {
+        setState(() {
+          _imageFile = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to pick image: $e')),
+        );
+      }
+    }
+  }
+
+  // --- ( ✨ 重大修改：_savePromotion 函数 ✨ ) ---
   Future<void> _savePromotion() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
 
-      // 额外的验证
+      // 额外验证
       if (_selectedProductType == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -105,8 +122,12 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
 
       setState(() => _isLoading = true);
 
+      // ( ✨ 修改的逻辑 ✨ )
+      String? newPromoId;
+      String? bannerUrl;
+
       try {
-        // 组合日期和时间
+        // 步骤 1: 组合日期和时间 (不变)
         final DateTime startDateTime = DateTime(
           _startDate!.year,
           _startDate!.month,
@@ -122,7 +143,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           _endTime!.minute,
         );
 
-        // 创建新的 PromotionModel
+        // 步骤 2: 创建模型 (不带 URL)
         final newPromotion = PromotionModel(
           title: _dealTitle,
           productType: _selectedProductType!,
@@ -130,11 +151,18 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           endDate: endDateTime,
           discountPercentage: _discountPercentage,
           totalRedemptions: _totalRedemptions,
-          // bannerUrl 和 claimedRedemptions 使用默认值
+          bannerUrl: '', // 暂时为空
         );
 
-        // 调用仓库保存
-        await _repo.addPromotion(newPromotion);
+        // 步骤 3: 保存到 Firestore (现在返回 ID)
+        newPromoId = await _repo.addPromotion(newPromotion);
+
+        // 步骤 4: 如果有图片，上传图片
+        if (_imageFile != null) {
+          bannerUrl = await _repo.uploadBannerImage(_imageFile!, newPromoId);
+          // 步骤 5: 更新 Firestore 文档的 bannerUrl
+          await _repo.updatePromotionBannerUrl(newPromoId, bannerUrl);
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -146,6 +174,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           Navigator.of(context).pop();
         }
       } catch (e) {
+        // (错误处理)
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -161,7 +190,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     }
   }
 
-  // --- (辅助) 可重用的文本输入框 (不变) ---
+  // ... (_buildTextField, _buildDateTimePicker, _buildProductTypeRadio 保持不变) ...
   Widget _buildTextField({
     required String label,
     required Function(String?) onSaved,
@@ -171,6 +200,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     bool readOnly = false,
     VoidCallback? onTap,
   }) {
+    // ... (不变)
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -192,7 +222,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
                     icon: const Icon(Icons.close, size: 18),
                     onPressed: () {
                       controller.clear();
-                      // 如果是日期/时间字段，也清除状态
                       if (controller == _startDateController) _startDate = null;
                       if (controller == _endDateController) _endDate = null;
                       if (controller == _startTimeController) _startTime = null;
@@ -229,7 +258,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     );
   }
 
-  // --- (辅助) 可重用的日期/时间输入框 (不变) ---
   Widget _buildDateTimePicker({
     required String label,
     required TextEditingController controller,
@@ -237,7 +265,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
   }) {
     return _buildTextField(
       label: label,
-      onSaved: (value) {}, // 不需要 onSaved，因为我们直接用 controller
+      onSaved: (value) {},
       controller: controller,
       readOnly: true,
       onTap: onTap,
@@ -247,6 +275,21 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
         }
         return null;
       },
+    );
+  }
+
+  Widget _buildProductTypeRadio(String title) {
+    return RadioListTile<String>(
+      title: Text(title, style: const TextStyle(color: kTextColor)),
+      value: title,
+      groupValue: _selectedProductType,
+      onChanged: (String? value) {
+        setState(() {
+          _selectedProductType = value!;
+        });
+      },
+      activeColor: kPrimaryActionColor,
+      contentPadding: EdgeInsets.zero,
     );
   }
 
@@ -269,11 +312,9 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- 1. 上传横幅图片 ---
+              // --- 1. ( ✨ 已修改 ✨ ) 上传横幅图片 ---
               GestureDetector(
-                onTap: () {
-                  // TODO: 实现图片上传逻辑
-                },
+                onTap: _pickImage, // <-- ( ✨ 绑定函数 ✨ )
                 child: Container(
                   height: 150,
                   width: double.infinity,
@@ -283,29 +324,36 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
                     border:
                         Border.all(color: kTextColor.withAlpha(51), width: 1.5),
                   ),
-                  child: const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.cloud_upload_outlined,
-                            size: 40, color: kTextColor),
-                        SizedBox(height: 8),
-                        Text('Upload Banner Image',
-                            style: TextStyle(color: kTextColor)),
-                      ],
-                    ),
-                  ),
+                  // ( ✨ 动态显示 ✨ )
+                  child: _imageFile != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.file(
+                            _imageFile!,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.cloud_upload_outlined,
+                                  size: 40, color: kTextColor),
+                              SizedBox(height: 8),
+                              Text('Upload Banner Image',
+                                  style: TextStyle(color: kTextColor)),
+                            ],
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 24),
 
-              // --- 2. 促销标题 ---
+              // ... (所有其他表单字段保持不变) ...
               _buildTextField(
                 label: 'Deal Title',
                 onSaved: (value) => _dealTitle = value!,
               ),
-
-              // --- 3. (已修改) 移除 "Online Deal" ---
               const Padding(
                 padding: EdgeInsets.only(left: 12.0, bottom: 4.0),
                 child: Text('Choose Products',
@@ -314,8 +362,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
               _buildProductTypeRadio('Blindbox'),
               _buildProductTypeRadio('Grocery'),
               const SizedBox(height: 16),
-
-              // --- 4. (不变) 开始/结束 时间/日期 ---
               Row(
                 children: [
                   Expanded(
@@ -354,8 +400,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
                   ),
                 ],
               ),
-
-              // --- 5. (已修改) 价格 -> 百分比 / 总数 ---
               Row(
                 children: [
                   Expanded(
@@ -400,8 +444,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
                 ],
               ),
               const SizedBox(height: 16),
-
-              // --- 6. (已修改) 保存按钮 ---
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -425,22 +467,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           ),
         ),
       ),
-    );
-  }
-
-  // (辅助) 构建单选按钮
-  Widget _buildProductTypeRadio(String title) {
-    return RadioListTile<String>(
-      title: Text(title, style: const TextStyle(color: kTextColor)),
-      value: title,
-      groupValue: _selectedProductType,
-      onChanged: (String? value) {
-        setState(() {
-          _selectedProductType = value!;
-        });
-      },
-      activeColor: kPrimaryActionColor,
-      contentPadding: EdgeInsets.zero,
     );
   }
 }
