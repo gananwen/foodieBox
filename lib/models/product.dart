@@ -1,10 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Product {
-  final String? id; // 文档 ID
+  final String? id;
   final String title;
   final String description;
-  final String productType; // 'Blind Box' 或 'Grocery Deal'
+  final String productType;
+  final String category;
+  final String subCategory;
+  // --- END NEW FIELDS ---
+
   final String expiryDate;
   final double originalPrice;
   final double discountedPrice;
@@ -13,13 +17,14 @@ class Product {
   final bool isHalal;
   final bool isVegan;
   final bool isNoPork;
-  // (你也可以添加 'sold' 字段，但你需要单独的逻辑来更新它)
 
   Product({
     this.id,
     required this.title,
     required this.description,
     required this.productType,
+    required this.category, // NEW
+    required this.subCategory, // NEW
     required this.expiryDate,
     required this.originalPrice,
     required this.discountedPrice,
@@ -30,12 +35,13 @@ class Product {
     required this.isNoPork,
   });
 
-  // 将 Product 对象转换为 Map (用于写入 Firestore)
   Map<String, dynamic> toMap() {
     return {
       'title': title,
       'description': description,
       'productType': productType,
+      'category': category, // NEW
+      'subCategory': subCategory, // NEW
       'expiryDate': expiryDate,
       'originalPrice': originalPrice,
       'discountedPrice': discountedPrice,
@@ -54,6 +60,8 @@ class Product {
       title: map['title'] ?? '',
       description: map['description'] ?? '',
       productType: map['productType'] ?? 'Grocery Deal',
+      category: map['category'] ?? '', // NEW
+      subCategory: map['subCategory'] ?? '', // NEW
       expiryDate: map['expiryDate'] ?? '',
       originalPrice: (map['originalPrice'] ?? 0.0).toDouble(),
       discountedPrice: (map['discountedPrice'] ?? 0.0).toDouble(),
@@ -70,6 +78,8 @@ class Product {
     String? title,
     String? description,
     String? productType,
+    String? category, // NEW
+    String? subCategory, // NEW
     String? expiryDate,
     double? originalPrice,
     double? discountedPrice,
@@ -84,6 +94,8 @@ class Product {
       title: title ?? this.title,
       description: description ?? this.description,
       productType: productType ?? this.productType,
+      category: category ?? this.category, // NEW
+      subCategory: subCategory ?? this.subCategory, // NEW
       expiryDate: expiryDate ?? this.expiryDate,
       originalPrice: originalPrice ?? this.originalPrice,
       discountedPrice: discountedPrice ?? this.discountedPrice,

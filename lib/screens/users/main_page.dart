@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:foodiebox/models/vendor.dart';
+import '../users/store_detail_page.dart';
 import '../../util/styles.dart';
 import '../../widgets/base_page.dart';
 import 'map_page.dart';
-import '../users/profile_page.dart';
+import 'profile_page.dart'; // Assuming profile_page is in the same folder
 import 'filter_page.dart';
 import '../../api/api_config.dart';
 
@@ -210,20 +211,17 @@ class _MainPageState extends State<MainPage> {
             ),
             const SizedBox(height: 30),
 
-            // --- MODIFIED: "Order snacks from" Section ---
+            // --- "Order snacks from" Section ---
             _buildVendorListSection(
               title: 'Order snacks from',
-              // This query simply gets ALL vendors.
-              // This will show everything in your database.
               stream:
                   FirebaseFirestore.instance.collection('vendors').snapshots(),
             ),
             const SizedBox(height: 30),
 
-            // --- MODIFIED: "Syok Deals" Section ---
+            // --- "Syok Deals" Section ---
             _buildVendorListSection(
               title: 'Syok Deals: RM10 OFF',
-              // This query gets the top 5 vendors, sorted by rating.
               stream: FirebaseFirestore.instance
                   .collection('vendors')
                   .orderBy('rating', descending: true)
@@ -285,7 +283,6 @@ class _MainPageState extends State<MainPage> {
               return Center(child: Text('Error: ${snapshot.error}'));
             }
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-              // This message will show if your 'vendors' collection is empty
               return const Center(
                   child: Text('No shops found.', style: kHintTextStyle));
             }
@@ -295,7 +292,9 @@ class _MainPageState extends State<MainPage> {
               children: snapshot.data!.docs.map((doc) {
                 VendorModel vendor =
                     VendorModel.fromMap(doc.data() as Map<String, dynamic>);
-                return _buildShopCard(vendor);
+                // --- MODIFIED ---
+                // Pass context to the card builder
+                return _buildShopCard(context, vendor);
               }).toList(),
             );
           },
@@ -304,117 +303,131 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  Widget _buildShopCard(VendorModel vendor) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 6,
-            offset: const Offset(2, 2),
+  // --- MODIFIED: This is YOUR UI, now made tappable ---
+  Widget _buildShopCard(BuildContext context, VendorModel vendor) {
+    // --- WRAPPED IN GESTUREDETECTOR ---
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            // Open the new StoreDetailPage and pass the vendor data
+            builder: (context) => StoreDetailPage(vendor: vendor),
           ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // --- Restaurant Image ---
-          ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(12),
-              bottomLeft: Radius.circular(12),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 6,
+              offset: const Offset(2, 2),
             ),
-            child: Image.network(
-              vendor.businessPhotoUrl,
-              width: 100,
-              height: 100,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return Container(
-                  width: 100,
-                  height: 100,
-                  color: Colors.grey.shade200,
-                  child: const Center(
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  width: 100,
-                  height: 100,
-                  color: Colors.grey.shade200,
-                  child: const Icon(Icons.store, size: 40, color: Colors.grey),
-                );
-              },
-            ),
-          ),
-
-          // --- Restaurant Info ---
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Store name
-                  Text(
-                    vendor.storeName,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- Restaurant Image (Your 100x100 UI) ---
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                bottomLeft: Radius.circular(12),
+              ),
+              child: Image.network(
+                vendor.businessPhotoUrl,
+                width: 100,
+                height: 100,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return Container(
+                    width: 100,
+                    height: 100,
+                    color: Colors.grey.shade200,
+                    child: const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Address / subtitle
-                  Text(
-                    vendor.storeAddress.isNotEmpty
-                        ? vendor.storeAddress
-                        : 'Free delivery available',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.black54,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Rating + Delivery Info Row
-                  Row(
-                    children: [
-                      const Icon(Icons.star, color: Colors.orange, size: 18),
-                      const SizedBox(width: 4),
-                      Text(
-                        vendor.rating.toStringAsFixed(1),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Icon(Icons.delivery_dining,
-                          color: Colors.green, size: 18),
-                      const SizedBox(width: 4),
-                      const Text(
-                        '30-40 min',
-                        style: TextStyle(fontSize: 13, color: Colors.black54),
-                      ),
-                    ],
-                  ),
-                ],
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    width: 100,
+                    height: 100,
+                    color: Colors.grey.shade200,
+                    child:
+                        const Icon(Icons.store, size: 40, color: Colors.grey),
+                  );
+                },
               ),
             ),
-          ),
-        ],
+
+            // --- Restaurant Info (Your UI) ---
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Store name
+                    Text(
+                      vendor.storeName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+
+                    // Address / subtitle
+                    Text(
+                      vendor.storeAddress.isNotEmpty
+                          ? vendor.storeAddress
+                          : 'Free delivery available',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.black54,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Rating + Delivery Info Row
+                    Row(
+                      children: [
+                        const Icon(Icons.star, color: Colors.orange, size: 18),
+                        const SizedBox(width: 4),
+                        Text(
+                          vendor.rating.toStringAsFixed(1),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Icon(Icons.delivery_dining,
+                            color: Colors.green, size: 18),
+                        const SizedBox(width: 4),
+                        const Text(
+                          '30-40 min',
+                          style: TextStyle(fontSize: 13, color: Colors.black54),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

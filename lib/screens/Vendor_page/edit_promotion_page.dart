@@ -45,6 +45,7 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
     super.initState();
     // --- 5. (已修改) 预先填充真实数据 ---
     final promo = widget.promotion;
+
     _dealTitle = promo.title;
     _selectedProductType = promo.productType;
     _startDate = promo.startDate;

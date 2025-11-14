@@ -19,7 +19,7 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
   final LatLng driverLocation = const LatLng(3.1400, 101.6875);
 
   // This is the hardcoded data you can replace with Firebase
-  final Driver driverDetails = Driver(
+  final DriverModel driverDetails = DriverModel(
     id: 'D-123',
     name: 'Vlad S.',
     phone: '+60123456789',
@@ -285,7 +285,7 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
   }
 
   /// Builds the driver info card
-  Widget _buildDriverInfo(Driver driver) {
+  Widget _buildDriverInfo(DriverModel driver) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
