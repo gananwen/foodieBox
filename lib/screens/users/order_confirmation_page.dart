@@ -1,10 +1,16 @@
+// 路径: lib/screens/users/order_confirmation_page.dart
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:foodiebox/models/order_model.dart'; // <-- NEW: To read order items
+import 'package:foodiebox/models/order_model.dart';
+
+// --- ( ✨ 关键修复：添加这个 import ✨ ) ---
+import 'package:foodiebox/models/order_item.model.dart';
+// --- ( ✨ 结束修复 ✨ ) ---
+
 import 'package:foodiebox/screens/users/main_page.dart';
 import 'package:foodiebox/screens/users/order_tracking_page.dart';
-import 'package:foodiebox/util/styles.dart'; // <-- NEW: For styling
+import 'package:foodiebox/util/styles.dart';
 
 class OrderConfirmationPage extends StatefulWidget {
   final String address;
@@ -27,17 +33,16 @@ class OrderConfirmationPage extends StatefulWidget {
 }
 
 class _OrderConfirmationPageState extends State<OrderConfirmationPage> {
-  // To hold the list of items from the order
+  // ( ✨ 修复 ✨ )
+  // 这里的类型现在可以被正确识别了
   Future<List<OrderItem>>? _itemsFuture;
 
   @override
   void initState() {
     super.initState();
-    // Fetch the order items when the page loads
     _itemsFuture = _fetchOrderItems();
   }
 
-  // NEW: Fetches the order from Firebase to get the item list
   Future<List<OrderItem>> _fetchOrderItems() async {
     try {
       final doc = await FirebaseFirestore.instance
@@ -45,6 +50,8 @@ class _OrderConfirmationPageState extends State<OrderConfirmationPage> {
           .doc(widget.orderId)
           .get();
       if (doc.exists) {
+        // ( ✨ 修复 ✨ )
+        // OrderModel.fromMap 现在可以被正确调用
         final order = OrderModel.fromMap(doc.data()!, doc.id);
         return order.items;
       }
@@ -60,22 +67,22 @@ class _OrderConfirmationPageState extends State<OrderConfirmationPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        // ... (不变) ...
         backgroundColor: Colors.white,
         elevation: 0,
-        // Remove the back button to prevent accidental returns
         automaticallyImplyLeading: false,
-        title: const Text('Order Accepted',
-            style: TextStyle(color: Colors.black)),
+        title:
+            const Text('Order Accepted', style: TextStyle(color: Colors.black)),
         centerTitle: true,
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
-          // --- MODIFIED: Center the content ---
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Spacer(), // Pushes content to the middle
+            // ... (不变) ...
+            const Spacer(),
             const Icon(Icons.check_circle, color: Colors.green, size: 80),
             const SizedBox(height: 16),
             const Text(
@@ -90,7 +97,7 @@ class _OrderConfirmationPageState extends State<OrderConfirmationPage> {
             ),
             const SizedBox(height: 30),
 
-            // --- VISUALIZE: Map Preview ---
+            // ... (Map 和 Address 不变) ...
             Container(
               height: 150,
               decoration: BoxDecoration(
@@ -117,7 +124,6 @@ class _OrderConfirmationPageState extends State<OrderConfirmationPage> {
               ),
             ),
             const SizedBox(height: 12),
-            // Address Text
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -141,13 +147,12 @@ class _OrderConfirmationPageState extends State<OrderConfirmationPage> {
             ),
             const SizedBox(height: 20),
 
-            // --- MORE INFO: Expandable Order Summary ---
+            // --- Order Summary ---
             Container(
               decoration: BoxDecoration(
                 color: Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(12),
               ),
-              // Use ExpansionTile to make it expandable
               child: ExpansionTile(
                 title: const Text('Order Summary',
                     style:
@@ -157,6 +162,7 @@ class _OrderConfirmationPageState extends State<OrderConfirmationPage> {
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8)
                         .copyWith(top: 0),
                 children: [
+                  // ... (Promo 不变) ...
                   if (widget.promoLabel.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10.0),
@@ -179,12 +185,12 @@ class _OrderConfirmationPageState extends State<OrderConfirmationPage> {
                   const Divider(height: 1),
                   const SizedBox(height: 10),
 
-                  // Show items from the future
+                  // ( ✨ 修复 ✨ )
+                  // FutureBuilder 现在可以正确识别 'List<OrderItem>'
                   FutureBuilder<List<OrderItem>>(
                     future: _itemsFuture,
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState ==
-                          ConnectionState.waiting) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(
                             child: CircularProgressIndicator(
                                 color: kPrimaryActionColor));
@@ -200,6 +206,9 @@ class _OrderConfirmationPageState extends State<OrderConfirmationPage> {
                             padding: const EdgeInsets.symmetric(vertical: 4.0),
                             child: Row(
                               children: [
+                                // ( ✨ 修复 ✨ )
+                                // item.quantity, item.name, item.price
+                                // 现在都可以被安全访问
                                 Text('${item.quantity}x',
                                     style: const TextStyle(
                                         color: kPrimaryActionColor,
@@ -218,8 +227,8 @@ class _OrderConfirmationPageState extends State<OrderConfirmationPage> {
                 ],
               ),
             ),
-            const Spacer(flex: 2), // Pushes buttons to the bottom
-            // --- Bottom Buttons ---
+            const Spacer(flex: 2),
+            // ... (Bottom Buttons 不变) ...
             Row(
               children: [
                 Expanded(
@@ -266,7 +275,7 @@ class _OrderConfirmationPageState extends State<OrderConfirmationPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 10), // Bottom padding
+            const SizedBox(height: 10),
           ],
         ),
       ),

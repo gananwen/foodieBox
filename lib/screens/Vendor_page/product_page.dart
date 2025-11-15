@@ -2,16 +2,25 @@ import 'package:flutter/material.dart';
 import '../../util/styles.dart';
 import 'add_product_page.dart';
 import 'edit_product_page.dart';
-// --- 1. 导入模型和仓库 ---
 import '../../models/product.dart';
 import '../../repositories/product_repository.dart';
 import '../../models/promotion.dart';
 import '../../repositories/promotion_repository.dart';
-import 'dart:math' as math; // 用于计算
+// --- ( ✨ 新增导入 ✨ ) ---
+import '../../repositories/vendor_data_repository.dart';
+// --- ( ✨ 结束 ✨ ) ---
+import 'dart:math' as math;
 
 class ProductPage extends StatefulWidget {
   final VoidCallback onBackToDashboard;
-  const ProductPage({super.key, required this.onBackToDashboard});
+  // --- ( ✨ 关键修改 ✨ ) ---
+  final VendorDataBundle bundle; // 接收 bundle
+  const ProductPage({
+    super.key,
+    required this.onBackToDashboard,
+    required this.bundle, // 添加到 constructor
+  });
+  // --- ( ✨ 结束修改 ✨ ) ---
 
   @override
   State<ProductPage> createState() => _ProductPageState();
@@ -24,10 +33,25 @@ class _ProductPageState extends State<ProductPage>
   final PromotionRepository _promoRepo = PromotionRepository();
   final Set<String> _selectedProductIds = {};
 
+  // --- ( ✨ 新增变量 ✨ ) ---
+  late String _vendorType;
+  // --- ( ✨ 结束 ✨ ) ---
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    // --- ( ✨ 关键修复：代码顺序 ✨ ) ---
+    // 1. 必须 *先* 初始化 _vendorType
+    _vendorType = widget.bundle.vendor.vendorType;
+
+    // 2. *然后* 再使用 _vendorType 来初始化 _tabController
+    if (_vendorType == 'Blindbox') {
+      _tabController = TabController(length: 1, vsync: this);
+    } else {
+      // 'Grocery' 供应商现在只有 2 个 tabs
+      _tabController = TabController(length: 2, vsync: this);
+    }
+    // --- ( ✨ 结束修复 ✨ ) ---
   }
 
   @override
@@ -36,6 +60,7 @@ class _ProductPageState extends State<ProductPage>
     super.dispose();
   }
 
+  // ... (_toggleSelection, _deleteSelectedProducts, _buildSelectionHeader 保持不变) ...
   void _toggleSelection(String productId) {
     setState(() {
       if (_selectedProductIds.contains(productId)) {
@@ -116,33 +141,30 @@ class _ProductPageState extends State<ProductPage>
     );
   }
 
-  // --- (已修改) _buildProductList ---
-  // 它现在接收两个列表：产品和促销
+  // --- ( ✨ 已修改：_buildProductList ✨ ) ---
   Widget _buildProductList(
       List<Product> allProducts, List<PromotionModel> activePromos) {
-    // 1. 创建一个 Map 来快速查找促销
-    // e.g., {'Blindbox': 20, 'Grocery': 0}
     final promoMap = <String, int>{};
     for (var promo in activePromos) {
       promoMap[promo.productType] = promo.discountPercentage;
     }
 
-    // 2. 按标签页过滤
-    final String currentTabType;
-    switch (_tabController.index) {
-      case 1:
-        currentTabType = 'Blindbox';
-        break;
-      case 2:
-        currentTabType = 'Grocery';
-        break;
-      default:
-        currentTabType = 'All';
-    }
+    // ( ✨ 逻辑简化：'allProducts' 已经是过滤后的 ✨ )
+    // 'allProducts' 已经被 repository 按 vendorType 过滤了
+    // 'Grocery' 供应商的 'All' tab 会显示所有 'Grocery' 产品
+    List<Product> filteredList = allProducts;
 
-    final filteredList = (currentTabType == 'All')
-        ? allProducts
-        : allProducts.where((p) => p.productType == currentTabType).toList();
+    // 只有当 'Grocery' 供应商点击 'Grocery' 标签页时，我们才需要再次过滤
+    // (这个逻辑是假设 'Grocery' 供应商可能也会创建 'Blindbox'，
+    // 但根据我们的新 repository, 他们不能, 所以这个过滤是安全的)
+    if (_vendorType == 'Grocery' && _tabController.index == 1) {
+      // 这是 'Grocery' 供应商的 "Grocery deals" 标签
+      filteredList =
+          allProducts.where((p) => p.productType == 'Grocery').toList();
+    } else if (_vendorType == 'Grocery' && _tabController.index == 0) {
+      // "All" 标签页
+      filteredList = allProducts;
+    }
 
     if (filteredList.isEmpty) {
       return const Center(
@@ -155,26 +177,25 @@ class _ProductPageState extends State<ProductPage>
 
     // 3. 构建列表
     return ListView.builder(
+      // ... (ListView.builder 内部不变) ...
       padding: const EdgeInsets.all(16.0),
       itemCount: filteredList.length,
       itemBuilder: (context, index) {
         final product = filteredList[index];
         final bool isSelected = _selectedProductIds.contains(product.id!);
-        // --- (已修改) 获取此产品的折扣 ---
         final int discount = promoMap[product.productType] ?? 0;
 
         return _ProductCard(
           product: product,
-          discountPercentage: discount, // 传递折扣
+          discountPercentage: discount,
           isSelected: isSelected,
           onTap: () {
-            // --- (已修改) 导航到 EditProductPage ---
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => EditProductPage(
                   product: product,
-                  discountPercentage: discount, // 传递折扣
+                  discountPercentage: discount,
                 ),
               ),
             );
@@ -187,6 +208,7 @@ class _ProductPageState extends State<ProductPage>
     );
   }
 
+  // --- ( ✨ 已修改：build ✨ ) ---
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -201,7 +223,7 @@ class _ProductPageState extends State<ProductPage>
         ),
         actions: [
           if (_selectedProductIds.isNotEmpty)
-            Container() // 占位符, 因为删除按钮已移到 _buildSelectionHeader
+            Container()
           else
             IconButton(
               icon: const Icon(Icons.add, color: kTextColor),
@@ -209,36 +231,41 @@ class _ProductPageState extends State<ProductPage>
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const AddProductPage(),
+                    builder: (context) => AddProductPage(
+                      vendorType: _vendorType,
+                    ),
                   ),
                 );
               },
             ),
         ],
+        // --- ( ✨ 关键修改：动态 Tabs ✨ ) ---
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: kTextColor,
           labelColor: kTextColor,
           unselectedLabelColor: kTextColor.withOpacity(0.6),
-          tabs: const [
-            Tab(text: 'All'),
-            Tab(text: 'Blind Boxes'),
-            Tab(text: 'Grocery deals'),
-          ],
+          // 2. 根据 vendorType 显示不同的 Tabs
+          tabs: _vendorType == 'Blindbox'
+              ? const [
+                  Tab(text: 'My Blind Boxes'), // 只有一个 Tab
+                ]
+              : const [
+                  Tab(text: 'All'), // 'Grocery' 供应商的 "All"
+                  Tab(text: 'Grocery deals'), // 'Grocery' 供应商的 "Grocery"
+                ],
           onTap: (index) {
-            // 切换标签页时清除选择
             setState(() {
               _selectedProductIds.clear();
             });
           },
         ),
+        // --- ( ✨ 结束修改 ✨ ) ---
       ),
-      // --- (已修改) 使用嵌套的 StreamBuilder ---
       body: Column(
         children: [
           _buildSelectionHeader(),
           Expanded(
-            // 1. StreamBuilder 1: 获取促销
             child: StreamBuilder<List<PromotionModel>>(
               stream: _promoRepo.getPromotionsStream(),
               builder: (context, promoSnapshot) {
@@ -247,12 +274,13 @@ class _ProductPageState extends State<ProductPage>
                       child: CircularProgressIndicator(
                           color: kPrimaryActionColor));
                 }
-                // (我们不关心促销错误或空状态，没有促销=0%折扣)
                 final activePromos = promoSnapshot.data ?? [];
 
-                // 2. StreamBuilder 2: 获取产品
                 return StreamBuilder<List<Product>>(
-                  stream: _productRepo.getProductsStream(),
+                  // --- ( ✨ 关键修改 ✨ ) ---
+                  // 3. 将 vendorType 传递给 repository
+                  stream: _productRepo.getProductsStream(_vendorType),
+                  // --- ( ✨ 结束修改 ✨ ) ---
                   builder: (context, productSnapshot) {
                     if (productSnapshot.connectionState ==
                         ConnectionState.waiting) {
@@ -272,14 +300,19 @@ class _ProductPageState extends State<ProductPage>
 
                     final allProducts = productSnapshot.data!;
 
-                    // 3. 返回 TabBarView
                     return TabBarView(
                       controller: _tabController,
-                      children: [
-                        _buildProductList(allProducts, activePromos),
-                        _buildProductList(allProducts, activePromos),
-                        _buildProductList(allProducts, activePromos),
-                      ],
+                      // --- ( ✨ 关键修改 ✨ ) ---
+                      // 4. 确保 TabBarView 匹配 Tab 列表
+                      children: _vendorType == 'Blindbox'
+                          ? [
+                              _buildProductList(allProducts, activePromos),
+                            ]
+                          : [
+                              _buildProductList(allProducts, activePromos),
+                              _buildProductList(allProducts, activePromos),
+                            ],
+                      // --- ( ✨ 结束修改 ✨ ) ---
                     );
                   },
                 );
@@ -292,7 +325,7 @@ class _ProductPageState extends State<ProductPage>
   }
 }
 
-// --- (已修改) 全新 "Modern" 产品卡片 UI ---
+// --- ( ✨ _ProductCard (已修复拼写错误) ✨ ) ---
 class _ProductCard extends StatelessWidget {
   final Product product;
   final int discountPercentage;
@@ -332,18 +365,19 @@ class _ProductCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // 1. Checkbox
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Checkbox(
                 value: isSelected,
                 onChanged: (val) => onSelect(),
                 activeColor: kPrimaryActionColor,
+                // --- ( ✨ 关键修复：拼写错误 ✨ ) ---
                 shape: RoundedRectangleBorder(
+                    // <-- 之前是 Gorder
                     borderRadius: BorderRadius.circular(4)),
+                // --- ( ✨ 结束修复 ✨ ) ---
               ),
             ),
-            // 2. Image
             Container(
               width: 80,
               height: 80,
@@ -363,17 +397,14 @@ class _ProductCard extends StatelessWidget {
                       color: kTextColor, size: 35)
                   : null,
             ),
-            // 3. Details
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // --- (新增) 类别标签 ---
                     if (product.category.isNotEmpty)
                       _CategoryChip(category: product.category),
-                    // ---
                     Text(
                       product.title,
                       style: const TextStyle(
@@ -408,7 +439,8 @@ class _ProductCard extends StatelessWidget {
   }
 }
 
-// (辅助) 价格 Widget
+// --- (_PriceInfo, _CategoryChip 保持不变) ---
+// (代码已折叠)
 class _PriceInfo extends StatelessWidget {
   final double originalPrice;
   final int discountPercentage;
@@ -457,7 +489,6 @@ class _PriceInfo extends StatelessWidget {
   }
 }
 
-// (辅助) 类别标签
 class _CategoryChip extends StatelessWidget {
   final String category;
   const _CategoryChip({required this.category});
