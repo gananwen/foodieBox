@@ -70,6 +70,7 @@ class _OrdersPageState extends State<OrdersPage>
       ),
     );
   }
+
   Widget _buildOrderList(BuildContext context,
       {required bool isOngoing, String? userId}) {
     // --- FIX: Add new pickup status to ongoing list ---
@@ -81,20 +82,20 @@ class _OrdersPageState extends State<OrdersPage>
       'paid_pending_pickup' // <-- ADDED
     ];
     // --- END FIX ---
-    
+
     final historyStatuses = ['completed', 'cancelled'];
 
     if (userId == null) {
       return const Center(
-        child: Text('Please log in to view your orders.', style: kHintTextStyle),
+        child:
+            Text('Please log in to view your orders.', style: kHintTextStyle),
       );
     }
 
     final query = FirebaseFirestore.instance
         .collection('orders')
         .where('userId', isEqualTo: userId)
-        .where('status',
-            whereIn: isOngoing ? ongoingStatuses : historyStatuses)
+        .where('status', whereIn: isOngoing ? ongoingStatuses : historyStatuses)
         .orderBy('timestamp', descending: true);
 
     return StreamBuilder<QuerySnapshot>(
@@ -130,13 +131,13 @@ class _OrdersPageState extends State<OrdersPage>
       },
     );
   }
+
   Widget _buildOrderCard(BuildContext context, OrderModel order,
       {required bool isOngoing}) {
     final String statusText =
         order.status[0].toUpperCase() + order.status.substring(1);
     final TextStyle statusStyle = _getStatusStyle(order.status);
-    final String formattedDateTime =
-        _formatDateTime(order.timestamp.toDate());
+    final String formattedDateTime = _formatDateTime(order.timestamp.toDate());
 
     return GestureDetector(
       // --- FIX: Only allow tap to track for delivery orders ---
@@ -173,24 +174,26 @@ class _OrdersPageState extends State<OrdersPage>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(order.vendorName,
+                  child: Text(order.vendorName as String,
                       style: kLabelTextStyle.copyWith(fontSize: 16),
                       overflow: TextOverflow.ellipsis),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: statusStyle.color?.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(statusText, style: statusStyle.copyWith(fontSize: 12)),
+                  child: Text(statusText,
+                      style: statusStyle.copyWith(fontSize: 12)),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Text(formattedDateTime,
                 style: kHintTextStyle.copyWith(fontSize: 13)),
-            
+
             // --- FIX: Check if address is null before showing it ---
             if (order.address != null && order.address!.isNotEmpty)
               Padding(
@@ -208,15 +211,18 @@ class _OrdersPageState extends State<OrdersPage>
               children: [
                 Text('Total: RM${order.total.toStringAsFixed(2)}',
                     style: kLabelTextStyle.copyWith(fontSize: 15)),
-                
+
                 // --- FIX: Show correct icon for delivery or pickup ---
-                if (order.orderType == 'Delivery' && order.driverId != null && isOngoing)
+                if (order.orderType == 'Delivery' &&
+                    order.driverId != null &&
+                    isOngoing)
                   const Icon(Icons.local_shipping,
                       color: kPrimaryActionColor, size: 20),
 
                 if (order.orderType == 'Pickup' && isOngoing)
                   const Icon(Icons.store, // Icon for pickup
-                      color: kPrimaryActionColor, size: 20),
+                      color: kPrimaryActionColor,
+                      size: 20),
                 // --- END FIX ---
               ],
             ),
@@ -225,6 +231,7 @@ class _OrdersPageState extends State<OrdersPage>
       ),
     );
   }
+
   TextStyle _getStatusStyle(String status) {
     Color color;
     switch (status) {
