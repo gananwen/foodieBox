@@ -13,29 +13,15 @@ class OrderModel {
   final double subtotal;
   final double total;
   final String status;
-  final String status;
   final List<OrderItem> items;
   final Timestamp timestamp;
   final String? driverId;
-  final String? driverId;
   final String? contactName;
   final String? contactPhone;
-
-  // --- ( ✨ 关键修复 ✨ ) ---
-  // 1. 地址/经纬度 必须是可为空的 (nullable)，因为 "Pickup" 订单没有这些
-  final String? address;
-  final double? lat;
-  final double? lng;
-
-  // 2. 添加了 orderType, vendorIds
   final String orderType;
+  final String deliveryOption;
+  final double deliveryFee;
   final List<String> vendorIds;
-
-  // 3. ( ✨ 关键修复 ✨ )
-  // 添加了你队友模型中缺失的字段 (你的 order_page.dart 需要用到!)
-  final String vendorName;
-  final String vendorType;
-  // --- ( ✨ 结束修复 ✨ ) ---
 
   // (评价字段)
   final double? rating;
@@ -43,14 +29,9 @@ class OrderModel {
   final Timestamp? reviewTimestamp;
 
   // (取货字段)
-  // (取货字段)
   final String? pickupId;
   final String? pickupDay; // "Today" or "Tomorrow"
   final String? pickupTime; // "12:00 PM – 1:00 PM"
-
-  // (配送字段)
-  final String deliveryOption;
-  final double deliveryFee;
 
   OrderModel({
     required this.id,
@@ -65,22 +46,12 @@ class OrderModel {
     required this.items,
     required this.timestamp,
     this.driverId,
-    this.driverId,
     this.contactName,
     this.contactPhone,
-
-    // --- ( ✨ 关键修复 ✨ ) ---
-    this.address, // <-- 变为 nullable
-    this.lat, // <-- 变为 nullable
-    this.lng, // <-- 变为 nullable
     required this.orderType,
+    this.deliveryOption = 'Standard',
+    this.deliveryFee = 0.0,
     required this.vendorIds,
-    required this.vendorName, // <-- 已添加
-    required this.vendorType, // <-- 已添加
-    // --- ( ✨ 结束修复 ✨ ) ---
-
-    this.deliveryOption = 'Standard', // (变为可选)
-    this.deliveryFee = 0.0, // (变为可选)
     this.rating,
     this.reviewText,
     this.reviewTimestamp,
@@ -107,27 +78,12 @@ class OrderModel {
       items: parsedItems,
       timestamp: map['timestamp'] ?? Timestamp.now(),
       driverId: map['driverId'],
-      driverId: map['driverId'],
       contactName: map['contactName'],
       contactPhone: map['contactPhone'],
-
-      // --- ( ✨ 关键修复 ✨ ) ---
-      // 1. 地址/经纬度 现在是 nullable
-      address: map['address'], // (如果不存在，则为 null)
-      lat: (map['lat'] as num?)?.toDouble(), // (如果不存在，则为 null)
-      lng: (map['lng'] as num?)?.toDouble(), // (如果不存在，则为 null)
-
-      // 2. 添加了 orderType, vendorIds
       orderType: map['orderType'] ?? 'Delivery',
-      vendorIds: List<String>.from(map['vendorIds'] ?? []),
-
-      // 3. 添加了 vendorName, vendorType
-      vendorName: map['vendorName'] ?? '', // <-- 已添加
-      vendorType: map['vendorType'] ?? '', // <-- 已添加
-      // --- ( ✨ 结束修复 ✨ ) ---
-
       deliveryOption: map['deliveryOption'] ?? 'Standard',
       deliveryFee: (map['deliveryFee'] as num?)?.toDouble() ?? 0.0,
+      vendorIds: List<String>.from(map['vendorIds'] ?? []),
       rating: (map['rating'] as num?)?.toDouble(),
       reviewText: map['reviewText'],
       reviewTimestamp: map['reviewTimestamp'],
