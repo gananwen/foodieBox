@@ -8,11 +8,8 @@ class OrderRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // 获取当前供应商的 UID
   String? get _vendorId => _auth.currentUser?.uid;
 
-  // --- 1. 获取订单列表 (用于 Orders Page) ---
-  // ( ✨ 已包含你对 "paid pending pickup" 状态的修复 ✨ )
   Stream<List<OrderModel>> getOrdersStream(String orderType) {
     final vendorId = _vendorId;
     if (vendorId == null) {
@@ -21,15 +18,21 @@ class OrderRepository {
 
     return _db
         .collection('orders')
-        .where('vendorIds', arrayContains: vendorId) // ( ❗ 依赖客户 App 修复 ❗ )
-        .where('orderType', isEqualTo: orderType)
+        .where('vendorIds', arrayContains: vendorId) // <-- ( ✨ 已修复! ✨ )
+        .where('orderType', isEqualTo: orderType) // <-- ( ✨ 正确! ✨ )
+
+        // --- ( ✨ 关键修复 ✨ ) ---
+        // 我们把带空格的 'paid pending pickup'
+        // 改成你新数据里带下划线的 'paid_pending_pickup'
         .where('status', whereIn: [
           'received',
           'Preparing',
           'Ready for Pickup',
           'Delivering',
-          'paid pending pickup' // ( ✨ 已添加 ✨ )
+          'paid_pending_pickup' // <-- ( ✨ 修复为下划线版本 ✨ )
         ])
+        // --- ( ✨ 结束修复 ✨ ) ---
+
         .orderBy('timestamp', descending: true)
         .snapshots()
         .map((snapshot) {
@@ -43,8 +46,6 @@ class OrderRepository {
         });
   }
 
-  // --- 2. 更新订单状态 (用于 Details Page) ---
-  // ( ✨ 这是你缺失的函数之一 ✨ )
   Future<void> updateOrderStatus(String orderId, String newStatus) async {
     try {
       await _db.collection('orders').doc(orderId).update({'status': newStatus});
@@ -54,8 +55,6 @@ class OrderRepository {
     }
   }
 
-  // --- 3. 分配司机 (用于 Details Page) ---
-  // ( ✨ 这是你缺失的函数之二 ✨ )
   Future<void> assignDriverToOrder(String orderId) async {
     try {
       final driversSnapshot = await _db.collection('drivers').get();
@@ -80,8 +79,6 @@ class OrderRepository {
     }
   }
 
-  // --- 4. 获取今日统计 (用于 Home Page Dashboard) ---
-  // ( ✨ 这是你缺失的函数之三 ✨ )
   Stream<Map<String, dynamic>> getTodaysStatsStream() {
     final vendorId = _vendorId;
     if (vendorId == null) {
@@ -94,18 +91,31 @@ class OrderRepository {
 
     final query = _db
         .collection('orders')
-        .where('vendorIds', arrayContains: vendorId) // ( ❗ 依赖客户 App 修复 ❗ )
+        .where('vendorIds', arrayContains: vendorId)
         .where('timestamp', isGreaterThanOrEqualTo: startOfTodayTimestamp);
 
+    // 监听快照
     return query.snapshots().map((snapshot) {
       int orderCount = snapshot.docs.length;
       double totalSales = 0.0;
 
+      // 遍历所有文档
       for (var doc in snapshot.docs) {
+        // --- ( ✨ 关键修复 ✨ ) ---
+        // 1. 安全地获取数据
         final data = doc.data() as Map<String, dynamic>?;
+
+        // 2. 检查 'total' 字段是否存在
         if (data != null && data.containsKey('total')) {
-          totalSales += (data['total'] as num?)?.toDouble() ?? 0.0;
+          // 3. 安全地检查 'total' 是不是一个 *数字* (Number)
+          final totalValue = data['total'];
+          if (totalValue is num) {
+            // 4. 只有当它 *是* 数字时，才进行加法
+            totalSales += totalValue.toDouble();
+          }
+          // (如果 totalValue 是 "32" (String) 或 null, 它会被安全地忽略)
         }
+        // --- ( ✨ 结束修复 ✨ ) ---
       }
 
       return {

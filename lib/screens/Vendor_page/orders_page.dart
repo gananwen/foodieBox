@@ -38,7 +38,13 @@ class _OrdersPageState extends State<OrdersPage>
     String statusText;
 
     switch (status) {
-      case 'received': // (新增)
+      // ( ✨ 新增 Case ✨ )
+      case 'paid_pending_pickup':
+        badgeColor = Colors.blue[100] ?? Colors.blue;
+        statusText = 'Pending Pickup';
+        break;
+
+      case 'received':
         badgeColor = Colors.blue[100] ?? Colors.blue;
         statusText = 'New Order';
         break;
@@ -60,7 +66,8 @@ class _OrdersPageState extends State<OrdersPage>
         break;
       default:
         badgeColor = Colors.grey[300] ?? Colors.grey;
-        statusText = status;
+        // ( ✨ 修复：替换掉下划线 ✨ )
+        statusText = status.replaceAll('_', ' ');
     }
 
     return Container(

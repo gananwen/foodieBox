@@ -1,9 +1,10 @@
 // 路径: lib/pages/vendor_home/order_details_page.dart
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // ( ✨ 需要 intl ✨ )
 import '../../util/styles.dart';
-import '../../models/order_model.dart';
-import '../../models/order_item.model.dart'; // ( ✨ 确保 import 路径正确 ✨ )
-import '../../repositories/order_repository.dart'; // ( ✨ 确保 import 路径正确 ✨ )
+import '../../models/order_model.dart'; // ( ✨ 使用更新后的模型 ✨ )
+import '../../models/order_item.model.dart';
+import '../../repositories/order_repository.dart';
 
 class OrderDetailsPage extends StatefulWidget {
   final OrderModel order;
@@ -24,29 +25,22 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     _currentStatus = widget.order.status;
   }
 
-  // --- ( ✨ 这是你的核心逻辑 ✨ ) ---
+  // ( _updateOrderStatus 核心逻辑不变 )
   Future<void> _updateOrderStatus(String newStatus) async {
     setState(() => _isLoading = true);
-
     try {
-      // 1. 始终更新状态
       await _repo.updateOrderStatus(widget.order.id, newStatus);
-
-      // --- 2. ( ✨ 新增 ✨ ) 检查触发条件 ---
-      // 如果你点击了 "Ready for Pickup"，则分配一个司机
-      if (newStatus == 'Ready for Pickup') {
-        // 这是 "auto random come out" 的触发器
+      if (newStatus == 'Ready for Pickup' &&
+          widget.order.orderType == 'Delivery') {
         await _repo.assignDriverToOrder(widget.order.id);
       }
-
-      // 3. 更新 UI
       setState(() {
         _currentStatus = newStatus;
       });
-
       if (mounted) {
         String message = 'Order status updated to $newStatus';
-        if (newStatus == 'Ready for Pickup') {
+        if (newStatus == 'Ready for Pickup' &&
+            widget.order.orderType == 'Delivery') {
           message += ' & Driver assigned!';
         }
         ScaffoldMessenger.of(context).showSnackBar(
@@ -74,7 +68,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     }
   }
 
-  // --- (不变) _buildSectionHeader ---
+  // ( _buildSectionHeader, _buildPriceRow, _buildStatusButton, _buildOrderItemList 辅助函数不变 )
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(top: 24.0, bottom: 8.0, left: 16.0),
@@ -89,7 +83,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  // --- (不变) _buildPriceRow ---
   Widget _buildPriceRow(String title, String amount, {bool isTotal = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
@@ -117,10 +110,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  // --- (不变) _buildStatusButton ---
   Widget _buildStatusButton(String title, String statusKey) {
     final bool isSelected = (_currentStatus == statusKey);
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
       child: isSelected
@@ -166,7 +157,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  // --- ( ✨ 已修改 ✨ ) _buildOrderItemList ---
   Widget _buildOrderItemList(List<OrderItem> items) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -210,10 +200,134 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
+  // ( _buildInfoRow 辅助函数不变 )
+  Widget _buildInfoRow(IconData icon, String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: kTextColor.withAlpha(150), size: 20),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: kTextColor.withAlpha(180),
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: kTextColor,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- ( ✨ 关键修改：_buildOrderInfoCard ✨ ) ---
+  Widget _buildOrderInfoCard(OrderModel order) {
+    final String formattedTimestamp =
+        DateFormat('dd MMM yyyy, hh:mm a').format(order.timestamp.toDate());
+    final String orderId = order.id.substring(0, 6).toUpperCase();
+
+    // --- ( ✨ 新逻辑：计算取货日期 ✨ ) ---
+    String pickupDateString = 'N/A';
+    // 1. 获取下单日期
+    final DateTime orderDate = order.timestamp.toDate();
+
+    // 2. 根据 "pickupDay" 字符串计算
+    if (order.pickupDay == 'Today') {
+      pickupDateString = DateFormat('dd MMM yyyy (Today)').format(orderDate);
+    } else if (order.pickupDay == 'Tomorrow') {
+      // 3. 计算 "明天"
+      final tomorrow = orderDate.add(const Duration(days: 1));
+      pickupDateString = DateFormat('dd MMM yyyy (Tomorrow)').format(tomorrow);
+    } else if (order.pickupDay != null) {
+      // 备用
+      pickupDateString = order.pickupDay!;
+    }
+    // --- ( ✨ 结束新逻辑 ✨ ) ---
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: kCardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kTextColor.withOpacity(0.1), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildInfoRow(
+            Icons.confirmation_number_outlined,
+            'Order ID',
+            orderId,
+          ),
+          const Divider(color: kAppBackgroundColor),
+          _buildInfoRow(
+            Icons.access_time,
+            'Order Placed',
+            formattedTimestamp,
+          ),
+          const Divider(color: kAppBackgroundColor),
+          if (order.orderType == 'Pickup') ...[
+            // --- ( ✨ 已修改 ✨ ) ---
+            _buildInfoRow(
+              Icons.calendar_today_outlined,
+              'Pickup Date',
+              pickupDateString, // <-- (使用我们计算出的新日期)
+            ),
+            const Divider(color: kAppBackgroundColor),
+            _buildInfoRow(
+              Icons.schedule_outlined,
+              'Pickup Slot',
+              order.pickupTime ?? 'N/A', // <-- (使用新字段)
+            ),
+            if (order.pickupId != null) ...[
+              const Divider(color: kAppBackgroundColor),
+              _buildInfoRow(
+                Icons.vpn_key_outlined,
+                'Pickup Code',
+                order.pickupId!,
+              ),
+            ]
+            // --- ( ✨ 结束修改 ✨ ) ---
+          ] else ...[
+            _buildInfoRow(
+              Icons.location_on_outlined,
+              'Delivery Address',
+              order.address,
+            ),
+            const Divider(color: kAppBackgroundColor),
+            _buildInfoRow(
+              Icons.delivery_dining_outlined,
+              'Delivery Option',
+              order.deliveryOption,
+            ),
+          ]
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ( ✨ 已修改 ✨ )
-    // 我们现在从更新后的 OrderModel 中获取这些值
+    // (build 方法的其余部分不变)
     final double total = widget.order.total;
     final double subtotal = widget.order.subtotal;
     final double deliveryFee = widget.order.deliveryFee;
@@ -232,7 +346,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- 1. Customer Details ---
             _buildSectionHeader('Customer'),
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -254,20 +367,21 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                       fontWeight: FontWeight.bold, color: kTextColor),
                 ),
                 subtitle: Text(
-                  // ( ✨ 已修改 ✨ ) 使用新的 'orderType' 字段
                   widget.order.orderType == 'Pickup'
                       ? 'Self-Pickup Order'
-                      : '${widget.order.address}\nDelivery: ${widget.order.deliveryOption}',
+                      : 'Delivery Order',
                   style: TextStyle(color: kTextColor.withOpacity(0.7)),
                 ),
               ),
             ),
 
-            // --- 2. Items Ordered ---
+            // ( ✨ 新卡片在这里 ✨ )
+            _buildSectionHeader('Order Details'),
+            _buildOrderInfoCard(widget.order),
+
             _buildSectionHeader('Items Ordered'),
             _buildOrderItemList(widget.order.items),
 
-            // --- 3. Order Summary ---
             _buildSectionHeader('Order Summary'),
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -292,25 +406,24 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               ),
             ),
 
-            // --- 4. Status Update ---
+            // --- ( ✨ 状态按钮已修复 ✨ ) ---
             _buildSectionHeader('Status'),
-            // (我们假设 'received' 是初始状态)
+
+            _buildStatusButton('Paid (Pending Pickup)', 'paid_pending_pickup'),
+
             _buildStatusButton('Preparing', 'Preparing'),
 
-            // ( ✨ 已修改 ✨ ) 使用新的 'orderType' 字段来决定显示哪个按钮
             if (widget.order.orderType == 'Pickup') ...[
               _buildStatusButton('Ready for Pickup', 'Ready for Pickup'),
             ] else ...[
-              // 这是你的触发器按钮
               _buildStatusButton(
                   'Ready for Pickup (Request Lalamove)', 'Ready for Pickup'),
               _buildStatusButton(
                   'Delivering',
-                  // ( ✨ 已修改 ✨ ) 检查 driverId 是否存在
                   (widget.order.driverId != null &&
                           widget.order.driverId!.isNotEmpty)
                       ? 'Delivering'
-                      : _currentStatus), // 只有在分配了司机后才能点击 "Delivering"
+                      : _currentStatus),
             ],
 
             _buildStatusButton('Completed', 'Completed'),

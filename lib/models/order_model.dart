@@ -21,12 +21,16 @@ class OrderModel {
   final String deliveryOption;
   final double deliveryFee;
   final List<String> vendorIds;
+  final double? rating;
+  final String? reviewText;
+  final Timestamp? reviewTimestamp;
 
-  // --- ( ✨ 新增字段 ✨ ) ---
-  // 假定客户 App 在订单完成后会更新这些字段
-  final double? rating; // e.g., 4.5
-  final String? reviewText; // e.g., "Great food!"
-  final Timestamp? reviewTimestamp; // 评价的时间
+  // --- ( ✨ 关键修复 ✨ ) ---
+  // (这些字段现在被添加到了模型中)
+  final String? pickupId;
+  final String? pickupDay; // "Today" or "Tomorrow"
+  final String? pickupTime; // "12:00 PM – 1:00 PM"
+  // --- ( ✨ 结束修复 ✨ ) ---
 
   OrderModel({
     required this.id,
@@ -47,11 +51,15 @@ class OrderModel {
     this.deliveryOption = 'Standard',
     this.deliveryFee = 0.0,
     required this.vendorIds,
-
-    // --- ( ✨ 新增字段 ✨ ) ---
     this.rating,
     this.reviewText,
     this.reviewTimestamp,
+
+    // --- ( ✨ 关键修复 ✨ ) ---
+    this.pickupId,
+    this.pickupDay,
+    this.pickupTime,
+    // --- ( ✨ 结束修复 ✨ ) ---
   });
 
   factory OrderModel.fromMap(Map<String, dynamic> map, String documentId) {
@@ -78,12 +86,16 @@ class OrderModel {
       deliveryOption: map['deliveryOption'] ?? 'Standard',
       deliveryFee: (map['deliveryFee'] as num?)?.toDouble() ?? 0.0,
       vendorIds: List<String>.from(map['vendorIds'] ?? []),
-
-      // --- ( ✨ 新增字段 ✨ ) ---
-      // (使用 'as num?' 来安全地处理 double 和 int)
       rating: (map['rating'] as num?)?.toDouble(),
       reviewText: map['reviewText'],
       reviewTimestamp: map['reviewTimestamp'],
+
+      // --- ( ✨ 关键修复 ✨ ) ---
+      // (现在 App 会从 Firebase 正确读取这些字段)
+      pickupId: map['pickupId'],
+      pickupDay: map['pickupDay'],
+      pickupTime: map['pickupTime'],
+      // --- ( ✨ 结束修复 ✨ ) ---
     );
   }
 }

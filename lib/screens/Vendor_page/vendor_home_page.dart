@@ -7,15 +7,12 @@ import 'orders_page.dart';
 import 'marketing_page.dart';
 import 'more_page.dart';
 import '../../repositories/vendor_data_repository.dart';
-import '../../models/user.dart';
-import '../../models/vendor.dart';
 import '../../repositories/order_repository.dart';
 import 'package:intl/intl.dart';
 
 import '../../repositories/notification_repository.dart';
 import '../shared/notifications_page.dart';
 
-// (VendorHomePage 类保持不变)
 class VendorHomePage extends StatefulWidget {
   const VendorHomePage({super.key});
 
