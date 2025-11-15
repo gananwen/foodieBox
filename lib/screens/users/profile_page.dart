@@ -6,13 +6,13 @@ import '../../util/styles.dart';
 import '../../widgets/base_page.dart';
 import '../auth/user_login.dart';
 import '../shared/about_page.dart';
-import '../shared/help_page.dart'; // <-- 确保导入了 help_page.dart
+import '../shared/help_page.dart';
 import 'subpages/my_details_page.dart';
 import 'subpages/delivery_address_page.dart';
 import '../shared/notifications_page.dart';
 import 'subpages/promo_card_page.dart';
 import 'subpages/orders_history_page.dart';
-import '../shared/notifications_page.dart';
+import '../vendor_page/vendor_regieteration_page.dart'; //
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -24,9 +24,10 @@ class ProfilePage extends StatelessWidget {
     return Scaffold(
       backgroundColor: kAppBackgroundColor,
       appBar: AppBar(
+        // ... (不变) ...
         backgroundColor: Colors.transparent,
         elevation: 0,
-        automaticallyImplyLeading: true, // shows the back button
+        automaticallyImplyLeading: true,
         iconTheme: const IconThemeData(color: kTextColor),
       ),
       body: SingleChildScrollView(
@@ -54,15 +55,12 @@ class ProfilePage extends StatelessWidget {
                         .doc(userId)
                         .snapshots(),
                     builder: (context, snapshot) {
+                      // ... (StreamBuilder 逻辑不变) ...
                       if (!snapshot.hasData || snapshot.data?.data() == null) {
                         return const Center(child: CircularProgressIndicator());
                       }
-
                       final data =
                           snapshot.data!.data() as Map<String, dynamic>;
-                      // ( ✨ 提示 ✨ )
-                      // 我们在这里假设了用户的 'role' 字段是 'User'
-                      // 因为这是用户的个人资料页面
                       final name = data['name'] ?? 'Your Name';
                       final email = data['email'] ?? 'your@email.com';
                       final imageUrl = data['profilePic'];
@@ -129,6 +127,7 @@ class ProfilePage extends StatelessWidget {
               ),
               child: const Column(
                 children: [
+                  // ... (所有其他 ProfileItem 不变) ...
                   _ProfileItem(
                     icon: Icons.receipt_long,
                     label: 'Order History',
@@ -153,31 +152,35 @@ class ProfilePage extends StatelessWidget {
                   _ProfileItem(
                       icon: Icons.notifications_none,
                       label: 'Notifications',
-                      targetPage:
-                          NotificationsPage(userRole: 'User') // <-- 传入角色
-                      ),
+                      targetPage: NotificationsPage(userRole: 'User')),
                   Divider(height: 1, thickness: 1),
-
-                  // --- ( ✨ 关键修改在这里 ✨ ) ---
                   _ProfileItem(
                     icon: Icons.help_outline,
                     label: 'Help',
-                    // 之前是: targetPage: HelpPage(),
-                    // 现在是:
-                    targetPage: HelpPage(userRole: 'User'), // <-- 传入 'User' 角色
+                    targetPage: HelpPage(userRole: 'User'),
                   ),
-                  // --- ( ✨ 结束修改 ✨ ) ---
-
                   Divider(height: 1, thickness: 1),
                   _ProfileItem(
                       icon: Icons.info_outline,
                       label: 'About',
                       targetPage: AboutPage()),
+
+                  // --- ( ✨ 2. 在这里添加新的列表项 ✨ ) ---
+                  Divider(height: 1, thickness: 1),
+                  _ProfileItem(
+                    icon: Icons.store_mall_directory_outlined, // 商业图标
+                    label: 'FoodieBox for Business',
+                    targetPage: VendorRegistrationPage(), //
+                  ),
+                  // --- ( ✨ 结束 ✨ ) ---
                 ],
               ),
             ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 30),
+
+            // --- ( ✨ 3. 移除了 _buildBusinessButton() ✨ ) ---
+            // (之前在这里有一个单独的按钮)
 
             // --- Log Out Button (不变) ---
             Center(
@@ -219,6 +222,8 @@ class ProfilePage extends StatelessWidget {
       ),
     );
   }
+
+  // --- ( ✨ 4. 移除了 _buildBusinessButton 辅助函数 ✨ ) ---
 }
 
 // --- _ProfileItem (不变) ---

@@ -1,7 +1,7 @@
 // 路径: lib/models/order_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 // ( ✨ 关键 ✨ ) 确保你导入了下面这个 order_item.model.dart 文件
-import 'order_item.model.dart'; 
+import 'order_item.model.dart';
 
 class OrderModel {
   final String id;

@@ -85,37 +85,48 @@ class OrderRepository {
       throw Exception('User not logged in');
     }
 
-    final now = DateTime.now();
-    final startOfToday = DateTime(now.year, now.month, now.day);
-    final startOfTodayTimestamp = Timestamp.fromDate(startOfToday);
+    // --- ( ✨ 关键修复：时区 ✨ ) ---
+    // 1. 获取当前的 UTC 时间
+    final nowUtc = DateTime.now().toUtc();
 
+    // 2. 手动将当前 UTC 时间调整为 UTC+8
+    final nowInMalaysia = nowUtc.add(const Duration(hours: 8));
+
+    // 3. 计算 UTC+8 时区的 "今天凌晨"
+    final startOfTodayInMalaysia = DateTime.utc(
+        nowInMalaysia.year,
+        nowInMalaysia.month,
+        nowInMalaysia.day,
+        0,
+        0,
+        0); // 这创建了 '2025-11-15 00:00:00' (UTC)
+
+    // 4. 将这个 UTC 时间转换回 UTC+8 的 "凌晨"，即减去8小时
+    //    这给了我们 '2025-11-14 16:00:00' (UTC)，这才是 UTC+8 的午夜
+    final startOfTodayTimestamp = Timestamp.fromDate(
+        startOfTodayInMalaysia.subtract(const Duration(hours: 8)));
+    // --- ( ✨ 结束修复 ✨ ) ---
+
+    // 5. 查询 (这个查询现在是正确的)
+    // (它在查询: ...where('timestamp', >= '2025-11-14 16:00:00 UTC') )
     final query = _db
         .collection('orders')
         .where('vendorIds', arrayContains: vendorId)
         .where('timestamp', isGreaterThanOrEqualTo: startOfTodayTimestamp);
 
-    // 监听快照
+    // 6. 监听快照 (这个逻辑是我们之前修复过的，是安全的)
     return query.snapshots().map((snapshot) {
       int orderCount = snapshot.docs.length;
       double totalSales = 0.0;
 
-      // 遍历所有文档
       for (var doc in snapshot.docs) {
-        // --- ( ✨ 关键修复 ✨ ) ---
-        // 1. 安全地获取数据
         final data = doc.data() as Map<String, dynamic>?;
-
-        // 2. 检查 'total' 字段是否存在
         if (data != null && data.containsKey('total')) {
-          // 3. 安全地检查 'total' 是不是一个 *数字* (Number)
           final totalValue = data['total'];
           if (totalValue is num) {
-            // 4. 只有当它 *是* 数字时，才进行加法
             totalSales += totalValue.toDouble();
           }
-          // (如果 totalValue 是 "32" (String) 或 null, 它会被安全地忽略)
         }
-        // --- ( ✨ 结束修复 ✨ ) ---
       }
 
       return {

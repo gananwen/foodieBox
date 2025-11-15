@@ -1,8 +1,8 @@
 // 路径: lib/pages/vendor_home/order_details_page.dart
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // ( ✨ 需要 intl ✨ )
+import 'package:intl/intl.dart';
 import '../../util/styles.dart';
-import '../../models/order_model.dart'; // ( ✨ 使用更新后的模型 ✨ )
+import '../../models/order_model.dart';
 import '../../models/order_item.model.dart';
 import '../../repositories/order_repository.dart';
 
@@ -15,6 +15,7 @@ class OrderDetailsPage extends StatefulWidget {
 }
 
 class _OrderDetailsPageState extends State<OrderDetailsPage> {
+  // ... (initState, _updateOrderStatus, _buildSectionHeader, _buildPriceRow, _buildStatusButton, _buildOrderItemList, _buildInfoRow 都保持不变) ...
   late String _currentStatus;
   final OrderRepository _repo = OrderRepository();
   bool _isLoading = false;
@@ -25,7 +26,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     _currentStatus = widget.order.status;
   }
 
-  // ( _updateOrderStatus 核心逻辑不变 )
   Future<void> _updateOrderStatus(String newStatus) async {
     setState(() => _isLoading = true);
     try {
@@ -68,7 +68,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     }
   }
 
-  // ( _buildSectionHeader, _buildPriceRow, _buildStatusButton, _buildOrderItemList 辅助函数不变 )
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(top: 24.0, bottom: 8.0, left: 16.0),
@@ -200,7 +199,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  // ( _buildInfoRow 辅助函数不变 )
   Widget _buildInfoRow(IconData icon, String title, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -237,29 +235,23 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  // --- ( ✨ 关键修改：_buildOrderInfoCard ✨ ) ---
   Widget _buildOrderInfoCard(OrderModel order) {
+    // ... (Timestamp 和 OrderID 逻辑不变) ...
     final String formattedTimestamp =
         DateFormat('dd MMM yyyy, hh:mm a').format(order.timestamp.toDate());
     final String orderId = order.id.substring(0, 6).toUpperCase();
 
-    // --- ( ✨ 新逻辑：计算取货日期 ✨ ) ---
+    // ... (pickupDateString 逻辑不变) ...
     String pickupDateString = 'N/A';
-    // 1. 获取下单日期
     final DateTime orderDate = order.timestamp.toDate();
-
-    // 2. 根据 "pickupDay" 字符串计算
     if (order.pickupDay == 'Today') {
       pickupDateString = DateFormat('dd MMM yyyy (Today)').format(orderDate);
     } else if (order.pickupDay == 'Tomorrow') {
-      // 3. 计算 "明天"
       final tomorrow = orderDate.add(const Duration(days: 1));
       pickupDateString = DateFormat('dd MMM yyyy (Tomorrow)').format(tomorrow);
     } else if (order.pickupDay != null) {
-      // 备用
       pickupDateString = order.pickupDay!;
     }
-    // --- ( ✨ 结束新逻辑 ✨ ) ---
 
     return Container(
       width: double.infinity,
@@ -273,6 +265,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ... (ID, Timestamp, Pickup Date, Pickup Slot, Pickup Code 不变) ...
           _buildInfoRow(
             Icons.confirmation_number_outlined,
             'Order ID',
@@ -285,18 +278,18 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             formattedTimestamp,
           ),
           const Divider(color: kAppBackgroundColor),
+
           if (order.orderType == 'Pickup') ...[
-            // --- ( ✨ 已修改 ✨ ) ---
             _buildInfoRow(
               Icons.calendar_today_outlined,
               'Pickup Date',
-              pickupDateString, // <-- (使用我们计算出的新日期)
+              pickupDateString,
             ),
             const Divider(color: kAppBackgroundColor),
             _buildInfoRow(
               Icons.schedule_outlined,
               'Pickup Slot',
-              order.pickupTime ?? 'N/A', // <-- (使用新字段)
+              order.pickupTime ?? 'N/A',
             ),
             if (order.pickupId != null) ...[
               const Divider(color: kAppBackgroundColor),
@@ -306,18 +299,21 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 order.pickupId!,
               ),
             ]
-            // --- ( ✨ 结束修改 ✨ ) ---
           ] else ...[
+            // --- ( ✨ 关键修复 ✨ ) ---
+            // 'order.address' 是 String? (nullable)
+            // 我们必须给它一个备用值，以防它是 null
             _buildInfoRow(
               Icons.location_on_outlined,
               'Delivery Address',
-              order.address,
+              order.address ?? 'N/A', // <-- 修复了错误
             ),
+            // --- ( ✨ 结束修复 ✨ ) ---
             const Divider(color: kAppBackgroundColor),
             _buildInfoRow(
               Icons.delivery_dining_outlined,
               'Delivery Option',
-              order.deliveryOption,
+              order.deliveryOption, // (这个是 String, 不是 nullable, 所以没问题)
             ),
           ]
         ],
@@ -327,7 +323,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    // (build 方法的其余部分不变)
+    // ... (build 方法的其余部分不变) ...
     final double total = widget.order.total;
     final double subtotal = widget.order.subtotal;
     final double deliveryFee = widget.order.deliveryFee;
@@ -374,14 +370,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 ),
               ),
             ),
-
-            // ( ✨ 新卡片在这里 ✨ )
             _buildSectionHeader('Order Details'),
             _buildOrderInfoCard(widget.order),
-
             _buildSectionHeader('Items Ordered'),
             _buildOrderItemList(widget.order.items),
-
             _buildSectionHeader('Order Summary'),
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -405,14 +397,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 ],
               ),
             ),
-
-            // --- ( ✨ 状态按钮已修复 ✨ ) ---
             _buildSectionHeader('Status'),
-
             _buildStatusButton('Paid (Pending Pickup)', 'paid_pending_pickup'),
-
             _buildStatusButton('Preparing', 'Preparing'),
-
             if (widget.order.orderType == 'Pickup') ...[
               _buildStatusButton('Ready for Pickup', 'Ready for Pickup'),
             ] else ...[
@@ -425,7 +412,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                       ? 'Delivering'
                       : _currentStatus),
             ],
-
             _buildStatusButton('Completed', 'Completed'),
             const SizedBox(height: 40),
           ],

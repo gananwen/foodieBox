@@ -6,7 +6,6 @@ import '../../util/styles.dart';
 import 'widgets/product_form.dart';
 import '../../models/product.dart';
 import '../../repositories/product_repository.dart';
-// --- (新增) 导入类别数据 ---
 import '../../util/categories.dart';
 
 class ModifyProductPage extends StatefulWidget {
@@ -22,14 +21,12 @@ class _ModifyProductPageState extends State<ModifyProductPage> {
   final _productRepo = ProductRepository();
   bool _isLoading = false;
 
-  // Controllers
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
   late TextEditingController _expiryDateController;
   late TextEditingController _originalPriceController;
   late TextEditingController _discountedPriceController;
 
-  // State
   File? _pickedImage;
   late String _productType;
   late int _quantity;
@@ -38,15 +35,14 @@ class _ModifyProductPageState extends State<ModifyProductPage> {
   late bool _isNoPork;
   late String _existingImageUrl;
 
-  // --- (新增) Category State ---
   String? _selectedCategory;
   String? _selectedSubCategory;
   List<String> _subCategories = [];
-  // ---
 
   @override
   void initState() {
     super.initState();
+    // (initState 逻辑不变)
     final product = widget.product;
     _titleController = TextEditingController(text: product.title);
     _descriptionController = TextEditingController(text: product.description);
@@ -62,7 +58,6 @@ class _ModifyProductPageState extends State<ModifyProductPage> {
     _isVegan = product.isVegan;
     _isNoPork = product.isNoPork;
 
-    // --- (新增) 加载类别 ---
     if (product.category.isNotEmpty) {
       _selectedCategory = product.category;
       _subCategories = kGroceryCategories[product.category] ?? [];
@@ -70,7 +65,6 @@ class _ModifyProductPageState extends State<ModifyProductPage> {
         _selectedSubCategory = product.subCategory;
       }
     }
-    // ---
   }
 
   @override
@@ -83,21 +77,17 @@ class _ModifyProductPageState extends State<ModifyProductPage> {
     super.dispose();
   }
 
-  // --- (新增) Category Handlers ---
-  void _onTypeChanged(String type) {
-    setState(() {
-      _productType = type;
-      _selectedCategory = null;
-      _selectedSubCategory = null;
-      _subCategories = [];
-    });
-  }
+  // --- ( ✨ 关键修改 ✨ ) ---
+  // 我们不再需要这个函数，因为类型被锁定了
+  // void _onTypeChanged(String type) { ... }
+  // --- ( ✨ 结束修改 ✨ ) ---
 
+  // ... (_onCategoryChanged, _onSubCategoryChanged, _onTagChanged, _onUploadImage, _selectExpiryDate 保持不变) ...
   void _onCategoryChanged(String? newValue) {
     if (newValue == null) return;
     setState(() {
       _selectedCategory = newValue;
-      _selectedSubCategory = null; // 重置子类别
+      _selectedSubCategory = null;
       _subCategories = kGroceryCategories[newValue] ?? [];
     });
   }
@@ -108,7 +98,6 @@ class _ModifyProductPageState extends State<ModifyProductPage> {
       _selectedSubCategory = newValue;
     });
   }
-  // ---
 
   void _onTagChanged(String key, bool value) {
     setState(() {
@@ -165,12 +154,12 @@ class _ModifyProductPageState extends State<ModifyProductPage> {
     }
   }
 
+  // ( _onUpdateProduct 逻辑不变, 它已经正确使用了 _productType )
   Future<void> _onUpdateProduct() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    // --- (新增) 类别验证 ---
     String finalCategory;
     String finalSubCategory;
 
@@ -190,7 +179,6 @@ class _ModifyProductPageState extends State<ModifyProductPage> {
       finalCategory = _selectedCategory!;
       finalSubCategory = _selectedSubCategory!;
     }
-    // ---
 
     setState(() => _isLoading = true);
 
@@ -205,10 +193,8 @@ class _ModifyProductPageState extends State<ModifyProductPage> {
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
         productType: _productType,
-        // --- (新增) 保存类别 ---
         category: finalCategory,
         subCategory: finalSubCategory,
-        // ---
         expiryDate: _expiryDateController.text.trim(),
         originalPrice: double.tryParse(_originalPriceController.text) ?? 0.0,
         discountedPrice:
@@ -279,13 +265,13 @@ class _ModifyProductPageState extends State<ModifyProductPage> {
                   pickedImage: _pickedImage,
                   existingImageUrl: _existingImageUrl,
                   productType: _productType,
-                  onTypeChanged: _onTypeChanged,
-                  // --- (新增) 传递类别 ---
+                  // --- ( ✨ 关键修改 ✨ ) ---
+                  onTypeChanged: null, // <-- 传入 null 来禁用它
+                  // --- ( ✨ 结束修改 ✨ ) ---
                   selectedCategory: _selectedCategory,
                   selectedSubCategory: _selectedSubCategory,
                   onCategoryChanged: _onCategoryChanged,
                   onSubCategoryChanged: _onSubCategoryChanged,
-                  // ---
                   initialQuantity: _quantity,
                   isHalal: _isHalal,
                   isVegan: _isVegan,

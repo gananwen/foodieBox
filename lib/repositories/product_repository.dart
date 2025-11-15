@@ -1,17 +1,15 @@
-import 'dart:io'; // 用于图片上传
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import '../models/product.dart'; // 导入你的新模型
+import '../models/product.dart';
 
 class ProductRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // 获取当前供应商的 UID
   String? get _vendorId => _auth.currentUser?.uid;
 
-  // 获取供应商的产品集合引用
   CollectionReference<Product> _getProductsRef() {
     final vendorId = _vendorId;
     if (vendorId == null) {
@@ -28,8 +26,8 @@ class ProductRepository {
         );
   }
 
-  // C - Create (创建产品)
   Future<DocumentReference<Product>> addProduct(Product product) async {
+    // ... (此函数不变) ...
     try {
       return await _getProductsRef().add(product);
     } catch (e) {
@@ -38,15 +36,22 @@ class ProductRepository {
     }
   }
 
+  // --- ( ✨ 关键修改 ✨ ) ---
   // R - Read (读取产品流)
-  Stream<List<Product>> getProductsStream() {
-    return _getProductsRef().snapshots().map((snapshot) {
+  // 我们现在要求传入 'vendorType'
+  Stream<List<Product>> getProductsStream(String vendorType) {
+    // 1. 添加一个新的 .where() 子句来过滤 productType
+    return _getProductsRef()
+        .where('productType', isEqualTo: vendorType)
+        .snapshots()
+        .map((snapshot) {
       return snapshot.docs.map((doc) => doc.data()).toList();
     });
   }
+  // --- ( ✨ 结束修改 ✨ ) ---
 
-  // U - Update (更新产品)
   Future<void> updateProduct(Product product) async {
+    // ... (此函数不变) ...
     if (product.id == null) {
       throw Exception('Product ID is required for updates');
     }
@@ -58,8 +63,8 @@ class ProductRepository {
     }
   }
 
-  // D - Delete (删除产品)
   Future<void> deleteProduct(String productId) async {
+    // ... (此函数不变) ...
     try {
       await _getProductsRef().doc(productId).delete();
     } catch (e) {
@@ -68,11 +73,10 @@ class ProductRepository {
     }
   }
 
-  // --- (附加) Firebase Storage 图片上传 ---
   Future<String> uploadProductImage(File imageFile, String productId) async {
+    // ... (此函数不变) ...
     try {
       final vendorId = _vendorId;
-      // 路径: /products/<vendor_id>/<product_id>.jpg
       final ref = FirebaseStorage.instance
           .ref('products')
           .child(vendorId!)

@@ -1,11 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../util/styles.dart';
-// --- (新增) 导入类别数据 ---
+// --- ( ✨ 新增导入 ✨ ) ---
 import '../../../util/categories.dart';
 
-class ProductForm extends StatefulWidget {
-  // We pass in controllers and initial values to make it reusable
+// 这是一个可重用的表单，用于 'add_product_page' 和 'modify_product_page'
+class ProductForm extends StatelessWidget {
+  // Controllers
   final TextEditingController titleController;
   final TextEditingController descriptionController;
   final TextEditingController expiryDateController;
@@ -15,29 +16,28 @@ class ProductForm extends StatefulWidget {
   // Image
   final File? pickedImage;
   final String existingImageUrl;
+  final VoidCallback onUploadImage;
 
-  // Product Type
-  final String productType; // 'Blindbox' or 'Grocery'
-  final Function(String) onTypeChanged;
-
-  // --- (新增) Category Fields ---
+  // Type & Category
+  final String productType;
+  final ValueChanged<String>? onTypeChanged; // ( ✨ 关键 ✨ ) 可为空
   final String? selectedCategory;
   final String? selectedSubCategory;
-  final Function(String?) onCategoryChanged;
-  final Function(String?) onSubCategoryChanged;
-  // ---
+  final ValueChanged<String?> onCategoryChanged;
+  final ValueChanged<String?> onSubCategoryChanged;
 
-  // Quantity and Tags
+  // Quantity
   final int initialQuantity;
+  final ValueChanged<int> onQuantityChanged;
+
+  // Tags
   final bool isHalal;
   final bool isVegan;
   final bool isNoPork;
-
-  // Callback functions
-  final Function(int) onQuantityChanged;
   final Function(String, bool) onTagChanged;
-  final VoidCallback onUploadImage;
-  final VoidCallback? onExpiryDateTap;
+
+  // Date Picker
+  final VoidCallback onExpiryDateTap;
 
   const ProductForm({
     super.key,
@@ -48,370 +48,332 @@ class ProductForm extends StatefulWidget {
     required this.discountedPriceController,
     this.pickedImage,
     required this.existingImageUrl,
+    required this.onUploadImage,
     required this.productType,
-    required this.onTypeChanged,
-    // --- (新增) ---
-    required this.selectedCategory,
-    required this.selectedSubCategory,
+    required this.onTypeChanged, // ( ✨ 关键 ✨ ) 可为空
+    this.selectedCategory,
+    this.selectedSubCategory,
     required this.onCategoryChanged,
     required this.onSubCategoryChanged,
-    // ---
     required this.initialQuantity,
+    required this.onQuantityChanged,
     required this.isHalal,
     required this.isVegan,
     required this.isNoPork,
-    required this.onQuantityChanged,
     required this.onTagChanged,
-    required this.onUploadImage,
-    this.onExpiryDateTap,
+    required this.onExpiryDateTap,
   });
 
   @override
-  State<ProductForm> createState() => _ProductFormState();
-}
-
-class _ProductFormState extends State<ProductForm> {
-  late int _quantity;
-
-  @override
-  void initState() {
-    super.initState();
-    _quantity = widget.initialQuantity;
-  }
-
-  // --- (不变) Reusable TextField Builder ---
-  Widget _buildTextField(
-    TextEditingController controller,
-    String label, {
-    bool readOnly = false,
-    VoidCallback? onTap,
-    TextInputType inputType = TextInputType.text,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextFormField(
-        controller: controller,
-        readOnly: readOnly,
-        onTap: onTap,
-        keyboardType: inputType,
-        decoration: InputDecoration(
-          labelText: label,
-          fillColor: kCardColor,
-          filled: true,
-          suffixIcon: (controller.text.isNotEmpty && !readOnly)
-              ? IconButton(
-                  icon: const Icon(Icons.close, size: 18),
-                  onPressed: () => controller.clear(),
-                )
-              : (readOnly
-                  ? const Icon(Icons.calendar_today_outlined, size: 20)
-                  : null),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: kTextColor.withOpacity(0.2)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: kTextColor.withOpacity(0.2)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: kPrimaryActionColor, width: 2),
-          ),
-        ),
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return '$label is required';
-          }
-          return null;
-        },
-      ),
-    );
-  }
-
-  // --- (新增) Reusable Dropdown Builder ---
-  Widget _buildDropdownField({
-    required String label,
-    required String? value,
-    required List<String> items,
-    required Function(String?) onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: DropdownButtonFormField<String>(
-        value: value,
-        items: items.map((String item) {
-          return DropdownMenuItem<String>(
-            value: item,
-            child: Text(item, style: const TextStyle(color: kTextColor)),
-          );
-        }).toList(),
-        onChanged: onChanged,
-        decoration: InputDecoration(
-          labelText: label,
-          fillColor: kCardColor,
-          filled: true,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: kTextColor.withOpacity(0.2)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: kTextColor.withOpacity(0.2)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: kPrimaryActionColor, width: 2),
-          ),
-        ),
-        dropdownColor: kCardColor, // 下拉菜单背景色
-        style: const TextStyle(color: kTextColor),
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return '$label is required';
-          }
-          return null;
-        },
-      ),
-    );
-  }
-
-  // --- (不变) Reusable Tag Checkbox Builder ---
-  Widget _buildTagCheckbox(String title, bool value, String key) {
-    return Container(
-      decoration: BoxDecoration(
-        color: kCardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kTextColor.withOpacity(0.2)),
-      ),
-      child: CheckboxListTile(
-        title: Text(title, style: const TextStyle(color: kTextColor)),
-        value: value,
-        onChanged: (bool? newValue) {
-          widget.onTagChanged(key, newValue ?? false);
-        },
-        activeColor: kPrimaryActionColor,
-        checkboxShape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        controlAffinity: ListTileControlAffinity.leading,
-      ),
-    );
-  }
-
-  @override
   Widget build(BuildContext context) {
-    // --- (新增) 动态获取子类别列表 ---
-    final List<String> subCategoryItems = (widget.selectedCategory != null &&
-            kGroceryCategories.containsKey(widget.selectedCategory))
-        ? kGroceryCategories[widget.selectedCategory]!
+    // 根据 productType 获取子类别列表
+    final List<String> subCategories = (selectedCategory != null &&
+            kGroceryCategories.containsKey(selectedCategory))
+        ? kGroceryCategories[selectedCategory]!
         : [];
+
+    // ( ✨ 关键逻辑 ✨ )
+    // 检查类型选择器是否应该被锁定
+    final bool isTypeLocked = (onTypeChanged == null);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // --- 1. Product Type Selector ---
-        const Padding(
-          padding: EdgeInsets.only(left: 12.0, bottom: 4.0),
-          child: Text('Product Type',
-              style: TextStyle(fontSize: 12, color: kTextColor)),
-        ),
-        ProductTypeSelector(
-          initialType: widget.productType,
-          onTypeChanged: widget.onTypeChanged,
-        ),
-        const SizedBox(height: 16),
+        // --- 1. 图片上传 ---
+        _buildImagePicker(
+            context, pickedImage, existingImageUrl, onUploadImage),
+        const SizedBox(height: 24),
 
-        // --- 2. (新增) 动态类别下拉菜单 ---
-        if (widget.productType == 'Grocery') ...[
-          _buildDropdownField(
-            label: 'Category',
-            value: widget.selectedCategory,
-            items: kGroceryCategories.keys.toList(),
-            onChanged: widget.onCategoryChanged,
-          ),
-          // --- (新增) 动态子类别下拉菜单 ---
-          if (widget.selectedCategory != null &&
-              widget.selectedCategory!.isNotEmpty) ...[
-            _buildDropdownField(
-              label: 'Sub-Category',
-              value: widget.selectedSubCategory,
-              items: subCategoryItems,
-              onChanged: widget.onSubCategoryChanged,
+        // --- 2. 产品类型 ---
+        _buildSectionTitle('Product Type'),
+        // ( ✨ 关键逻辑 ✨ )
+        if (isTypeLocked)
+          // A. 如果被锁定, 只显示一个 Chip
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Chip(
+              label: Text(productType),
+              backgroundColor: kPrimaryActionColor.withOpacity(0.1),
+              labelStyle: const TextStyle(
+                  color: kPrimaryActionColor, fontWeight: FontWeight.bold),
+              side: BorderSide.none,
             ),
-          ]
-        ],
+          )
+        else
+          // B. 否则, 显示 SegmentedButton
+          SegmentedButton<String>(
+            segments: const <ButtonSegment<String>>[
+              ButtonSegment<String>(
+                value: 'Blindbox',
+                label: Text('Blindbox'),
+                icon: Icon(Icons.card_giftcard_outlined),
+              ),
+              ButtonSegment<String>(
+                value: 'Grocery',
+                label: Text('Grocery'),
+                icon: Icon(Icons.shopping_cart_outlined),
+              ),
+            ],
+            selected: <String>{productType},
+            onSelectionChanged: (Set<String> newSelection) {
+              onTypeChanged!(newSelection.first); // (我们知道它不为 null)
+            },
+            style: SegmentedButton.styleFrom(
+              backgroundColor: kCardColor,
+              foregroundColor: kTextColor.withOpacity(0.7),
+              selectedForegroundColor: kPrimaryActionColor,
+              selectedBackgroundColor: kPrimaryActionColor.withOpacity(0.1),
+              side: BorderSide(color: Colors.grey.withOpacity(0.5)),
+            ),
+          ),
+        const SizedBox(height: 24),
 
-        // --- 3. (不变) 文本字段 ---
-        _buildTextField(widget.titleController, 'Product Title'),
-        _buildTextField(widget.descriptionController, 'Product Description'),
-        _buildTextField(
-          widget.expiryDateController,
-          'Expired Date',
-          readOnly: true,
-          onTap: widget.onExpiryDateTap,
-        ),
+        // --- 3. 详情表单 ---
+        _buildSectionTitle('Product Details'),
+        _buildTextField(titleController, 'Title', 'e.g., Fresh Apples'),
+        _buildTextField(descriptionController, 'Description',
+            'Tell us about your product...',
+            maxLines: 3),
+        _buildTextField(expiryDateController, 'Expiry Date', 'Select date',
+            readOnly: true, onTap: onExpiryDateTap, icon: Icons.calendar_today),
+
+        // --- 4. 价格 ---
+        _buildSectionTitle('Price (RM)'),
         Row(
           children: [
             Expanded(
               child: _buildTextField(
-                widget.originalPriceController,
-                'Original Price',
-                inputType: const TextInputType.numberWithOptions(decimal: true),
-              ),
+                  originalPriceController, 'Original Price', 'e.g., 12.00',
+                  inputType: TextInputType.number),
             ),
             const SizedBox(width: 16),
             Expanded(
               child: _buildTextField(
-                widget.discountedPriceController,
-                'Discounted Price',
-                inputType: const TextInputType.numberWithOptions(decimal: true),
-              ),
+                  discountedPriceController, 'Discounted Price', 'e.g., 9.90',
+                  inputType: TextInputType.number),
             ),
           ],
         ),
 
-        // --- 4. (不变) Upload Image Button ---
-        GestureDetector(
-          onTap: widget.onUploadImage,
-          child: Container(
-            height: 150,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: kCardColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: kTextColor.withOpacity(0.2)),
-              image: widget.pickedImage != null
-                  ? DecorationImage(
-                      image: FileImage(widget.pickedImage!), fit: BoxFit.cover)
-                  : (widget.existingImageUrl.isNotEmpty
-                      ? DecorationImage(
-                          image: NetworkImage(widget.existingImageUrl),
-                          fit: BoxFit.cover)
-                      : null),
+        // --- 5. 类别 (仅在 'Grocery' 时显示) ---
+        if (productType == 'Grocery') ...[
+          const SizedBox(height: 16),
+          _buildSectionTitle('Category'),
+          _buildDropdown(
+            'Main Category',
+            selectedCategory,
+            kGroceryCategories.keys.toList(),
+            onCategoryChanged,
+          ),
+          if (subCategories.isNotEmpty)
+            _buildDropdown(
+              'Sub-Category',
+              selectedSubCategory,
+              subCategories,
+              onSubCategoryChanged,
             ),
-            child: (widget.pickedImage == null &&
-                    widget.existingImageUrl.isEmpty)
-                ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.cloud_upload_outlined,
-                            color: kTextColor, size: 40),
-                        Text('Upload Product Image',
-                            style: TextStyle(color: kTextColor)),
-                      ],
-                    ),
-                  )
-                : Align(
-                    alignment: Alignment.topRight,
-                    child: Container(
-                      margin: const EdgeInsets.all(8),
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.5),
-                        shape: BoxShape.circle,
-                      ),
-                      child:
-                          const Icon(Icons.edit, color: Colors.white, size: 20),
-                    ),
-                  ),
-          ),
-        ),
-        const SizedBox(height: 20),
+        ],
 
-        // --- 5. (不变) Quantity Counter ---
-        Center(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.remove_circle_outline,
-                    color: kTextColor, size: 30),
-                onPressed: () {
-                  if (_quantity > 1) {
-                    setState(() {
-                      _quantity--;
-                      widget.onQuantityChanged(_quantity);
-                    });
-                  }
-                },
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Text('$_quantity',
-                    style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: kTextColor)),
-              ),
-              IconButton(
-                icon: const Icon(Icons.add_circle_outline,
-                    color: kTextColor, size: 30),
-                onPressed: () {
-                  setState(() {
-                    _quantity++;
-                    widget.onQuantityChanged(_quantity);
-                  });
-                },
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
+        // --- 6. 库存 ---
+        const SizedBox(height: 16),
+        _buildSectionTitle('Stock Quantity'),
+        _buildQuantitySelector(initialQuantity, onQuantityChanged),
 
-        // --- 6. (不变) Dietary Tags ---
-        const Padding(
-          padding: EdgeInsets.only(left: 12.0, bottom: 4.0),
-          child: Text('Dietary Tags',
-              style: TextStyle(fontSize: 12, color: kTextColor)),
+        // --- 7. 标签 ---
+        const SizedBox(height: 16),
+        _buildSectionTitle('Tags (Optional)'),
+        Wrap(
+          spacing: 8.0,
+          children: [
+            _buildTagChip(
+                'Halal', isHalal, (val) => onTagChanged('halal', val)),
+            _buildTagChip(
+                'Vegan', isVegan, (val) => onTagChanged('vegan', val)),
+            _buildTagChip(
+                'No Pork', isNoPork, (val) => onTagChanged('noPork', val)),
+          ],
         ),
-        _buildTagCheckbox('Halal', widget.isHalal, 'halal'),
-        const SizedBox(height: 8),
-        _buildTagCheckbox('Vegan', widget.isVegan, 'vegan'),
-        const SizedBox(height: 8),
-        _buildTagCheckbox('No Pork', widget.isNoPork, 'noPork'),
       ],
     );
   }
-}
 
-// --- (不变) ProductTypeSelector Widget ---
-class ProductTypeSelector extends StatelessWidget {
-  final String initialType;
-  final Function(String) onTypeChanged;
+  // --- 辅助 Widgets ---
 
-  const ProductTypeSelector({
-    super.key,
-    required this.initialType,
-    required this.onTypeChanged,
-  });
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Text(
+        title,
+        style: const TextStyle(
+            fontSize: 16, color: kTextColor, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return SegmentedButton<String>(
-      segments: const <ButtonSegment<String>>[
-        ButtonSegment<String>(
-          value: 'Blindbox',
-          label: Text('Blindbox'),
-          icon: Icon(Icons.card_giftcard),
+  Widget _buildImagePicker(BuildContext context, File? pickedImage,
+      String existingImageUrl, VoidCallback onUploadImage) {
+    ImageProvider? image;
+    if (pickedImage != null) {
+      image = FileImage(pickedImage);
+    } else if (existingImageUrl.isNotEmpty) {
+      image = NetworkImage(existingImageUrl);
+    }
+
+    return GestureDetector(
+      onTap: onUploadImage,
+      child: Container(
+        height: 180,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: kCardColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kTextColor.withAlpha(51), width: 1.5),
+          image: image != null
+              ? DecorationImage(image: image, fit: BoxFit.cover)
+              : null,
         ),
-        ButtonSegment<String>(
-          value: 'Grocery',
-          label: Text('Grocery'),
-          icon: Icon(Icons.shopping_cart),
+        child: image == null
+            ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.cloud_upload_outlined,
+                        size: 40, color: kTextColor),
+                    SizedBox(height: 8),
+                    Text('Upload Product Image',
+                        style: TextStyle(color: kTextColor)),
+                  ],
+                ),
+              )
+            : Align(
+                alignment: Alignment.bottomRight,
+                child: Container(
+                  margin: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: kTextColor.withOpacity(0.7),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.edit, color: kCardColor, size: 18),
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(
+      TextEditingController controller, String label, String hint,
+      {int maxLines = 1,
+      TextInputType? inputType,
+      bool readOnly = false,
+      VoidCallback? onTap,
+      IconData? icon}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: TextFormField(
+        controller: controller,
+        maxLines: maxLines,
+        keyboardType: inputType,
+        readOnly: readOnly,
+        onTap: onTap,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          fillColor: kCardColor,
+          filled: true,
+          suffixIcon:
+              icon != null ? Icon(icon, color: kPrimaryActionColor) : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: kTextColor.withAlpha(51)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: kTextColor.withAlpha(51)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: kPrimaryActionColor, width: 2),
+          ),
+        ),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return '$label is required';
+          }
+          if (label.contains('Price') && double.tryParse(value) == null) {
+            return 'Must be a valid number';
+          }
+          return null;
+        },
+      ),
+    );
+  }
+
+  Widget _buildDropdown(String label, String? value, List<String> items,
+      ValueChanged<String?> onChanged) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: DropdownButtonFormField<String>(
+        value: value,
+        hint: Text(label),
+        decoration: InputDecoration(
+          fillColor: kCardColor,
+          filled: true,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: kTextColor.withAlpha(51)),
+          ),
+        ),
+        items: items.map((String item) {
+          return DropdownMenuItem<String>(
+            value: item,
+            child: Text(item),
+          );
+        }).toList(),
+        onChanged: onChanged,
+        validator: (value) => value == null ? '$label is required' : null,
+      ),
+    );
+  }
+
+  Widget _buildQuantitySelector(int quantity, ValueChanged<int> onChanged) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.remove_circle_outline),
+          onPressed: () {
+            if (quantity > 1) onChanged(quantity - 1);
+          },
+        ),
+        Text(
+          quantity.toString(),
+          style: const TextStyle(
+              fontSize: 20, fontWeight: FontWeight.bold, color: kTextColor),
+        ),
+        IconButton(
+          icon:
+              const Icon(Icons.add_circle_outline, color: kPrimaryActionColor),
+          onPressed: () {
+            onChanged(quantity + 1);
+          },
         ),
       ],
-      selected: <String>{initialType},
-      onSelectionChanged: (Set<String> newSelection) {
-        onTypeChanged(newSelection.first);
-      },
-      style: SegmentedButton.styleFrom(
-        backgroundColor: kCardColor,
-        foregroundColor: kTextColor.withOpacity(0.7),
-        selectedForegroundColor: kPrimaryActionColor,
-        selectedBackgroundColor: kPrimaryActionColor.withOpacity(0.1),
-        side: BorderSide(color: kTextColor.withOpacity(0.2)),
-      ),
+    );
+  }
+
+  Widget _buildTagChip(
+      String label, bool isSelected, ValueChanged<bool> onSelected) {
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: onSelected,
+      backgroundColor: kCardColor,
+      selectedColor: kCategoryColor,
+      labelStyle:
+          TextStyle(color: isSelected ? kTextColor : kTextColor.withAlpha(179)),
+      checkmarkColor: kTextColor,
+      side: BorderSide(color: kTextColor.withAlpha(51)),
     );
   }
 }
