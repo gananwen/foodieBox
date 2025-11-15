@@ -6,12 +6,17 @@ import 'order_item.model.dart';
 class OrderModel {
   final String id;
   final String userId;
+  final String address;
+  final double lat;
+  final double lng;
   final String paymentMethod;
   final double subtotal;
   final double total;
   final String status;
+  final String status;
   final List<OrderItem> items;
   final Timestamp timestamp;
+  final String? driverId;
   final String? driverId;
   final String? contactName;
   final String? contactPhone;
@@ -38,6 +43,7 @@ class OrderModel {
   final Timestamp? reviewTimestamp;
 
   // (取货字段)
+  // (取货字段)
   final String? pickupId;
   final String? pickupDay; // "Today" or "Tomorrow"
   final String? pickupTime; // "12:00 PM – 1:00 PM"
@@ -49,12 +55,16 @@ class OrderModel {
   OrderModel({
     required this.id,
     required this.userId,
+    required this.address,
+    required this.lat,
+    required this.lng,
     required this.paymentMethod,
     required this.subtotal,
     required this.total,
     required this.status,
     required this.items,
     required this.timestamp,
+    this.driverId,
     this.driverId,
     this.contactName,
     this.contactPhone,
@@ -87,12 +97,16 @@ class OrderModel {
     return OrderModel(
       id: documentId,
       userId: map['userId'] ?? '',
+      address: map['address'] ?? '',
+      lat: (map['lat'] as num?)?.toDouble() ?? 0.0,
+      lng: (map['lng'] as num?)?.toDouble() ?? 0.0,
       paymentMethod: map['paymentMethod'] ?? '',
       subtotal: (map['subtotal'] as num?)?.toDouble() ?? 0.0,
       total: (map['total'] as num?)?.toDouble() ?? 0.0,
       status: map['status'] ?? 'received',
       items: parsedItems,
       timestamp: map['timestamp'] ?? Timestamp.now(),
+      driverId: map['driverId'],
       driverId: map['driverId'],
       contactName: map['contactName'],
       contactPhone: map['contactPhone'],
