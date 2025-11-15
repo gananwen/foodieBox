@@ -1,0 +1,1 @@
+enum CheckoutType { delivery, pickup }

@@ -43,7 +43,7 @@ flutter {
 
 dependencies {
     // Firebase SDKs
-    implementation("com.google.firebase:firebase-auth:22.3.0")
+    implementation("com.google.firebase:firebase-auth:23.2.1")
     implementation("com.google.firebase:firebase-firestore:24.10.0")
     implementation("com.google.firebase:firebase-storage:20.3.0")
 

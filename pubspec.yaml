@@ -14,6 +14,8 @@ dependencies:
   intl: ^0.20.2
   image_picker: ^1.2.0
   table_calendar: ^3.0.8
+  url_launcher: ^6.3.0
+  
 
   # --- UI & Core Utility ---
   cupertino_icons: ^1.0.8
@@ -44,6 +46,7 @@ dependencies:
   google_place: ^0.4.7
   confetti: ^0.8.0
   flutter_rating_bar: ^4.0.1
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

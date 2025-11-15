@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../util/styles.dart';
 import 'notifications_page.dart';
 import '../auth/admin_login.dart';
 import 'vendor_management_page.dart';
-import 'orders_page.dart';
 import 'promotions_page.dart';
 import 'rating_page.dart';
-import 'dispute_page.dart';
-import 'payment_page.dart';
 import 'report_page.dart';
 import 'subscription_page.dart';
 import 'profile_page.dart';
@@ -28,7 +26,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kAppBackgroundColor,
-      drawer: const _AdminDrawer(), // 👈 Drawer Added Here
+      drawer: const _AdminDrawer(),
       appBar: AppBar(
         backgroundColor: kCardColor,
         elevation: 1,
@@ -80,219 +78,320 @@ class _AdminHomePageState extends State<AdminHomePage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- Stats Cards ---
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.3,
-              children: const [
-                _StatCard(title: "Total Vendors", value: "22", change: "+10%"),
-                _StatCard(title: "Orders Today", value: "9", change: "+5%"),
-                _StatCard(
-                    title: "Active Deliveries", value: "4", change: "-2%"),
-                _StatCard(
-                    title: "Complaints/Disputes", value: "2", change: "-1%"),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final screenWidth = constraints.maxWidth;
+          final crossAxisCount = screenWidth > 1000
+              ? 4
+              : screenWidth > 700
+                  ? 3
+                  : 2; // Responsive grid columns
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // --- Stats Cards ---
+                GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: crossAxisCount,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1.3,
+                  children: const [
+                    _StatCard(
+                        title: "Total Vendors", value: "22", change: "+10%"),
+                    _StatCard(title: "Orders Today", value: "9", change: "+5%"),
+                    _StatCard(
+                        title: "Active Deliveries", value: "4", change: "-2%"),
+                    _StatCard(
+                        title: "Complaints/Disputes",
+                        value: "2",
+                        change: "-1%"),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // --- Charts ---
+                const _SectionTitle(title: "Weekly Sales"),
+                SizedBox(
+                  height: 200,
+                  width: double.infinity,
+                  child: const _WeeklySalesChart(),
+                ),
+                const SizedBox(height: 20),
+
+                const _SectionTitle(title: "Order Status"),
+                SizedBox(
+                  height: 200,
+                  width: double.infinity,
+                  child: const _OrderStatusPieChart(),
+                ),
+                const SizedBox(height: 20),
+
+                const _SectionTitle(title: "Vendor Performance"),
+                SizedBox(
+                  height: 200,
+                  width: double.infinity,
+                  child: const _VendorPerformanceBarChart(),
+                ),
               ],
             ),
-            const SizedBox(height: 20),
-
-            // --- Charts ---
-            const _SectionTitle(title: "Weekly Sales"),
-            const _WeeklySalesChart(),
-
-            const SizedBox(height: 20),
-            const _SectionTitle(title: "Order Status"),
-            const _OrderStatusPieChart(),
-
-            const SizedBox(height: 20),
-            const _SectionTitle(title: "Vendor Performance"),
-            const _VendorPerformanceBarChart(),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 }
 
+// ================== Drawer ==================
 class _AdminDrawer extends StatelessWidget {
   const _AdminDrawer();
 
   @override
   Widget build(BuildContext context) {
     return Drawer(
-      backgroundColor: kCardColor,
-      child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Text("Menu",
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: kTextColor)),
-            const SizedBox(height: 16),
-
-            // --- Main Menu Items ---
-            _DrawerItem(
-                icon: Icons.dashboard_outlined,
-                title: "Dashboard",
-                onTap: () => Navigator.pop(context)),
-            _DrawerItem(
-              icon: Icons.people_alt_outlined,
-              title: "Vendor Management & customer support",
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const VendorManagementPage()),
-                );
-              },
+      backgroundColor: const Color.fromARGB(255, 196, 195, 195),
+      surfaceTintColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topRight: Radius.circular(20),
+          bottomRight: Radius.circular(20),
+        ),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color.fromARGB(255, 243, 241, 241),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black26.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(3, 0),
             ),
-            _DrawerItem(
-              icon: Icons.local_shipping_outlined,
-              title: "Orders & Deliveries",
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const OrdersPage()),
-                );
-              },
-            ),
-            _DrawerItem(
-                icon: Icons.campaign_outlined,
-                title: "Promotions & Ads",
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const PromotionsPage()),
-                  );
-                }),
-            _DrawerItem(
-                icon: Icons.reviews_outlined,
-                title: "Ratings & Moderation",
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const LowRatingsPanel()),
-                  );
-                }),
-            _DrawerItem(
-                icon: Icons.account_balance_wallet_outlined,
-                title: "Payment management",
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const PaymentPage()),
-                  );
-                }),
-            _DrawerItem(
-                icon: Icons.analytics_outlined,
-                title: "Analytics & Reports",
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ReportPage()),
-                  );
-                }),
-            _DrawerItem(
-                icon: Icons.subscriptions_outlined,
-                title: "Subscription management",
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SubscriptionApp()),
-                  );
-                }),
-
-            const SizedBox(height: 24),
-            const Divider(),
-            const Text("Others",
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: kTextColor)),
-            const SizedBox(height: 12),
-
-            // --- Others ---
-            _DrawerItem(
-                icon: Icons.person_outline,
-                title: "Profile",
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ProfilePage()),
-                  );
-                }),
-            _DrawerItem(
-                icon: Icons.settings_outlined,
-                title: "Settings",
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SettingsApp()),
-                  );
-                }),
-
-            // --- Logout with confirmation ---
-            _DrawerItem(
-              icon: Icons.logout_outlined,
-              title: "Logout",
-              onTap: () async {
-                final shouldLogout = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    backgroundColor: kCardColor,
-                    title: const Text("Confirm Logout",
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, color: kTextColor)),
-                    content: const Text(
-                      "Are you sure you want to logout?",
-                      style: TextStyle(color: kTextColor),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text("Cancel",
-                            style: TextStyle(color: Colors.grey)),
+          ],
+          borderRadius: const BorderRadius.only(
+            topRight: Radius.circular(20),
+            bottomRight: Radius.circular(20),
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // --- Drawer Header ---
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 24,
+                        backgroundColor: Colors.blueGrey,
+                        child: Icon(Icons.admin_panel_settings,
+                            color: Colors.white, size: 28),
                       ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: kPrimaryActionColor,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              "Admin Panel",
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1F2937)),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              "FoodieBox",
+                              style: TextStyle(
+                                  fontSize: 13, color: Color(0xFF6B7280)),
+                            ),
+                          ],
                         ),
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text("Logout",
-                            style: TextStyle(color: Colors.white)),
                       ),
                     ],
                   ),
-                );
+                ),
+                const SizedBox(height: 8),
+                const Divider(height: 1, thickness: 0.5, color: Colors.grey),
+                const SizedBox(height: 16),
 
-                if (shouldLogout == true) {
-                  Navigator.pop(context); // close drawer
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AdminLoginPage()),
-                  ); // 👈 go to admin login page
-                }
-              },
+                // --- Scrollable items ---
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        _drawerSectionTitle("Main"),
+                        _DrawerItem(
+                          icon: Icons.dashboard_outlined,
+                          title: "Dashboard",
+                          onTap: () => Navigator.pop(context),
+                        ),
+                        _DrawerItem(
+                          icon: Icons.people_alt_outlined,
+                          title: "Vendor Management",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const VendorManagementPage()),
+                            );
+                          },
+                        ),
+                        _DrawerItem(
+                          icon: Icons.campaign_outlined,
+                          title: "Promotions & Vouchers",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const PromotionsAdminPage()),
+                            );
+                          },
+                        ),
+                        _DrawerItem(
+                          icon: Icons.reviews_outlined,
+                          title: "Ratings & Moderation",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const LowRatingsPanel()),
+                            );
+                          },
+                        ),
+                        _DrawerItem(
+                          icon: Icons.analytics_outlined,
+                          title: "Analytics & Reports",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const ReportPage()),
+                            );
+                          },
+                        ),
+                        _DrawerItem(
+                          icon: Icons.subscriptions_outlined,
+                          title: "Subscription Management",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const SubscriptionApp()),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _drawerSectionTitle("Others"),
+                        _DrawerItem(
+                          icon: Icons.person_outline,
+                          title: "Profile",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const ProfilePage()),
+                            );
+                          },
+                        ),
+                        _DrawerItem(
+                          icon: Icons.settings_outlined,
+                          title: "Settings",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const SettingsApp()),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        const Divider(height: 1, thickness: 0.5),
+                        const SizedBox(height: 8),
+                        _DrawerItem(
+                          icon: Icons.logout_outlined,
+                          title: "Logout",
+                          onTap: () async {
+                            final shouldLogout = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                backgroundColor: Colors.white,
+                                surfaceTintColor: Colors.transparent,
+                                title: const Text("Confirm Logout",
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1F2937))),
+                                content: const Text(
+                                  "Are you sure you want to logout?",
+                                  style: TextStyle(color: Color(0xFF4B5563)),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child: const Text("Cancel",
+                                        style: TextStyle(color: Colors.grey)),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Color(0xFF3B82F6),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(8)),
+                                    ),
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
+                                    child: const Text("Logout",
+                                        style: TextStyle(color: Colors.white)),
+                                  ),
+                                ],
+                              ),
+                            );
+
+                            if (shouldLogout == true) {
+                              Navigator.pop(context);
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const AdminLoginPage()),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _drawerSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 8, bottom: 6, top: 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF6B7280)),
       ),
     );
   }
 }
 
+// Drawer Item widget
 class _DrawerItem extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -307,19 +406,30 @@ class _DrawerItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 5),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: Colors.white,
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: ListTile(
-        leading: Icon(icon, color: kTextColor),
-        title: Text(title,
-            style: const TextStyle(fontSize: 14, color: kTextColor)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        leading: Icon(icon, color: const Color(0xFF374151), size: 22),
+        title: Text(
+          title,
+          style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF1F2937)),
+        ),
         onTap: onTap,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        tileColor: Colors.white,
+        hoverColor: Colors.grey.shade100,
       ),
     );
   }
 }
 
-// --- Stat cards, charts, and decorations remain same as before ---
+// ================== Stats & Charts ==================
 class _StatCard extends StatelessWidget {
   final String title;
   final String value;
@@ -396,7 +506,6 @@ class _WeeklySalesChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 180,
       decoration: _chartBoxDecoration(),
       padding: const EdgeInsets.all(12),
       child: LineChart(
@@ -460,7 +569,6 @@ class _OrderStatusPieChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 180,
       decoration: _chartBoxDecoration(),
       padding: const EdgeInsets.all(12),
       child: PieChart(
@@ -469,23 +577,20 @@ class _OrderStatusPieChart extends StatelessWidget {
           centerSpaceRadius: 40,
           sections: [
             PieChartSectionData(
-              color: kPrimaryActionColor,
-              value: 45,
-              title: 'Completed',
-              titleStyle: const TextStyle(fontSize: 10, color: kTextColor),
-            ),
+                color: kPrimaryActionColor,
+                value: 45,
+                title: 'Completed',
+                titleStyle: const TextStyle(fontSize: 10, color: kTextColor)),
             PieChartSectionData(
-              color: kCategoryColor,
-              value: 35,
-              title: 'Pending',
-              titleStyle: const TextStyle(fontSize: 10, color: kTextColor),
-            ),
+                color: kCategoryColor,
+                value: 35,
+                title: 'Pending',
+                titleStyle: const TextStyle(fontSize: 10, color: kTextColor)),
             PieChartSectionData(
-              color: Colors.amberAccent,
-              value: 20,
-              title: 'Cancelled',
-              titleStyle: const TextStyle(fontSize: 10, color: kTextColor),
-            ),
+                color: Colors.amberAccent,
+                value: 20,
+                title: 'Cancelled',
+                titleStyle: const TextStyle(fontSize: 10, color: kTextColor)),
           ],
         ),
       ),
@@ -499,7 +604,6 @@ class _VendorPerformanceBarChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 180,
       decoration: _chartBoxDecoration(),
       padding: const EdgeInsets.all(12),
       child: BarChart(
@@ -555,7 +659,9 @@ BoxDecoration _chartBoxDecoration() {
   );
 }
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(MaterialApp(
     debugShowCheckedModeBanner: false,
     home: const AdminHomePage(),

@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+// --- NEW: Import the new VoucherModel ---
+import 'package:foodiebox/models/voucher_model.dart'; 
 import 'package:foodiebox/screens/users/order_confirmation_page.dart';
 import 'package:foodiebox/screens/users/order_failure_page.dart';
 import 'package:provider/provider.dart';
 import 'package:foodiebox/providers/cart_provider.dart';
-import '../users/subpages/delivery_address_page.dart';
+import 'package:foodiebox/screens/users/subpages/delivery_address_page.dart';
 import 'package:foodiebox/util/styles.dart';
 
 class CheckoutPage extends StatefulWidget {
@@ -24,64 +26,87 @@ class CheckoutPage extends StatefulWidget {
 }
 
 class _CheckoutPageState extends State<CheckoutPage> {
+  final List<Map<String, dynamic>> _deliveryOptions = [
+    {'label': 'Express', 'time': '20 min', 'price': 4.99},
+    {'label': 'Standard', 'time': '40 min', 'price': 2.99},
+    {'label': 'Saver', 'time': '60 min', 'price': 0.99},
+  ];
   String selectedDelivery = 'Standard';
+
   bool agreedToTerms = true;
   String selectedPayment = 'Credit/Debit Card';
 
-  // --- MODIFIED: Address State ---
-  // We will store the selected address details here
-  // They are nullable because no address is selected initially
   String? _selectedAddressString;
   LatLng? _selectedAddressLatLng;
   String? _selectedContactName;
   String? _selectedContactPhone;
   String? _selectedAddressLabel;
 
-  // We need the current user to fetch addresses
   User? _user;
-  // --- END MODIFICATION ---
 
   late double subtotal;
   double discount = 0.0;
-  double deliveryFee = 5.00;
-  double deliveryDiscount = 3.00;
-  String promoCode = '';
-  String promoLabel = '';
-  String promoError = '';
+  late double deliveryFee;
+  double deliveryDiscount = 0.0; 
+  bool _isLoading = false;
 
-  final List<Map<String, dynamic>> availablePromos = [
-    // ... your promo list remains unchanged ...
-        {
-      'title': '14% Additional Groceries Discount',
-      'code': 'VLZKOW7',
-      'minSpend': 45.00,
-      'discountAmount': 10.00,
-    },
-    {
-      'title': '30% OFF for your first pick up order',
-      'code': 'NEWPICKUP',
-      'minSpend': 25.00,
-      'discountAmount': 7.50,
-    },
-    {
-      'title': 'Enjoy RM10 off with RM 25 min. food delivery order',
-      'code': 'SYOK10',
-      'minSpend': 25.00,
-      'discountAmount': 10.00,
-    },
-  ];
+  // --- Voucher State ---
+  String voucherCode = '';
+  String voucherLabel = '';
+  String voucherError = '';
+  VoucherModel? selectedVoucher; 
+  List<VoucherModel> availableVouchers = []; 
+  bool _isLoadingVouchers = true;
+  // --- END Voucher State ---
 
   @override
   void initState() {
     super.initState();
     subtotal = widget.subtotal;
-    // --- NEW: Get user and load their default address ---
     _user = FirebaseAuth.instance.currentUser;
+
+    deliveryFee = _deliveryOptions
+        .firstWhere((opt) => opt['label'] == selectedDelivery)['price'];
+
     _loadDefaultAddress();
-    // --- END NEW ---
+    _fetchVouchers(); 
   }
 
-  // --- NEW METHOD: Load the user's most recent address ---
+  // --- Fetch vouchers from Firebase ---
+  Future<void> _fetchVouchers() async {
+    if (_user == null) {
+      setState(() => _isLoadingVouchers = false);
+      return;
+    }
+    try {
+      final now = DateTime.now();
+      final snapshot = await FirebaseFirestore.instance
+          .collection('vouchers')
+          .where('type', whereIn: ['delivery', 'all'])
+          .where('endDate', isGreaterThanOrEqualTo: now)
+          .get();
+
+      final vouchers = snapshot.docs
+          .map((doc) => VoucherModel.fromMap(doc.data(), doc.id))
+          .where((voucher) => voucher.startDate.isBefore(now) && 
+                           voucher.claimedRedemptions < voucher.totalRedemptions)
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          availableVouchers = vouchers;
+          _isLoadingVouchers = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingVouchers = false);
+      }
+      print("Error fetching vouchers: $e");
+    }
+  }
+  // --- END Fetch vouchers ---
+
   Future<void> _loadDefaultAddress() async {
     if (_user == null) return;
 
@@ -90,22 +115,19 @@ class _CheckoutPageState extends State<CheckoutPage> {
           .collection('users')
           .doc(_user!.uid)
           .collection('addresses')
-          .orderBy('timestamp', descending: true) // Get the latest one
+          .orderBy('timestamp', descending: true)
           .limit(1)
           .get();
 
       if (snapshot.docs.isNotEmpty) {
         final defaultAddress = snapshot.docs.first.data();
-        // Use our new helper to set the state
         _updateSelectedAddress(defaultAddress);
       }
     } catch (e) {
-      // Handle error, e.g., show a snackbar
       print("Error loading default address: $e");
     }
   }
 
-  // --- NEW HELPER METHOD: Update state with selected address ---
   void _updateSelectedAddress(Map<String, dynamic> addressData) {
     setState(() {
       _selectedAddressString = addressData['address'];
@@ -119,22 +141,17 @@ class _CheckoutPageState extends State<CheckoutPage> {
     });
   }
 
-  // --- NEW METHOD: Navigate to address selection page ---
   Future<void> _selectAddress() async {
-    // Navigate to the DeliveryAddressPage
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const DeliveryAddressPage()),
     );
 
-    // This page will pop back with the selected address data
     if (result != null && result is Map<String, dynamic>) {
-      // Update the checkout page's state with the selected address
       _updateSelectedAddress(result);
     }
   }
 
-  // --- (buildOrderSummary, _loadLastPromo, _selectPaymentMethod, _showPromoSelector, buildDeliveryOption methods remain unchanged) ---
   Widget buildOrderSummary() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -147,17 +164,33 @@ class _CheckoutPageState extends State<CheckoutPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Subtotal: RM${subtotal.toStringAsFixed(2)}'),
-          Text('Total discount: -RM${discount.toStringAsFixed(2)}'),
           Text('Delivery fee: RM${deliveryFee.toStringAsFixed(2)}'),
-          Text(
-            'Delivery fee discount: -RM${deliveryDiscount.toStringAsFixed(2)}',
-          ),
-          if (promoCode.isNotEmpty)
-            Text(
-              discount > 0
-                  ? "Promo Applied: $promoLabel"
-                  : "Promo '$promoCode' cannot be used (min RM${_getPromoMinSpend(promoCode).toStringAsFixed(2)})",
-              style: TextStyle(color: discount > 0 ? Colors.green : Colors.red),
+          
+          if (discount > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                'Voucher (${selectedVoucher?.code ?? ''}): -RM${discount.toStringAsFixed(2)}',
+                style: const TextStyle(color: Colors.green),
+              ),
+            ),
+          
+          if (deliveryDiscount > 0) 
+             Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                'Delivery fee discount: -RM${deliveryDiscount.toStringAsFixed(2)}',
+                style: const TextStyle(color: Colors.green),
+              ),
+            ),
+
+          if (voucherError.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                voucherError,
+                style: const TextStyle(color: Colors.red),
+              ),
             ),
           const Divider(),
           Text(
@@ -173,48 +206,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
     return subtotal - discount + deliveryFee - deliveryDiscount;
   }
 
-  double _getPromoMinSpend(String code) {
-    final promo = availablePromos.firstWhere(
-      (p) => p['code'] == code,
-      orElse: () => {},
-    );
-    return promo['minSpend'] ?? 0.0;
-  }
-
-  // --- _loadLastPromo ---
-  Future<void> _loadLastPromo() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-    final data = doc.data();
-    if (data != null && data['lastPromo'] != null) {
-      final promo = data['lastPromo'];
-      final code = promo['code'];
-      final label = promo['label'];
-      final savedDiscount = promo['discount'];
-
-      final promoDetails = availablePromos.firstWhere(
-        (p) => p['code'] == code,
-        orElse: () => {},
-      );
-      final meetsMinSpend = subtotal >= (promoDetails['minSpend'] ?? 0.0);
-
-      setState(() {
-        promoCode = code;
-        promoLabel = label;
-        discount = meetsMinSpend ? savedDiscount : 0.0;
-        promoError = meetsMinSpend
-            ? ''
-            : 'Promo requires RM${promoDetails['minSpend']} minimum spend';
-      });
+  double _getVoucherMinSpend(String code) {
+    try {
+      final voucher = availableVouchers.firstWhere((v) => v.code == code);
+      return voucher.minSpend;
+    } catch (e) {
+      return 0.0;
     }
   }
 
-  // --- _selectPaymentMethod ---
   void _selectPaymentMethod() {
     showModalBottomSheet(
       context: context,
@@ -255,14 +255,24 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  // --- _showPromoSelector ---
-  void _showPromoSelector() {
+  // --- Show Voucher Selector Modal ---
+  void _showVoucherSelector() {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
+        if (_isLoadingVouchers) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (availableVouchers.isEmpty) {
+          return const Center(child: Padding(
+            padding: EdgeInsets.all(20.0),
+            child: Text("No vouchers available right now."),
+          ));
+        }
+
         return Container(
           color: Colors.white,
           padding: const EdgeInsets.all(16),
@@ -270,146 +280,120 @@ class _CheckoutPageState extends State<CheckoutPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Choose a Promo Code',
+                'Choose a Voucher Code', 
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
               Expanded(
                 child: ListView.separated(
-                  itemCount: availablePromos.length,
+                  itemCount: availableVouchers.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
-                    final promo = availablePromos[index];
-                    final meetsMinSpend = subtotal >= promo['minSpend'];
-                    final isSelected = promoCode == promo['code'];
+                    final voucher = availableVouchers[index];
+                    final meetsMinSpend = subtotal >= voucher.minSpend;
+                    final isSelected = voucherCode == voucher.code;
 
                     return GestureDetector(
                       onTap: () {
                         setState(() {
-                          promoCode = promo['code'];
-                          promoLabel = promo['title'];
                           if (meetsMinSpend) {
-                            discount = promo['discountAmount'];
-                            promoError = '';
+                            voucherCode = voucher.code;
+                            voucherLabel = voucher.title;
+                            selectedVoucher = voucher;
+                            discount = voucher.calculateDiscount(subtotal);
+                            voucherError = '';
                           } else {
+                            voucherCode = voucher.code;
+                            voucherLabel = voucher.title;
+                            selectedVoucher = voucher;
                             discount = 0.0;
-                            promoError =
-                                'Promo requires RM${promo['minSpend']} minimum spend';
+                            voucherError =
+                                'Voucher requires RM${voucher.minSpend.toStringAsFixed(2)} minimum spend';
                           }
                         });
                         Navigator.pop(context);
                       },
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween<double>(
-                          begin: 1.0,
-                          end: isSelected ? 1.03 : 1.0,
-                        ),
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                        builder: (context, scale, child) {
-                          return Transform.scale(
-                            scale: scale,
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                gradient: isSelected
-                                    ? LinearGradient(
-                                        colors: [
-                                          Colors.amber.shade100,
-                                          Colors.white,
-                                        ],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      )
-                                    : null,
-                                color: isSelected ? null : Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? Colors.amber
-                                      : Colors.grey.shade300,
-                                  width: 1.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: isSelected
-                                        ? Colors.amber.withOpacity(0.4)
-                                        : Colors.grey.shade100,
-                                    blurRadius: isSelected ? 12 : 6,
-                                    spreadRadius: isSelected ? 2 : 1,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          promo['title'],
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                      Tooltip(
-                                        message:
-                                            'Min spend RM${promo['minSpend']}\nCode: ${promo['code']}',
-                                        child: const Icon(
-                                          Icons.info_outline,
-                                          size: 18,
-                                          color: Colors.grey,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Text(
-                                            'Code: ${promo['code']}',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey.shade700,
-                                            ),
-                                          ),
-                                          if (meetsMinSpend)
-                                            const Padding(
-                                              padding: EdgeInsets.only(left: 6),
-                                              child: Icon(
-                                                Icons.local_offer,
-                                                color: Colors.green,
-                                                size: 18,
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                      Text(
-                                        meetsMinSpend
-                                            ? 'Eligible'
-                                            : 'Min RM${promo['minSpend']}',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: meetsMinSpend
-                                              ? Colors.green
-                                              : Colors.red,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.amber.shade100 : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected
+                                ? Colors.amber
+                                : Colors.grey.shade300,
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.shade100,
+                              blurRadius: 6,
+                              spreadRadius: 1,
+                              offset: const Offset(0, 2),
                             ),
-                          );
-                        },
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    voucher.title, 
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Tooltip(
+                                  message: 'Expires: ${voucher.endDate.toLocal().toString().split(' ')[0]}\n'
+                                           'Min. Spend: RM${voucher.minSpend.toStringAsFixed(2)}\n'
+                                           'Type: ${voucher.type}',
+                                  child: const Icon(
+                                    Icons.info_outline,
+                                    size: 18,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.label, color: Colors.green.shade700, size: 16),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Code: ${voucher.code}', 
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  meetsMinSpend
+                                      ? 'Eligible'
+                                      : 'Min RM${voucher.minSpend.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: meetsMinSpend
+                                        ? Colors.green
+                                        : Colors.red,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -422,11 +406,20 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  // --- buildDeliveryOption ---
-  Widget buildDeliveryOption(String label, String time, double price) {
+  Widget _buildDeliveryOptionWidget(Map<String, dynamic> option) {
+    final String label = option['label'];
+    final String time = option['time'];
+    final double price = option['price'];
+
     final isSelected = selectedDelivery == label;
+
     return GestureDetector(
-      onTap: () => setState(() => selectedDelivery = label),
+      onTap: () {
+        setState(() {
+          selectedDelivery = label;
+          deliveryFee = price;
+        });
+      },
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 6),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -460,18 +453,16 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  // --- NEW WIDGET: Replaces the old hardcoded address section ---
   Widget _buildAddressSection() {
-    // Case 1: No address has been selected or loaded yet
     if (_selectedAddressString == null) {
       return InkWell(
         onTap: _selectAddress,
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: kYellowLight, // Use your style
+            color: kYellowLight,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: kPrimaryActionColor, width: 1.5), // Use your style
+            border: Border.all(color: kPrimaryActionColor, width: 1.5),
           ),
           child: const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -481,16 +472,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: kTextColor), // Use your style
+                    color: kTextColor),
               ),
-              Icon(Icons.arrow_forward_ios, size: 16, color: kTextColor), // Use your style
+              Icon(Icons.arrow_forward_ios, size: 16, color: kTextColor),
             ],
           ),
         ),
       );
     }
 
-    // Case 2: An address is selected
     IconData iconData = Icons.location_on;
     if (_selectedAddressLabel == 'Home') {
       iconData = Icons.home;
@@ -499,21 +489,20 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
 
     return InkWell(
-      onTap: _selectAddress, // Tap to change address
+      onTap: _selectAddress,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(color: Colors.grey.shade200, blurRadius: 4)
-          ],
-          border: Border.all(color: Colors.grey.shade300)
-        ),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(color: Colors.grey.shade200, blurRadius: 4)
+            ],
+            border: Border.all(color: Colors.grey.shade300)),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(iconData, color: kPrimaryActionColor, size: 28), // Use your style
+            Icon(iconData, color: kPrimaryActionColor, size: 28),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -521,14 +510,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 children: [
                   Text(
                     '$_selectedAddressLabel - $_selectedContactName',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     _selectedAddressString ?? 'No address',
                     style: const TextStyle(fontSize: 14, color: Colors.black54),
                   ),
-                   const SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     _selectedContactPhone ?? 'No phone',
                     style: const TextStyle(fontSize: 14, color: Colors.black54),
@@ -536,7 +526,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 ],
               ),
             ),
-            const Icon(Icons.edit_location_alt_outlined, size: 20, color: Colors.grey),
+            const Icon(Icons.edit_location_alt_outlined,
+                size: 20, color: Colors.grey),
           ],
         ),
       ),
@@ -562,25 +553,22 @@ class _CheckoutPageState extends State<CheckoutPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- MODIFIED: Delivery Address ---
             const Text('Delivery Address',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            // Use our new dynamic widget
             _buildAddressSection(),
             const SizedBox(height: 20),
-            // --- END MODIFICATION ---
 
-            // --- Delivery Option ---
             const Text('Delivery Option',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            buildDeliveryOption('Express', '20 min', 4.99),
-            buildDeliveryOption('Standard', '40 min', 2.99),
-            buildDeliveryOption('Saver', '60 min', 0.99),
+
+            ..._deliveryOptions.map((option) {
+              return _buildDeliveryOptionWidget(option);
+            }).toList(),
+
             const SizedBox(height: 20),
 
-            // --- Payment Method ---
             const Text('Payment Method',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
@@ -592,13 +580,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   vertical: 14,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(color: Colors.grey.shade200, blurRadius: 4),
-                  ],
-                   border: Border.all(color: Colors.grey.shade300)
-                ),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(color: Colors.grey.shade200, blurRadius: 4),
+                    ],
+                    border: Border.all(color: Colors.grey.shade300)),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -610,118 +597,74 @@ class _CheckoutPageState extends State<CheckoutPage> {
             ),
             const SizedBox(height: 20),
 
-            // --- Promo Code ---
-            const Text('Promo Code',
+            // --- UPDATED: Voucher Code Section ---
+            const Text('Voucher Code',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            TweenAnimationBuilder<double>(
-              tween: Tween<double>(
-                begin: 1.0,
-                end: promoCode.isEmpty ? 1.05 : 1.0,
+            ElevatedButton.icon(
+              onPressed: _showVoucherSelector, 
+              icon: const Icon(Icons.local_offer, size: 18),
+              label: Text(
+                voucherCode.isEmpty ? 'Select Voucher' : 'Voucher: $voucherCode',
+                style: const TextStyle(fontSize: 14),
               ),
-              duration: const Duration(milliseconds: 600),
-              curve: Curves.easeInOut,
-              builder: (context, scale, child) {
-                return Transform.scale(
-                  scale: scale,
-                  child: ElevatedButton.icon(
-                    onPressed: _showPromoSelector,
-                    icon: const Icon(Icons.local_offer, size: 18),
-                    label: Text(
-                      promoCode.isEmpty ? 'Select Promo' : 'Promo: $promoCode',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 14,
-                        horizontal: 16,
-                      ),
-                      backgroundColor: promoCode.isEmpty
-                          ? Colors.white
-                          : Colors.amber.shade100,
-                      foregroundColor: Colors.black,
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        side: BorderSide(
-                          color: promoCode.isEmpty
-                              ? Colors.grey.shade300
-                              : Colors.amber,
-                          width: 1.5,
-                        ),
-                      ),
-                    ),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 14,
+                  horizontal: 16,
+                ),
+                backgroundColor: voucherCode.isEmpty
+                    ? Colors.white
+                    : Colors.amber.shade100,
+                foregroundColor: Colors.black,
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(
+                    color: voucherCode.isEmpty
+                        ? Colors.grey.shade300
+                        : Colors.amber,
+                    width: 1.5,
                   ),
-                );
-              },
-            ),
-            if (promoCode.isNotEmpty && promoError.isEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  'Suggested from last order',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ),
-            if (promoCode.isNotEmpty)
+            ),
+            
+            if (voucherCode.isNotEmpty)
               TextButton.icon(
                 onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Clear Promo'),
-                      content: const Text(
-                        'Are you sure you want to remove the applied promo code?',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              promoCode = '';
-                              promoLabel = '';
-                              discount = 0.0;
-                              promoError = '';
-                            });
-                            Navigator.pop(context);
-                          },
-                          child: const Text(
-                            'Clear',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
+                  // Clear voucher
+                  setState(() {
+                    voucherCode = '';
+                    voucherLabel = '';
+                    selectedVoucher = null;
+                    discount = 0.0;
+                    voucherError = '';
+                  });
                 },
                 icon: const Icon(Icons.close, size: 16, color: Colors.red),
                 label: const Text(
-                  'Clear Promo',
+                  'Clear Voucher',
                   style: TextStyle(color: Colors.red),
                 ),
               ),
-            if (promoError.isNotEmpty)
+            if (voucherError.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  promoError,
+                  voucherError,
                   style: const TextStyle(color: Colors.red),
                 ),
               ),
             const SizedBox(height: 20),
+            // --- END UPDATED SECTION ---
 
-            // --- Order Summary ---
             const Text('Order Summary',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            // Use the reusable buildOrderSummary method
             buildOrderSummary(),
             const SizedBox(height: 20),
 
-            // --- Terms and Conditions ---
             Row(
               children: [
                 Checkbox(
@@ -747,23 +690,32 @@ class _CheckoutPageState extends State<CheckoutPage> {
             ),
             const SizedBox(height: 20),
 
-            // --- Place Order Button ---
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: agreedToTerms ? _placeOrder : null,
+                onPressed: agreedToTerms && !_isLoading ? _placeOrder : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimaryActionColor, // Use your style
-                  foregroundColor: kTextColor, // Use your style
+                  backgroundColor: kPrimaryActionColor,
+                  foregroundColor: kTextColor,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'Place Order',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: kTextColor,
+                          strokeWidth: 3,
+                        ),
+                      )
+                    : const Text(
+                        'Place Order',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
               ),
             ),
           ],
@@ -773,14 +725,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Future<void> _placeOrder() async {
-    // --- MODIFIED: Check for address first ---
+    // ... existing checks ...
     if (_selectedAddressString == null || _selectedAddressLatLng == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a delivery address.')),
       );
       return;
     }
-    // --- END MODIFICATION ---
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -790,46 +741,26 @@ class _CheckoutPageState extends State<CheckoutPage> {
       return;
     }
 
-    // ... (Promo validation logic remains unchanged) ...
-    if (promoCode.isNotEmpty && discount == 0.0) {
-      final minSpend = _getPromoMinSpend(promoCode).toStringAsFixed(2);
-
-      final shouldClear = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Promo Not Applicable'),
-          content: Text(
-            'The promo code "$promoCode" requires a minimum spend of RM$minSpend. Please clear the promo to continue with your order.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () =>
-                  Navigator.pop(context, false), // Cancel order attempt
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context, true); // Signal to clear promo
-              },
-              child: const Text(
-                'Clear Promo',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        ),
+    if (widget.items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Your cart is empty.')),
       );
-
-      if (shouldClear == true) {
-        setState(() {
-          promoCode = '';
-          promoLabel = '';
-          promoError = '';
-        });
-        return _placeOrder();
-      }
       return;
     }
+
+    setState(() => _isLoading = true);
+
+    // --- UPDATED: Voucher Validation ---
+    if (voucherCode.isNotEmpty && discount == 0.0) {
+      // This means a voucher is selected but min spend not met
+      final minSpend = _getVoucherMinSpend(voucherCode).toStringAsFixed(2);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Voucher requires RM$minSpend minimum spend.'), backgroundColor: Colors.red),
+      );
+      setState(() => _isLoading = false);
+      return;
+    }
+    // --- END UPDATED ---
 
     final itemsData = widget.items.map((item) {
       return {
@@ -842,57 +773,73 @@ class _CheckoutPageState extends State<CheckoutPage> {
       };
     }).toList();
 
-    // --- MODIFIED: Use dynamic address data in the order ---
+    // --- NEW: Get all unique vendor IDs from the cart ---
+    final allVendorIds = widget.items.map((item) => item.vendorId).toSet().toList();
+    // --- END NEW ---
+
+    String vendorName = 'Unknown Store';
+    String vendorType = 'Grocery';
+    // Get vendor details (we use the first vendor for the main summary fields)
+    try {
+      final firstVendorId = widget.items.first.vendorId;
+      final vendorDoc = await FirebaseFirestore.instance
+          .collection('vendors')
+          .doc(firstVendorId)
+          .get();
+
+      if (vendorDoc.exists) {
+        vendorName = vendorDoc.data()?['storeName'] ?? 'Unknown Store';
+        vendorType = vendorDoc.data()?['vendorType'] ?? 'Grocery';
+      }
+    } catch (e) {
+      print("Error fetching vendor data: $e");
+    }
+
+    // --- FINAL Order data preparation ---
     final orderData = {
       'userId': user.uid,
-      'address': _selectedAddressString, // Use state variable
-      'lat': _selectedAddressLatLng!.latitude, // Use state variable
-      'lng': _selectedAddressLatLng!.longitude, // Use state variable
-      'contactName': _selectedContactName, // Add contact name
-      'contactPhone': _selectedContactPhone, // Add contact phone
+      'orderType': 'Delivery', 
+      'address': _selectedAddressString,
+      'lat': _selectedAddressLatLng!.latitude,
+      'lng': _selectedAddressLatLng!.longitude,
+      'contactName': _selectedContactName,
+      'contactPhone': _selectedContactPhone,
       'deliveryOption': selectedDelivery,
       'paymentMethod': selectedPayment,
       'subtotal': subtotal,
-      'discount': discount,
+      'discount': discount, 
       'deliveryFee': deliveryFee,
       'deliveryDiscount': deliveryDiscount,
       'total': getTotal(),
-      'promoCode': promoCode,
-      'promoLabel': promoLabel,
+      'promoCode': null, 
+      'promoLabel': null, 
+      'voucherCode': voucherCode, 
+      'voucherLabel': voucherLabel, 
+      'vendorIds': allVendorIds, // <-- ADDED
       'status': 'received',
       'items': itemsData,
       'timestamp': FieldValue.serverTimestamp(),
+      'vendorName': vendorName,
+      'vendorType': vendorType,
     };
-    // --- END MODIFICATION ---
+    // --- END FINAL Order data ---
 
     try {
       final docRef =
           await FirebaseFirestore.instance.collection('orders').add(orderData);
       final orderId = docRef.id;
 
-      if (promoCode.isNotEmpty) {
-        // ... (Promo usage update logic remains unchanged) ...
-        final promoRef = FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('promoUsage')
-            .doc(promoCode);
-
-        await promoRef.set({
-          'label': promoLabel,
-          'lastUsed': FieldValue.serverTimestamp(),
-          'count': FieldValue.increment(1),
-        }, SetOptions(merge: true));
-
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'lastPromo': {
-            'code': promoCode,
-            'label': promoLabel,
-            'discount': discount,
-          },
-        }, SetOptions(merge: true));
+      // --- Increment VOUCHER redemption count ---
+      if (selectedVoucher != null) {
+        await FirebaseFirestore.instance
+            .collection('vouchers') 
+            .doc(selectedVoucher!.id)
+            .update({
+          'claimedRedemptions': FieldValue.increment(1),
+        });
       }
-
+      // --- END Increment ---
+      
       if (mounted) {
         context.read<CartProvider>().clearCart();
       }
@@ -906,10 +853,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
           context,
           MaterialPageRoute(
             builder: (context) => OrderConfirmationPage(
-              address: _selectedAddressString!, // Pass the selected address
-              location: _selectedAddressLatLng!, // Pass the selected lat/lng
+              address: _selectedAddressString!,
+              location: _selectedAddressLatLng!,
               total: getTotal(),
-              promoLabel: promoLabel,
+              promoLabel: voucherLabel, 
               orderId: orderId,
             ),
           ),
@@ -925,6 +872,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
           context,
           MaterialPageRoute(builder: (context) => const OrderFailurePage()),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
