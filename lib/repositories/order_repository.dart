@@ -10,6 +10,7 @@ class OrderRepository {
 
   String? get _vendorId => _auth.currentUser?.uid;
 
+  // --- ( 这是你现有的函数 - 保持不变 ) ---
   Stream<List<OrderModel>> getOrdersStream(String orderType) {
     final vendorId = _vendorId;
     if (vendorId == null) {
@@ -20,10 +21,6 @@ class OrderRepository {
         .collection('orders')
         .where('vendorIds', arrayContains: vendorId) // <-- ( ✨ 已修复! ✨ )
         .where('orderType', isEqualTo: orderType) // <-- ( ✨ 正确! ✨ )
-
-        // --- ( ✨ 关键修复 ✨ ) ---
-        // 我们把带空格的 'paid pending pickup'
-        // 改成你新数据里带下划线的 'paid_pending_pickup'
         .where('status', whereIn: [
           'received',
           'Preparing',
@@ -31,8 +28,6 @@ class OrderRepository {
           'Delivering',
           'paid_pending_pickup' // <-- ( ✨ 修复为下划线版本 ✨ )
         ])
-        // --- ( ✨ 结束修复 ✨ ) ---
-
         .orderBy('timestamp', descending: true)
         .snapshots()
         .map((snapshot) {
@@ -46,6 +41,7 @@ class OrderRepository {
         });
   }
 
+  // --- ( 这是你现有的函数 - 保持不变 ) ---
   Future<void> updateOrderStatus(String orderId, String newStatus) async {
     try {
       await _db.collection('orders').doc(orderId).update({'status': newStatus});
@@ -55,6 +51,7 @@ class OrderRepository {
     }
   }
 
+  // --- ( 这是你现有的函数 - 保持不变 ) ---
   Future<void> assignDriverToOrder(String orderId) async {
     try {
       final driversSnapshot = await _db.collection('drivers').get();
@@ -79,6 +76,7 @@ class OrderRepository {
     }
   }
 
+  // --- ( 这是你现有的函数 - 保持不变 ) ---
   Stream<Map<String, dynamic>> getTodaysStatsStream() {
     final vendorId = _vendorId;
     if (vendorId == null) {
@@ -94,15 +92,7 @@ class OrderRepository {
 
     // 3. 计算 UTC+8 时区的 "今天凌晨"
     final startOfTodayInMalaysia = DateTime.utc(
-        nowInMalaysia.year,
-        nowInMalaysia.month,
-        nowInMalaysia.day,
-        0,
-        0,
-        0); // 这创建了 '2025-11-15 00:00:00' (UTC)
-
-    // 4. 将这个 UTC 时间转换回 UTC+8 的 "凌晨"，即减去8小时
-    //    这给了我们 '2025-11-14 16:00:00' (UTC)，这才是 UTC+8 的午夜
+        nowInMalaysia.year, nowInMalaysia.month, nowInMalaysia.day, 0, 0, 0);
     final startOfTodayTimestamp = Timestamp.fromDate(
         startOfTodayInMalaysia.subtract(const Duration(hours: 8)));
     // --- ( ✨ 结束修复 ✨ ) ---
@@ -135,4 +125,32 @@ class OrderRepository {
       };
     });
   }
+
+  // --- ( ✨✨ 1. 这是你需要添加的新函数 ✨✨ ) ---
+  Stream<List<OrderModel>> getHistoryOrdersStream() {
+    final vendorId = _vendorId;
+    if (vendorId == null) {
+      throw Exception('User not logged in');
+    }
+
+    return _db
+        .collection('orders')
+        .where('vendorIds', arrayContains: vendorId)
+        // ( 关键 ) 查询 "Completed" 和 "Cancelled" 状态
+        .where('status', whereIn: ['Completed', 'Cancelled'])
+        // ( 索引 ) 这个查询需要一个新的索引
+        .orderBy('timestamp', descending: true)
+        .limit(50) // (可选：对历史记录进行分页或限制)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs.map((doc) {
+            final Map<String, dynamic>? data = doc.data();
+            if (data == null) {
+              throw Exception('Found order with empty data: ${doc.id}');
+            }
+            return OrderModel.fromMap(data, doc.id);
+          }).toList();
+        });
+  }
+  // --- ( ✨✨ 结束新函数 ✨✨ ) ---
 }

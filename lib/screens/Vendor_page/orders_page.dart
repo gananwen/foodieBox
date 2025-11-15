@@ -5,6 +5,8 @@ import '../../util/styles.dart';
 import 'order_details_page.dart';
 import '../../models/order_model.dart';
 import '../../repositories/order_repository.dart';
+// --- ( ✨ 1. 导入你的新页面 ✨ ) ---
+import 'order_history_page.dart';
 
 class OrdersPage extends StatefulWidget {
   final VoidCallback onBackToDashboard;
@@ -17,7 +19,6 @@ class OrdersPage extends StatefulWidget {
 class _OrdersPageState extends State<OrdersPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  // --- 2. 实例化仓库 ---
   final OrderRepository _repo = OrderRepository();
 
   @override
@@ -32,18 +33,16 @@ class _OrdersPageState extends State<OrdersPage>
     super.dispose();
   }
 
-  // --- (不变) 状态徽章 ---
+  // --- ( 状态徽章 - 保持不变 ) ---
   Widget _buildStatusBadge(String status) {
     Color badgeColor;
     String statusText;
 
     switch (status) {
-      // ( ✨ 新增 Case ✨ )
       case 'paid_pending_pickup':
         badgeColor = Colors.blue[100] ?? Colors.blue;
         statusText = 'Pending Pickup';
         break;
-
       case 'received':
         badgeColor = Colors.blue[100] ?? Colors.blue;
         statusText = 'New Order';
@@ -66,7 +65,6 @@ class _OrdersPageState extends State<OrdersPage>
         break;
       default:
         badgeColor = Colors.grey[300] ?? Colors.grey;
-        // ( ✨ 修复：替换掉下划线 ✨ )
         statusText = status.replaceAll('_', ' ');
     }
 
@@ -87,9 +85,8 @@ class _OrdersPageState extends State<OrdersPage>
     );
   }
 
-  // --- 4. (已修改) 构建订单卡片 ---
+  // --- ( 构建订单卡片 - 保持不变 ) ---
   Widget _buildOrderCard(OrderModel order) {
-    // 格式化时间戳
     final String timeAgo =
         DateFormat('dd MMM, hh:mm a').format(order.timestamp.toDate());
 
@@ -139,10 +136,9 @@ class _OrdersPageState extends State<OrdersPage>
     );
   }
 
-  // --- 6. (已修改) 构建订单列表 ---
+  // --- ( 构建订单列表 - 保持不变 ) ---
   Widget _buildOrderList(String type) {
     return StreamBuilder<List<OrderModel>>(
-      // 7. (已修改) 使用仓库的 Stream
       stream: _repo.getOrdersStream(type),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -150,7 +146,6 @@ class _OrdersPageState extends State<OrdersPage>
               child: CircularProgressIndicator(color: kPrimaryActionColor));
         }
         if (snapshot.hasError) {
-          // ( ✨ 提示 ✨ ) 这里是你的 Firebase 权限错误最先出现的地方
           return Center(
               child: Padding(
             padding: const EdgeInsets.all(16.0),
@@ -167,7 +162,6 @@ class _OrdersPageState extends State<OrdersPage>
           );
         }
 
-        // 我们有数据了
         final activeOrders = snapshot.data!;
 
         return ListView.builder(
@@ -192,8 +186,26 @@ class _OrdersPageState extends State<OrdersPage>
           icon: const Icon(Icons.arrow_back, color: kTextColor),
           onPressed: widget.onBackToDashboard,
         ),
+
+        // --- ( ✨ 2. 在这里添加 actions 属性 ✨ ) ---
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history_outlined, color: kTextColor),
+            tooltip: 'Order History',
+            onPressed: () {
+              // 导航到你即将创建的新页面
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const OrderHistoryPage(),
+                ),
+              );
+            },
+          ),
+        ],
+        // --- ( ✨ 结束修改 ✨ ) ---
+
         bottom: TabBar(
-          // ... (不变)
           controller: _tabController,
           indicatorColor: kTextColor,
           labelColor: kTextColor,
@@ -205,7 +217,6 @@ class _OrdersPageState extends State<OrdersPage>
         ),
       ),
       body: TabBarView(
-        // ... (不变)
         controller: _tabController,
         children: [
           _buildOrderList('Pickup'),
