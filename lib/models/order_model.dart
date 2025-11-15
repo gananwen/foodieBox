@@ -1,6 +1,7 @@
 // 路径: lib/models/order_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'order_item.model.dart'; // 确保这个 import 路径正确
+// ( ✨ 关键 ✨ ) 确保你导入了下面这个 order_item.model.dart 文件
+import 'order_item.model.dart';
 
 class OrderModel {
   final String id;
@@ -21,16 +22,16 @@ class OrderModel {
   final String deliveryOption;
   final double deliveryFee;
   final List<String> vendorIds;
+
+  // (评价字段)
   final double? rating;
   final String? reviewText;
   final Timestamp? reviewTimestamp;
 
-  // --- ( ✨ 关键修复 ✨ ) ---
-  // (这些字段现在被添加到了模型中)
+  // (取货字段)
   final String? pickupId;
   final String? pickupDay; // "Today" or "Tomorrow"
   final String? pickupTime; // "12:00 PM – 1:00 PM"
-  // --- ( ✨ 结束修复 ✨ ) ---
 
   OrderModel({
     required this.id,
@@ -54,12 +55,9 @@ class OrderModel {
     this.rating,
     this.reviewText,
     this.reviewTimestamp,
-
-    // --- ( ✨ 关键修复 ✨ ) ---
     this.pickupId,
     this.pickupDay,
     this.pickupTime,
-    // --- ( ✨ 结束修复 ✨ ) ---
   });
 
   factory OrderModel.fromMap(Map<String, dynamic> map, String documentId) {
@@ -89,13 +87,9 @@ class OrderModel {
       rating: (map['rating'] as num?)?.toDouble(),
       reviewText: map['reviewText'],
       reviewTimestamp: map['reviewTimestamp'],
-
-      // --- ( ✨ 关键修复 ✨ ) ---
-      // (现在 App 会从 Firebase 正确读取这些字段)
       pickupId: map['pickupId'],
       pickupDay: map['pickupDay'],
       pickupTime: map['pickupTime'],
-      // --- ( ✨ 结束修复 ✨ ) ---
     );
   }
 }

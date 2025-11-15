@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import '../auth/admin_login.dart';
 import 'admin_home_page.dart';
@@ -20,467 +22,555 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  // Employee info
-  String name = 'Hans Minero';
-  String email = 'Minerohans56@gmail.com';
-  String phone = '+1 234 567 890';
-  String role = 'Admin';
-  String status = 'Active';
-
-  File? profileImage;
+  final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
   final ImagePicker _picker = ImagePicker();
 
-  // Pick image from gallery
+  File? profileImage;
+
+  // Employee info
+  String name = '';
+  String email = '';
+  String phone = '';
+  String role = '';
+  String status = '';
+
+  bool _isLoading = true;
+  bool _isEditing = false; // Edit mode flag
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAdminData();
+  }
+
+  Future<void> _loadAdminData() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final doc = await _firestore.collection('admins').doc(user.uid).get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        setState(() {
+          name = data['name'] ?? '';
+          email = data['email'] ?? user.email ?? '';
+          phone = data['phone'] ?? '';
+          role = data['role'] ?? 'Admin';
+          status = data['status'] ?? 'Active';
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading admin data: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // =================== Image Picker ===================
   Future<void> _pickFromGallery() async {
-    final XFile? image = await _picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 500,
-      maxHeight: 500,
-    );
-    if (image != null) {
-      setState(() {
-        profileImage = File(image.path);
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) setState(() => profileImage = File(image.path));
+  }
+
+  // =================== Save Profile ===================
+  Future<void> _saveProfile() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await _firestore.collection('admins').doc(user.uid).update({
+        'name': name,
+        'phone': phone,
+        // You can add profile image upload to Firebase Storage here
       });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile updated successfully!')),
+      );
+
+      setState(() {
+        _isEditing = false;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating profile: $e')),
+      );
     }
   }
 
-  // Capture image from camera
-  Future<void> _pickFromCamera() async {
-    final XFile? image = await _picker.pickImage(
-      source: ImageSource.camera,
-      maxWidth: 500,
-      maxHeight: 500,
-    );
-    if (image != null) {
-      setState(() {
-        profileImage = File(image.path);
-      });
-    }
-  }
-
-  // Open modal for editing profile
-  void _openEditProfileModal() {
-    final nameController = TextEditingController(text: name);
-    final emailController = TextEditingController(text: email);
-    final phoneController = TextEditingController(text: phone);
-    final roleController = TextEditingController(text: role);
-    String tempStatus = status;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          top: 16,
-          left: 16,
-          right: 16,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundColor: Colors.grey.shade300,
-                      backgroundImage: profileImage != null
-                          ? FileImage(profileImage!)
-                          : null,
-                      child: profileImage == null
-                          ? const Icon(Icons.person,
-                              size: 50, color: Colors.grey)
-                          : null,
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: PopupMenuButton(
-                        onSelected: (String value) {
-                          if (value == 'Gallery') {
-                            _pickFromGallery();
-                          } else if (value == 'Camera') {
-                            _pickFromCamera();
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          const PopupMenuItem(
-                              value: 'Gallery',
-                              child: Text('Choose from Gallery')),
-                          const PopupMenuItem(
-                              value: 'Camera', child: Text('Take Photo')),
-                        ],
-                        child: CircleAvatar(
-                          radius: 16,
-                          backgroundColor: Colors.white,
-                          child: const Icon(Icons.camera_alt, size: 16),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              _buildTextField('Name', nameController),
-              _buildTextField('Email', emailController,
-                  keyboardType: TextInputType.emailAddress),
-              _buildTextField('Phone', phoneController,
-                  keyboardType: TextInputType.phone),
-              _buildTextField('Role', roleController),
-              const SizedBox(height: 16),
-              const Text('Status',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 12,
-                children: ['Active', 'On Leave', 'Suspended'].map((s) {
-                  final isSelected = s == tempStatus;
-                  return ChoiceChip(
-                    label: Text(s),
-                    selected: isSelected,
-                    selectedColor: statusColors[s],
-                    labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black),
-                    onSelected: (_) {
-                      setState(() {
-                        tempStatus = s;
-                      });
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      name = nameController.text;
-                      email = emailController.text;
-                      phone = phoneController.text;
-                      role = roleController.text;
-                      status = tempStatus;
-                    });
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Save Changes',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField(
-    String label,
-    TextEditingController controller, {
-    TextInputType keyboardType = TextInputType.text,
-    bool obscureText = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        obscureText: obscureText,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-      ),
-    );
-  }
-
-  // ================= Open Change Password Modal =================
-  void _openChangePasswordModal() {
-    final currentPasswordController = TextEditingController();
-    final newPasswordController = TextEditingController();
-    final confirmPasswordController = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          top: 16,
-          left: 16,
-          right: 16,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Center(
-                  child: Text('Change Password',
-                      style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold))),
-              const SizedBox(height: 16),
-              _buildTextField('Current Password', currentPasswordController,
-                  obscureText: true),
-              _buildTextField('New Password', newPasswordController,
-                  obscureText: true),
-              _buildTextField('Confirm New Password', confirmPasswordController,
-                  obscureText: true),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(50),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12))),
-                  onPressed: () {
-                    // TODO: Add password validation & save logic
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Save Password',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ================= Open Payroll / Payment Info Modal =================
-  void _openPayrollInfoModal() {
-    final bankNameController = TextEditingController();
-    final accountNumberController = TextEditingController();
-    final ifscController = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          top: 16,
-          left: 16,
-          right: 16,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Center(
-                  child: Text('Payroll / Payment Info',
-                      style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold))),
-              const SizedBox(height: 16),
-              _buildTextField('Bank Name', bankNameController),
-              _buildTextField('Account Number', accountNumberController,
-                  keyboardType: TextInputType.number),
-              _buildTextField('IFSC / Routing Code', ifscController),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(50),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12))),
-                  onPressed: () {
-                    // TODO: Add save logic
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Save Info',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
+  // =================== Build UI ===================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F7),
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, size: 24),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const AdminHomePage(),
-              ),
-            );
-          },
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const AdminHomePage()),
+          ),
         ),
-        title: const Text('Employee Profile'),
+        title: const Text('Admin Profile'),
         centerTitle: true,
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-        children: [
-          // ===================== Employee Card =====================
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color.fromRGBO(0, 0, 0, 0.05),
-                  blurRadius: 6,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.all(24),
-            child: Column(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(16),
               children: [
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Colors.grey.shade300,
-                  backgroundImage:
-                      profileImage != null ? FileImage(profileImage!) : null,
-                  child: profileImage == null
-                      ? const Icon(Icons.person, size: 50, color: Colors.grey)
-                      : null,
+                _buildProfileCard(),
+                const SizedBox(height: 32),
+                _buildActionTile(
+                    icon: Icons.edit,
+                    title: _isEditing ? 'Cancel Edit' : 'Edit Profile',
+                    onTap: () {
+                      setState(() {
+                        _isEditing = !_isEditing;
+                      });
+                    }),
+                _buildActionTile(
+                  icon: Icons.lock_outline,
+                  title: 'Change Password',
+                  onTap: _changePasswordDialog,
                 ),
-                const SizedBox(height: 16),
-                Text(name,
-                    style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1F2937))),
-                const SizedBox(height: 4),
-                Text('Employee ID: #A12345',
-                    style:
-                        TextStyle(fontSize: 14, color: Colors.grey.shade700)),
-                const SizedBox(height: 4),
-                Text('Role: $role',
-                    style:
-                        TextStyle(fontSize: 14, color: Colors.grey.shade700)),
-                const SizedBox(height: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColors[status],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(status,
-                      style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold)),
+                _buildActionTile(
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: 'Payroll / Payment Info',
+                  onTap: _showPayrollDialog,
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.email, color: Colors.grey.shade600, size: 20),
-                    const SizedBox(width: 6),
-                    Text(email,
-                        style: TextStyle(
-                            color: Colors.grey.shade700, fontSize: 14)),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.phone, color: Colors.grey.shade600, size: 20),
-                    const SizedBox(width: 6),
-                    Text(phone,
-                        style: TextStyle(
-                            color: Colors.grey.shade700, fontSize: 14)),
-                  ],
-                ),
+                _buildActionTile(
+                    icon: Icons.history,
+                    title: 'Attendance & Logs',
+                    onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const AttendanceLogsPage()),
+                        )),
+                const SizedBox(height: 32),
+                _logoutButton(),
               ],
             ),
-          ),
+    );
+  }
 
-          const SizedBox(height: 32),
-
-          // ================= Updated Action Tiles =================
-          _buildActionTile(
-              icon: Icons.edit,
-              title: 'Edit Profile',
-              onTap: _openEditProfileModal),
-          _buildActionTile(
-              icon: Icons.lock_outline,
-              title: 'Change Password',
-              onTap: _openChangePasswordModal),
-          _buildActionTile(
-              icon: Icons.account_balance_wallet_outlined,
-              title: 'Payroll / Payment Info',
-              onTap: _openPayrollInfoModal),
-          _buildActionTile(
-              icon: Icons.history,
-              title: 'Attendance & Logs',
-              onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const AttendanceLogsPage()),
-                  )),
-
-          const SizedBox(height: 32),
-
-          // ================= Logout =================
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade600,
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(50),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-              icon: const Icon(Icons.logout),
-              label: const Text('Logout',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-              onPressed: () => Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const AdminLoginPage()),
-              ),
+  // =================== Profile Card ===================
+  Widget _buildProfileCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+              color: Color.fromRGBO(0, 0, 0, 0.05),
+              blurRadius: 6,
+              offset: Offset(0, 2)),
+        ],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: _isEditing ? _pickFromGallery : null,
+            child: CircleAvatar(
+              radius: 50,
+              backgroundColor: Colors.grey.shade300,
+              backgroundImage:
+                  profileImage != null ? FileImage(profileImage!) : null,
+              child: profileImage == null
+                  ? const Icon(Icons.person, size: 50, color: Colors.grey)
+                  : null,
             ),
           ),
+          const SizedBox(height: 16),
+          _isEditing
+              ? TextFormField(
+                  initialValue: name,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                  onChanged: (val) => name = val,
+                )
+              : Text(name.isNotEmpty ? name : 'No name',
+                  style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1F2937))),
+          const SizedBox(height: 4),
+          Text('Email: ${email.isNotEmpty ? email : "N/A"}',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade700)),
+          const SizedBox(height: 4),
+          Text('Role: ${role.isNotEmpty ? role : "N/A"}',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade700)),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: statusColors[status] ?? Colors.grey,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(status.isNotEmpty ? status : 'Unknown',
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 16),
+          _isEditing
+              ? TextFormField(
+                  initialValue: phone,
+                  decoration: const InputDecoration(labelText: 'Phone'),
+                  onChanged: (val) => phone = val,
+                  keyboardType: TextInputType.phone,
+                )
+              : (phone.isNotEmpty
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.phone, size: 18, color: Colors.grey),
+                        const SizedBox(width: 6),
+                        Text(phone,
+                            style: const TextStyle(color: Colors.black87)),
+                      ],
+                    )
+                  : Container()),
+          if (_isEditing)
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: ElevatedButton(
+                onPressed: _saveProfile,
+                child: const Text('Save Changes'),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildActionTile(
-      {required IconData icon,
-      required String title,
-      required VoidCallback onTap}) {
+// =================== Change Password Dialog ===================
+  Future<void> _changePasswordDialog() async {
+    final _currentPasswordController = TextEditingController();
+    final _newPasswordController = TextEditingController();
+    final _confirmPasswordController = TextEditingController();
+    final _formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 16,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Change Password',
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1F2937)),
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: _currentPasswordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: 'Current Password',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: const Icon(Icons.lock_outline),
+                    ),
+                    validator: (val) => val == null || val.isEmpty
+                        ? 'Enter current password'
+                        : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _newPasswordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: 'New Password',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: const Icon(Icons.lock),
+                    ),
+                    validator: (val) => val == null || val.length < 6
+                        ? 'Password must be at least 6 characters'
+                        : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: 'Confirm New Password',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: const Icon(Icons.lock),
+                    ),
+                    validator: (val) => val != _newPasswordController.text
+                        ? 'Passwords do not match'
+                        : null,
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.grey.shade700,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.shade600,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () async {
+                          if (!_formKey.currentState!.validate()) return;
+
+                          final user = _auth.currentUser;
+                          if (user == null) return;
+
+                          final cred = EmailAuthProvider.credential(
+                            email: user.email!,
+                            password: _currentPasswordController.text,
+                          );
+
+                          try {
+                            // Reauthenticate
+                            await user.reauthenticateWithCredential(cred);
+
+                            // Update password
+                            await user
+                                .updatePassword(_newPasswordController.text);
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Password updated successfully!'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                            Navigator.pop(context);
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                        child: const Text(
+                          'Change Password',
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  )
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+// =================== Payment Info Dialog ===================
+  Future<void> _showPayrollDialog() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final doc = await _firestore.collection('admins').doc(user.uid).get();
+    final data = doc.data()?['paymentInfo'] ?? {};
+
+    final _bankController = TextEditingController(text: data['bankName'] ?? '');
+    final _accountController =
+        TextEditingController(text: data['accountNumber'] ?? '');
+    final _ifscController = TextEditingController(text: data['ifsc'] ?? '');
+    final _salaryController =
+        TextEditingController(text: data['salary']?.toString() ?? '');
+
+    final _formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 16,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Payroll / Payment Info',
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1F2937)),
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: _bankController,
+                    decoration: InputDecoration(
+                      labelText: 'Bank Name',
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    validator: (val) =>
+                        val == null || val.isEmpty ? 'Enter bank name' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _accountController,
+                    decoration: InputDecoration(
+                      labelText: 'Account Number',
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    validator: (val) => val == null || val.isEmpty
+                        ? 'Enter account number'
+                        : null,
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _ifscController,
+                    decoration: InputDecoration(
+                      labelText: 'IFSC / Routing Code',
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    validator: (val) =>
+                        val == null || val.isEmpty ? 'Enter IFSC code' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _salaryController,
+                    decoration: InputDecoration(
+                      labelText: 'Salary',
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    validator: (val) =>
+                        val == null || val.isEmpty ? 'Enter salary' : null,
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.grey.shade700,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.shade600,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () async {
+                          if (!_formKey.currentState!.validate()) return;
+
+                          try {
+                            await _firestore
+                                .collection('admins')
+                                .doc(user.uid)
+                                .update({
+                              'paymentInfo': {
+                                'bankName': _bankController.text,
+                                'accountNumber': _accountController.text,
+                                'ifsc': _ifscController.text,
+                                'salary':
+                                    int.tryParse(_salaryController.text) ?? 0,
+                              }
+                            });
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content:
+                                    Text('Payment info updated successfully!'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+
+                            Navigator.pop(context);
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                        child: const Text(
+                          'Save',
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  )
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // =================== Action Tile ===================
+  Widget _buildActionTile({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
     return Column(
       children: [
         ListTile(
@@ -495,6 +585,28 @@ class _ProfilePageState extends State<ProfilePage> {
         Divider(
             height: 1, thickness: 1, color: Colors.grey.shade200, indent: 16),
       ],
+    );
+  }
+
+  // =================== Logout Button ===================
+  Widget _logoutButton() {
+    return ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.red.shade600,
+        foregroundColor: Colors.white,
+        minimumSize: const Size.fromHeight(50),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      icon: const Icon(Icons.logout),
+      label: const Text('Logout',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+      onPressed: () async {
+        await _auth.signOut();
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const AdminLoginPage()),
+        );
+      },
     );
   }
 }

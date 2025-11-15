@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../util/styles.dart';
+import '../../repositories/auth_repository.dart';
+import '../../repositories/user_repository.dart';
+import '../Admin/admin_home_page.dart';
 
 class AdminLoginPage extends StatefulWidget {
   const AdminLoginPage({super.key});
@@ -12,8 +17,14 @@ class _AdminLoginPageState extends State<AdminLoginPage>
     with SingleTickerProviderStateMixin {
   static const String _logoPath = 'assets/images/FoodieBoxLogo.png';
 
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final AuthRepository _authRepo = AuthRepository();
+  final UserRepository _userRepo = UserRepository();
+
   late AnimationController _controller;
   late Animation<double> _animation;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -31,7 +42,47 @@ class _AdminLoginPageState extends State<AdminLoginPage>
   @override
   void dispose() {
     _controller.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _signInAdmin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter email and password")),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final user = await _authRepo.signInWithEmail(email, password);
+      final userData = await _userRepo.getUserData(user!.uid);
+
+      if (userData?.role != 'Admin') {
+        throw Exception("Access denied: This account is not an Admin.");
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Admin login successful")),
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const AdminHomePage()),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Login failed: ${e.toString()}")),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -49,12 +100,9 @@ class _AdminLoginPageState extends State<AdminLoginPage>
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 500),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 const SizedBox(height: 60),
-
-                // --- Animated Logo ---
                 ScaleTransition(
                   scale: _animation,
                   child: Padding(
@@ -66,8 +114,6 @@ class _AdminLoginPageState extends State<AdminLoginPage>
                     ),
                   ),
                 ),
-
-                // --- Admin Login Title ---
                 const Text(
                   'Welcome Back, Admin',
                   textAlign: TextAlign.center,
@@ -78,33 +124,33 @@ class _AdminLoginPageState extends State<AdminLoginPage>
                   ),
                 ),
                 const SizedBox(height: 40),
-
-                // --- Input Fields ---
-                const _CustomInputField(label: 'Email'),
+                _CustomInputField(label: 'Email', controller: _emailController),
                 const SizedBox(height: 20),
-                const _CustomInputField(label: 'Password', obscureText: true),
-                const SizedBox(height: 30),
-
-                // --- Sign In Button ---
-                ElevatedButton(
-                  onPressed: () {
-                    // Temporary placeholder — no navigation yet
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kCategoryColor,
-                    foregroundColor: kTextColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Sign In',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
+                _CustomInputField(
+                  label: 'Password',
+                  controller: _passwordController,
+                  obscureText: true,
                 ),
-
+                const SizedBox(height: 30),
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : ElevatedButton(
+                        onPressed: _signInAdmin,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kCategoryColor,
+                          foregroundColor: kTextColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Sign In',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 18),
+                        ),
+                      ),
                 const SizedBox(height: 40),
               ],
             ),
@@ -117,26 +163,29 @@ class _AdminLoginPageState extends State<AdminLoginPage>
 
 class _CustomInputField extends StatelessWidget {
   final String label;
+  final TextEditingController controller;
   final bool obscureText;
 
-  const _CustomInputField({required this.label, this.obscureText = false});
+  const _CustomInputField({
+    required this.label,
+    required this.controller,
+    this.obscureText = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isWideScreen = MediaQuery.of(context).size.width > 600;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 12.0),
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: kTextColor),
-          ),
+          child: Text(label,
+              style: const TextStyle(fontSize: 12, color: kTextColor)),
         ),
         const SizedBox(height: 4),
         TextField(
+          controller: controller,
           obscureText: obscureText,
           decoration: InputDecoration(
             hintText: 'Enter $label',
@@ -144,7 +193,7 @@ class _CustomInputField extends StatelessWidget {
             filled: true,
             suffixIcon: IconButton(
               icon: const Icon(Icons.close, size: 18),
-              onPressed: () {},
+              onPressed: () => controller.clear(),
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(30),
@@ -156,26 +205,15 @@ class _CustomInputField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(30),
-              borderSide: const BorderSide(
-                color: kPrimaryActionColor,
-                width: 2,
-              ),
+              borderSide:
+                  const BorderSide(color: kPrimaryActionColor, width: 2),
             ),
             contentPadding: EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: isWideScreen ? 18 : 12,
-            ),
+                horizontal: 20, vertical: isWideScreen ? 18 : 12),
             isDense: true,
           ),
         ),
       ],
     );
   }
-}
-
-void main() {
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: AdminLoginPage(),
-  ));
 }

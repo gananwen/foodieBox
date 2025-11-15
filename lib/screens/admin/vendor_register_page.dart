@@ -1,6 +1,82 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../util/styles.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'registration_pending_page.dart';
 
+// ====== STYLE CONSTANTS ======
+const kPrimaryActionColor = Color(0xFF4A47A3);
+const kCardColor = Color(0xFFF9F9F9);
+const kAppBackgroundColor = Color(0xFFF5F5F5);
+const kTextColor = Colors.black87;
+
+const kLabelTextStyle = TextStyle(
+  fontWeight: FontWeight.w600,
+  color: kTextColor,
+);
+
+const kHintTextStyle = TextStyle(
+  fontSize: 13,
+  color: Colors.black54,
+);
+
+// =============================== MODEL ===============================
+class Vendor {
+  final String uid;
+  final String storeName;
+  final String storeAddress;
+  final String email;
+  final String? storePhone;
+  final String? storeHours;
+  final String? vendorType;
+  final String? businessLicenseUrl;
+  final String? halalCertificateUrl;
+  final String? businessPhotoUrl;
+  final bool isApproved;
+  final bool isLocked;
+  final double rating;
+  final DateTime? createdAt;
+  final DateTime? approvedAt;
+
+  Vendor({
+    required this.uid,
+    required this.storeName,
+    required this.storeAddress,
+    required this.email,
+    this.storePhone,
+    this.storeHours,
+    this.vendorType,
+    this.businessLicenseUrl,
+    this.halalCertificateUrl,
+    this.businessPhotoUrl,
+    this.isApproved = false,
+    this.isLocked = false,
+    this.rating = 0,
+    this.createdAt,
+    this.approvedAt,
+  });
+
+  Map<String, dynamic> toMap() => {
+        'uid': uid,
+        'storeName': storeName,
+        'storeAddress': storeAddress,
+        'email': email,
+        'storePhone': storePhone,
+        'storeHours': storeHours,
+        'vendorType': vendorType,
+        'businessLicenseUrl': businessLicenseUrl,
+        'halalCertificateUrl': halalCertificateUrl,
+        'businessPhotoUrl': businessPhotoUrl,
+        'isApproved': isApproved,
+        'isLocked': isLocked,
+        'rating': rating,
+        'createdAt': createdAt ?? FieldValue.serverTimestamp(),
+        'approvedAt': approvedAt,
+      };
+}
+
+// =============================== PAGE ===============================
 class VendorRegisterPage extends StatefulWidget {
   const VendorRegisterPage({super.key});
 
@@ -12,16 +88,22 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
   final _formKey1 = GlobalKey<FormState>();
   final _formKey2 = GlobalKey<FormState>();
   final _formKey3 = GlobalKey<FormState>();
-
   late PageController _pageController;
   int _currentPage = 0;
 
-  // Data
-  String _vendorName = '';
-  String _address = '';
-  String _email = '';
-  String _password = '';
-  String _confirmPassword = '';
+  // Text controllers
+  final _vendorNameController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _storeHoursController = TextEditingController();
+  final _storePhoneController = TextEditingController();
+
+  // Files
+  File? _businessLicenseFile;
+  File? _halalCertFile;
+  File? _businessPhotoFile;
 
   @override
   void initState() {
@@ -32,10 +114,17 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
   @override
   void dispose() {
     _pageController.dispose();
+    _vendorNameController.dispose();
+    _addressController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _storeHoursController.dispose();
+    _storePhoneController.dispose();
     super.dispose();
   }
 
-  // Navigation
+  // =============================== NAVIGATION ===============================
   void _goToNextPage() {
     final forms = [_formKey1, _formKey2, _formKey3];
     if (forms[_currentPage].currentState?.validate() ?? true) {
@@ -62,43 +151,109 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
     }
   }
 
-  void _submitRegistration() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Vendor $_vendorName registration complete!'),
-        backgroundColor: kPrimaryActionColor,
-      ),
-    );
-    Navigator.pop(context);
+  // =============================== FILE UPLOAD ===============================
+  Future<String> _uploadFile(File? file, String path, String docId) async {
+    if (file == null) return '';
+    final ref = FirebaseStorage.instance.ref(
+        'vendors/$docId/$path-${DateTime.now().millisecondsSinceEpoch}.jpg');
+    await ref.putFile(file);
+    return await ref.getDownloadURL();
   }
 
-  // Progress dots
-  Widget _buildDots() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(3, (index) {
-        final isActive = _currentPage == index;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: isActive ? 12 : 8,
-          height: isActive ? 12 : 8,
-          decoration: BoxDecoration(
-            color: isActive ? kPrimaryActionColor : Colors.grey.shade300,
-            shape: BoxShape.circle,
+  // =============================== SUBMIT REGISTRATION ===============================
+  Future<void> _submitRegistration() async {
+    if (_businessLicenseFile == null || _businessPhotoFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please upload required documents.')),
+      );
+      return;
+    }
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Uploading documents...')),
+      );
+
+      final vendorRef = FirebaseFirestore.instance.collection('vendors').doc();
+      final docId = vendorRef.id;
+
+      // Upload documents
+      final licenseUrl =
+          await _uploadFile(_businessLicenseFile, 'business_license', docId);
+      final halalUrl =
+          await _uploadFile(_halalCertFile, 'halal_certificate', docId);
+      final photoUrl =
+          await _uploadFile(_businessPhotoFile, 'business_photo', docId);
+
+      // Build Vendor object
+      final vendor = Vendor(
+        uid: docId,
+        storeName: _vendorNameController.text.trim(),
+        storeAddress: _addressController.text.trim(),
+        storePhone: _storePhoneController.text.trim().isEmpty
+            ? null
+            : _storePhoneController.text.trim(),
+        storeHours: _storeHoursController.text.trim(),
+        email: _emailController.text.trim(),
+        businessLicenseUrl: licenseUrl,
+        halalCertificateUrl: halalUrl.isEmpty ? null : halalUrl,
+        businessPhotoUrl: photoUrl,
+        isApproved: false, // Admin must approve
+        isLocked: false,
+        rating: 0,
+        vendorType: 'Restaurant',
+        createdAt: null, // Use Firestore server time
+        approvedAt: null,
+      );
+
+      // Save to Firestore
+      await vendorRef.set(vendor.toMap());
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content:
+                  Text('Registration submitted! Awaiting admin approval.')),
+        );
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const RegistrationPendingPage(),
           ),
         );
-      }),
-    );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error submitting registration: $e')),
+      );
+    }
   }
 
-  // Minimal input field
+  // =============================== UI HELPERS ===============================
+  Widget _buildDots() => Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(3, (index) {
+          final active = _currentPage == index;
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            width: active ? 12 : 8,
+            height: active ? 12 : 8,
+            decoration: BoxDecoration(
+              color: active ? kPrimaryActionColor : Colors.grey.shade300,
+              shape: BoxShape.circle,
+            ),
+          );
+        }),
+      );
+
   Widget _buildMinimalField({
     required String label,
     required String hint,
-    required FormFieldSetter<String> onSaved,
+    required TextEditingController controller,
+    bool obscure = false,
   }) {
-    final controller = TextEditingController();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       child: Column(
@@ -106,10 +261,9 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
         children: [
           Text(label,
               style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.black,
-              )),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black)),
           const SizedBox(height: 4),
           Container(
             decoration: BoxDecoration(
@@ -123,12 +277,12 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: TextFormField(
                       controller: controller,
+                      obscureText: obscure,
                       decoration: InputDecoration(
                         hintText: hint,
                         hintStyle: const TextStyle(color: Colors.black38),
                         border: InputBorder.none,
                       ),
-                      onSaved: onSaved,
                     ),
                   ),
                 ),
@@ -145,10 +299,10 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
     );
   }
 
-  // Upload container for documents
   Widget _buildDocumentUploadContainer({
     required String title,
     required String subtitle,
+    required void Function(File file) onFilePicked,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,22 +326,27 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
         const SizedBox(height: 8),
         InkWell(
           borderRadius: BorderRadius.circular(8),
-          onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Simulating upload for: $title')),
-          ),
+          onTap: () async {
+            final picker = ImagePicker();
+            final picked = await picker.pickImage(source: ImageSource.gallery);
+            if (picked != null) {
+              onFilePicked(File(picked.path));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Selected: ${picked.name}')),
+              );
+            }
+          },
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 20),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.black54, width: 1),
+              border: Border.all(color: Colors.black54),
               borderRadius: BorderRadius.circular(8),
               color: kCardColor,
             ),
             child: const Center(
-              child: Text(
-                'Upload related documents',
-                style: TextStyle(color: Colors.black54, fontSize: 14),
-              ),
+              child: Text('Upload related documents',
+                  style: TextStyle(color: Colors.black54, fontSize: 14)),
             ),
           ),
         ),
@@ -195,8 +354,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
     );
   }
 
-  // ------------------ PAGES ------------------
-
+  // =============================== PAGES ===============================
   Widget _page1() => Form(
         key: _formKey1,
         child: SingleChildScrollView(
@@ -204,12 +362,11 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
           child: Column(
             children: [
               const SizedBox(height: 16),
-              // Logo
               Container(
                 width: 140,
                 height: 90,
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.black54, width: 1),
+                  border: Border.all(color: Colors.black54),
                   borderRadius: BorderRadius.circular(8),
                   image: const DecorationImage(
                     image: AssetImage('assets/images/App_icons.png'),
@@ -219,28 +376,27 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
               ),
               const SizedBox(height: 20),
               Text("Let's Get Started",
-                  style: kLabelTextStyle.copyWith(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w600,
-                      color: kTextColor)),
+                  style: kLabelTextStyle.copyWith(fontSize: 22)),
               const SizedBox(height: 6),
-              Text(
-                'Create an account to set your business to bloom!',
-                style: kHintTextStyle.copyWith(fontSize: 14),
-                textAlign: TextAlign.center,
-              ),
+              Text('Create an account to set your business to bloom!',
+                  style: kHintTextStyle, textAlign: TextAlign.center),
               const SizedBox(height: 24),
               _buildMinimalField(
                   label: 'Vendor Name',
-                  hint: 'Input',
-                  onSaved: (v) => _vendorName = v ?? ''),
-              _buildMinimalField(label: 'Logo', hint: 'Input', onSaved: (_) {}),
+                  hint: 'e.g. Pizza Palace',
+                  controller: _vendorNameController),
               _buildMinimalField(
-                  label: 'Hours', hint: 'Input', onSaved: (_) {}),
+                  label: 'Store Hours',
+                  hint: 'e.g. 9:00 AM - 6:00 PM',
+                  controller: _storeHoursController),
               _buildMinimalField(
                   label: 'Address',
-                  hint: 'Input',
-                  onSaved: (v) => _address = v ?? ''),
+                  hint: 'e.g. 123 Main Street',
+                  controller: _addressController),
+              _buildMinimalField(
+                  label: 'Store Phone (Optional)',
+                  hint: 'e.g. +123456789',
+                  controller: _storePhoneController),
             ],
           ),
         ),
@@ -253,33 +409,26 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
           child: Column(
             children: [
               const SizedBox(height: 20),
-              Text(
-                'Confirm Your\nBusiness Account',
-                textAlign: TextAlign.center,
-                style: kLabelTextStyle.copyWith(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: kTextColor),
-              ),
+              Text('Confirm Your Business Account',
+                  style: kLabelTextStyle.copyWith(fontSize: 20)),
               const SizedBox(height: 6),
-              Text(
-                'Please input real business email to use in the platform.',
-                style: kHintTextStyle.copyWith(fontSize: 14),
-                textAlign: TextAlign.center,
-              ),
+              Text('Use a valid business email address.',
+                  style: kHintTextStyle),
               const SizedBox(height: 24),
               _buildMinimalField(
                   label: 'Email',
-                  hint: 'Input',
-                  onSaved: (v) => _email = v ?? ''),
+                  hint: 'Business email',
+                  controller: _emailController),
               _buildMinimalField(
                   label: 'Password',
-                  hint: 'Input',
-                  onSaved: (v) => _password = v ?? ''),
+                  hint: 'Enter password',
+                  controller: _passwordController,
+                  obscure: true),
               _buildMinimalField(
                   label: 'Confirm Password',
-                  hint: 'Input',
-                  onSaved: (v) => _confirmPassword = v ?? ''),
+                  hint: 'Re-enter password',
+                  controller: _confirmPasswordController,
+                  obscure: true),
             ],
           ),
         ),
@@ -290,35 +439,32 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.center, // Center content horizontally
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                'Upload Your Documents',
-                style: kLabelTextStyle.copyWith(fontSize: 20),
-                textAlign: TextAlign.center, // Center text inside widget
-              ),
+              Text('Upload Your Documents',
+                  style: kLabelTextStyle.copyWith(fontSize: 20)),
               const SizedBox(height: 4),
               Text(
-                'Please upload the required documents to verify business. '
-                'This ensures platform safety and quality.',
-                style: kHintTextStyle,
-                textAlign: TextAlign.center, // Center text inside widget
-              ),
+                  'Please upload the required documents to verify your business.',
+                  style: kHintTextStyle,
+                  textAlign: TextAlign.center),
               const SizedBox(height: 24),
               _buildDocumentUploadContainer(
                 title: 'Business License',
                 subtitle: '(Required)',
+                onFilePicked: (file) => _businessLicenseFile = file,
               ),
               const SizedBox(height: 16),
               _buildDocumentUploadContainer(
                 title: 'Halal Certification',
                 subtitle: '(If applicable)',
+                onFilePicked: (file) => _halalCertFile = file,
               ),
               const SizedBox(height: 16),
               _buildDocumentUploadContainer(
-                title: 'Other Certifications',
-                subtitle: '(Optional)',
+                title: 'Business Photo',
+                subtitle: '(Required)',
+                onFilePicked: (file) => _businessPhotoFile = file,
               ),
               const SizedBox(height: 48),
               SizedBox(
@@ -335,10 +481,9 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
                     ),
                     backgroundColor: kCardColor,
                   ),
-                  child: const Text(
-                    "Submit",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  child: const Text("Submit",
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -346,8 +491,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
         ),
       );
 
-  // ------------------ BUILD ------------------
-
+  // =============================== BUILD ===============================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -355,64 +499,42 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // 🔸 Top bar — centered title and progress dots, arrow aligned left
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: SizedBox(
                 height: 70,
                 child: Row(
                   children: [
-                    // Back arrow
                     IconButton(
                       icon: const Icon(Icons.arrow_back_ios_new_rounded,
                           size: 20),
                       onPressed: _goToPreviousPage,
                     ),
-
-                    // Spacer
                     const SizedBox(width: 8),
-
-                    // Title and dots stacked vertically
                     Expanded(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Text(
-                            'Store Setup',
-                            style: kLabelTextStyle.copyWith(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                          Text('Store Setup',
+                              style: kLabelTextStyle.copyWith(fontSize: 22)),
                           const SizedBox(height: 4),
-                          _buildDots(), // Make sure this reflects current page visually
+                          _buildDots(),
                         ],
                       ),
                     ),
-
-                    // Invisible spacer to balance layout
                     const SizedBox(width: 48),
                   ],
                 ),
               ),
             ),
-
-            // 🔹 PageView Section
             Expanded(
               child: PageView(
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: (i) => setState(() => _currentPage = i),
-                children: [
-                  _page1(),
-                  _page2(),
-                  _page3(),
-                ],
+                children: [_page1(), _page2(), _page3()],
               ),
             ),
-
-            // 🔹 Next Button (hidden on last page)
             if (_currentPage < 2)
               Padding(
                 padding:
@@ -428,13 +550,9 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
                         borderRadius: BorderRadius.circular(25),
                       ),
                     ),
-                    child: const Text(
-                      'Next',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
+                    child: const Text('Next',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, color: Colors.white)),
                   ),
                 ),
               ),
