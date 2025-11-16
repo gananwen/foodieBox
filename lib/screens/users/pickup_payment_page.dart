@@ -5,9 +5,9 @@ import 'package:foodiebox/providers/cart_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:foodiebox/util/styles.dart';
 import 'dart:math'; // To generate the pickup ID
-// --- ( ✨ NEW IMPORTS ✨ ) ---
+// --- ( NEW IMPORTS ) ---
 import 'package:foodiebox/screens/users/qr_payment_page.dart';
-// --- ( ✨ END NEW IMPORTS ✨ ) ---
+// --- ( END NEW IMPORTS ) ---
 import 'package:foodiebox/enums/checkout_type.dart';
 import 'package:foodiebox/models/promotion.dart';
 import 'package:foodiebox/models/voucher_model.dart';
@@ -345,7 +345,7 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
     );
   }
 
-  // --- ( ✨ MODIFIED: Replaced _placePickupOrder with _proceedToPayment ✨ ) ---
+  // --- MODIFIED: _proceedToPayment function (Packages data and navigates to QR Page) ---
   Future<void> _proceedToPayment() async {
     final cart = context.read<CartProvider>();
     if (_user == null) {
@@ -447,12 +447,12 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
       'vendorName': vendorName,
       'vendorAddress': vendorAddress,
       'vendorType': vendorType,
-      'paymentMethod': 'QR Pay', // <-- NEW
+      'paymentMethod': 'QR Pay', // Set payment method here
       'subtotal': subtotal,
       'discount': totalDiscount,
       'total': total,
       'vendorIds': [vendorId],
-      'promoCode': null, 
+      'promoCode': null, // FIX: Use null here as automaticPromo does not have a code field
       'promoLabel': automaticPromo?.title, 
       'voucherCode': selectedVoucher?.code,
       'voucherLabel': selectedVoucher?.title, 
@@ -463,9 +463,7 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
       'hasBeenReviewed': false, 
     };
 
-    // --- ( ✨ This is the new navigation ✨ ) ---
-    // We don't create the order here anymore.
-    // We just navigate to the payment page.
+    // --- Navigate to QR Payment Page ---
     if (mounted) {
       Navigator.push(
         context,
@@ -477,9 +475,8 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
         ),
       );
     }
-    // --- ( ✨ End of new navigation ✨ ) ---
 
-     setState(() => _isLoading = false);
+    setState(() => _isLoading = false);
   }
 
   @override
@@ -704,7 +701,7 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            // --- ( ✨ MODIFIED: Call _proceedToPayment ✨ ) ---
+            // --- MODIFIED: Call _proceedToPayment ---
             onPressed: _isLoading ? null : _proceedToPayment,
             style: ElevatedButton.styleFrom(
               backgroundColor: kPrimaryActionColor,
@@ -724,7 +721,7 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
                     ),
                   )
                 : Text(
-                    'Proceed to Pay RM${getTotal().toStringAsFixed(2)}', // <-- MODIFIED TEXT
+                    'Proceed to Pay RM${getTotal().toStringAsFixed(2)}', // MODIFIED TEXT
                     style: const TextStyle(
                         fontSize: 16, fontWeight: FontWeight.bold),
                   ),

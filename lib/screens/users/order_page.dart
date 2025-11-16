@@ -229,7 +229,7 @@ class _OrdersPageState extends State<OrdersPage>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(order.vendorName,
+                  child: Text(order.vendorName ?? 'Store',
                       style: kLabelTextStyle.copyWith(fontSize: 16),
                       overflow: TextOverflow.ellipsis),
                 ),

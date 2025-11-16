@@ -61,10 +61,7 @@ class _CheckoutPage extends State<CheckoutPage> {
   VoucherModel? selectedVoucher;
   List<VoucherEligibility> voucherList = [];
   bool _isLoadingVouchers = true;
-  // --- ( ✨ FIX: Correct Declaration of State Variable ✨ ) ---
-  double voucherDiscount = 0.0; 
-  // --- ( ✨ END FIX ✨ ) ---
-
+  double voucherDiscount = 0.0;
 
   @override
   void initState() {
@@ -85,55 +82,58 @@ class _CheckoutPage extends State<CheckoutPage> {
   Future<void> _fetchAutomaticPromo() {
     if (widget.items.isEmpty) {
       setState(() => _isLoadingPromo = false);
-      return Future.value(); 
+      return Future.value();
     }
     final String vendorId = widget.items.first.vendorId;
-    final String productType = widget.items.first.product.productType == 'Blindbox'
-        ? 'Blindbox'
-        : 'Grocery';
+    final String productType =
+        widget.items.first.product.productType == 'Blindbox'
+            ? 'Blindbox'
+            : 'Grocery';
 
     try {
       final now = DateTime.now();
-      
+
       FirebaseFirestore.instance
           .collection('vendors')
-          .doc(vendorId) 
-          .collection('promotions') 
-          .where('endDate', isGreaterThanOrEqualTo: now) 
+          .doc(vendorId)
+          .collection('promotions')
+          .where('endDate', isGreaterThanOrEqualTo: now)
           .get()
           .then((snapshot) {
-            
-      final promos = snapshot.docs
-          .map((doc) => PromotionModel.fromMap(doc.data(), doc.id))
-          .where((promo) =>
-              promo.startDate.isBefore(now) &&
-              (promo.totalRedemptions == 0 || promo.claimedRedemptions < promo.totalRedemptions))
-          .toList();
+        final promos = snapshot.docs
+            .map((doc) => PromotionModel.fromMap(doc.data(), doc.id))
+            .where((promo) =>
+                promo.startDate.isBefore(now) &&
+                (promo.totalRedemptions == 0 ||
+                    promo.claimedRedemptions < promo.totalRedemptions))
+            .toList();
 
-      final validPromos = promos.where((promo) =>
-              promo.productType == productType && 
-              promo.startDate.isBefore(now) &&
-              (promo.totalRedemptions == 0 || promo.claimedRedemptions < promo.totalRedemptions) &&
-              subtotal >= promo.minSpend 
-          ).toList();
+        final validPromos = promos
+            .where((promo) =>
+                promo.productType == productType &&
+                promo.startDate.isBefore(now) &&
+                (promo.totalRedemptions == 0 ||
+                    promo.claimedRedemptions < promo.totalRedemptions) &&
+                subtotal >= promo.minSpend)
+            .toList();
 
-      if (mounted && validPromos.isNotEmpty) {
-        validPromos.sort((a, b) {
-          int minSpendComp = b.minSpend.compareTo(a.minSpend);
-          if (minSpendComp != 0) return minSpendComp;
-          return b.discountPercentage.compareTo(a.discountPercentage);
-        });
+        if (mounted && validPromos.isNotEmpty) {
+          validPromos.sort((a, b) {
+            int minSpendComp = b.minSpend.compareTo(a.minSpend);
+            if (minSpendComp != 0) return minSpendComp;
+            return b.discountPercentage.compareTo(a.discountPercentage);
+          });
 
-        setState(() {
-          automaticPromo = validPromos.first; 
-          promoDiscount =
-              subtotal * (automaticPromo!.discountPercentage / 100.0);
-          _isLoadingPromo = false;
-        });
-      } else if (mounted) {
-        setState(() => _isLoadingPromo = false);
-      }
-    });
+          setState(() {
+            automaticPromo = validPromos.first;
+            promoDiscount =
+                subtotal * (automaticPromo!.discountPercentage / 100.0);
+            _isLoadingPromo = false;
+          });
+        } else if (mounted) {
+          setState(() => _isLoadingPromo = false);
+        }
+      });
     } catch (e) {
       if (mounted) setState(() => _isLoadingPromo = false);
       print("Error fetching automatic promo: $e");
@@ -149,11 +149,12 @@ class _CheckoutPage extends State<CheckoutPage> {
     setState(() => _isLoadingVouchers = true);
 
     final vouchers = await _voucherRepo.fetchAllActiveVouchers();
-    
+
     // --- NEW: Get all vendor types from cart ---
     // Note: 'Blind Box' (with space) comes from product.dart
     final cartVendorTypes = widget.items
-        .map((item) => item.product.productType == 'Blind Box' ? 'BlindBox' : 'Grocery')
+        .map((item) =>
+            item.product.productType == 'Blind Box' ? 'BlindBox' : 'Grocery')
         .toSet()
         .toList();
 
@@ -243,56 +244,16 @@ class _CheckoutPage extends State<CheckoutPage> {
     }
     return subtotalAfterPromo - voucherDiscountOnSubtotal + finalDeliveryFee;
   }
-  
-  void _selectPaymentMethod() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.credit_card),
-              title: const Text('Credit/Debit Card'),
-              onTap: () {
-                setState(() => selectedPayment = 'Credit/Debit Card');
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.money),
-              title: const Text('Cash on Delivery'),
-              onTap: () {
-                setState(() => selectedPayment = 'Cash on Delivery');
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.account_balance_wallet),
-              title: const Text('E-Wallet'),
-              onTap: () {
-                setState(() => selectedPayment = 'E-Wallet');
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   // --- VOUCHER MODAL - STYLED TO MATCH IMAGE & SORTED ---
   void _showVoucherSelector() {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, 
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      backgroundColor: Colors.grey[100], 
+      backgroundColor: Colors.grey[100],
       builder: (context) {
         if (_isLoadingVouchers) {
           return const SizedBox(
@@ -316,12 +277,12 @@ class _CheckoutPage extends State<CheckoutPage> {
           child: Container(
             padding: const EdgeInsets.all(16),
             child: Column(
-              mainAxisSize: MainAxisSize.min, 
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Center(
                   child: Text(
-                    'Choose a Promo Code', 
+                    'Choose a Promo Code',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -330,7 +291,7 @@ class _CheckoutPage extends State<CheckoutPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // --- List of Vouchers ---
                 Expanded(
                   child: ListView.separated(
@@ -373,7 +334,7 @@ class _CheckoutPage extends State<CheckoutPage> {
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: isSelected
-                                    ? kPrimaryActionColor 
+                                    ? kPrimaryActionColor
                                     : Colors.grey.shade300,
                                 width: isSelected ? 2.0 : 1.0,
                               ),
@@ -418,7 +379,7 @@ class _CheckoutPage extends State<CheckoutPage> {
                                       ],
                                     ),
                                     Text(
-                                      eligibilityMessage, 
+                                      eligibilityMessage,
                                       style: TextStyle(
                                         fontSize: 14,
                                         color: isEligible
@@ -596,8 +557,8 @@ class _CheckoutPage extends State<CheckoutPage> {
             const SizedBox(height: 10),
             ..._deliveryOptions.map(_buildDeliveryOptionWidget).toList(),
             const SizedBox(height: 20),
-            
-            // --- ( ✨ REMOVED Payment Method section ✨ ) ---
+
+            // Note: The Payment Method section was removed to force QR payment.
 
             const Text('Voucher Code',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -788,8 +749,9 @@ class _CheckoutPage extends State<CheckoutPage> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                // --- ( ✨ MODIFIED: Call _proceedToPayment ✨ ) ---
-                onPressed: agreedToTerms && !_isLoading ? _proceedToPayment : null,
+                // --- MODIFIED: Call _proceedToPayment ---
+                onPressed:
+                    agreedToTerms && !_isLoading ? _proceedToPayment : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimaryActionColor,
                   foregroundColor: kTextColor,
@@ -808,7 +770,7 @@ class _CheckoutPage extends State<CheckoutPage> {
                         ),
                       )
                     : const Text(
-                        'Proceed to Payment', // <-- ( ✨ MODIFIED: Changed text ✨ )
+                        'Proceed to Payment', // --- MODIFIED: Changed text ---
                         style: TextStyle(
                             fontSize: 16, fontWeight: FontWeight.bold),
                       ),
@@ -820,7 +782,7 @@ class _CheckoutPage extends State<CheckoutPage> {
     );
   }
 
-  // --- ( ✨ MODIFIED: Replaced _placeOrder with _proceedToPayment ✨ ) ---
+  // --- MODIFIED: _proceedToPayment function (Packages data and navigates to QR Page) ---
   Future<void> _proceedToPayment() async {
     if (_selectedAddressString == null || _selectedAddressLatLng == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -837,9 +799,10 @@ class _CheckoutPage extends State<CheckoutPage> {
 
     setState(() => _isLoading = true);
 
-    // Validate voucher one last time
+    // --- Validate Vouchers (Voucher validation logic remains here) ---
     final cartVendorTypes = widget.items
-        .map((item) => item.product.productType == 'Blind Box' ? 'BlindBox' : 'Grocery')
+        .map((item) =>
+            item.product.productType == 'Blind Box' ? 'BlindBox' : 'Grocery')
         .toSet()
         .toList();
 
@@ -861,7 +824,8 @@ class _CheckoutPage extends State<CheckoutPage> {
         return;
       }
     }
-    
+
+    // --- Prepare Order Data ---
     final itemsData = widget.items.map((item) {
       return {
         'name': item.product.title,
@@ -897,8 +861,8 @@ class _CheckoutPage extends State<CheckoutPage> {
     final finalTotal = getTotal();
     final finalDeliveryFee =
         (selectedVoucher?.freeDelivery ?? false) ? 0.0 : deliveryFee;
+    final totalDiscount = promoDiscount + voucherDiscount;
 
-    // This is the data we will pass to the QR payment page
     final orderData = {
       'userId': _user!.uid,
       'orderType': 'Delivery',
@@ -908,78 +872,38 @@ class _CheckoutPage extends State<CheckoutPage> {
       'contactName': _selectedContactName,
       'contactPhone': _selectedContactPhone,
       'deliveryOption': selectedDelivery,
-      'paymentMethod': 'QR Pay', // <-- NEW
+      'paymentMethod': 'QR Pay', // Set payment method here
       'subtotal': subtotal,
-      'discount': promoDiscount + voucherDiscount,
+      'discount': totalDiscount,
       'deliveryFee': finalDeliveryFee,
       'total': finalTotal,
-      'promoCode': null, 
-      'promoLabel': automaticPromo?.title, 
+      'promoCode':
+          null, // FIX: Use null here as automaticPromo does not have a code field
+      'promoLabel': automaticPromo?.title,
       'voucherCode': selectedVoucher?.code,
-      'voucherLabel': selectedVoucher?.title, 
+      'voucherLabel': selectedVoucher?.title,
       'vendorIds': allVendorIds,
-      'status': 'received',
+      'status': 'Awaiting Payment Proof', // Pre-order status
       'items': itemsData,
       'timestamp': FieldValue.serverTimestamp(),
       'vendorName': vendorName,
       'vendorType': vendorType,
-      'hasBeenReviewed': false, // <-- ( ✨ ADD THIS LINE ✨ )
+      'hasBeenReviewed': false,
     };
-    // --- ( ✨ END UPDATED ORDER DATA ✨ ) ---
 
-    try {
-      final docRef =
-          await FirebaseFirestore.instance.collection('orders').add(orderData);
-      final orderId = docRef.id;
-
-      if (selectedVoucher != null) {
-        await _voucherRepo.incrementVoucherRedemption(selectedVoucher!.id);
-      }
-      if (automaticPromo != null) {
-         await FirebaseFirestore.instance
-            .collection('promotions')
-            .doc(automaticPromo!.id)
-            .update({
-          'claimedRedemptions': FieldValue.increment(1),
-        });
-      }
-
-      if (mounted) {
-        context.read<CartProvider>().clearCart();
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Order placed successfully!')),
-      );
-
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => OrderConfirmationPage(
-              address: _selectedAddressString!,
-              location: _selectedAddressLatLng!,
-              total: finalTotal,
-              promoLabel: voucherLabel, // Pass the correct label
-              orderId: orderId,
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
+    // --- Navigate to QR Payment Page ---
+    if (mounted) {
+      Navigator.push(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to place order: $e')));
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const OrderFailurePage()),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+        MaterialPageRoute(
+          builder: (context) => QrPaymentPage(
+            orderData: orderData,
+            orderType: CheckoutType.delivery,
+          ),
+        ),
+      );
     }
+
+    setState(() => _isLoading = false);
   }
 }
