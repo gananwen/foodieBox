@@ -15,6 +15,7 @@ dependencies:
   image_picker: ^1.2.0
   table_calendar: ^3.0.8
   url_launcher: ^6.3.0
+
   
 
   # --- UI & Core Utility ---
@@ -23,6 +24,8 @@ dependencies:
   fl_chart: ^0.69.0
   pdf: ^3.11.0
   printing: ^5.10.0
+  path_provider: ^2.0.15
+  
 
   # --- Location, Maps, and Geocoding ---
   google_maps_flutter: ^2.5.0

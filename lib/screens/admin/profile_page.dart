@@ -109,6 +109,10 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F7),
       appBar: AppBar(
+        // === CHANGE 1: Header Color Updated ===
+        backgroundColor: const Color.fromARGB(255, 114, 158, 199),
+        foregroundColor: Colors.white, // Ensure icons/text are visible
+        // ======================================
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pushReplacement(
@@ -148,10 +152,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     icon: Icons.history,
                     title: 'Attendance & Logs',
                     onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const AttendanceLogsPage()),
-                        )),
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const AttendanceLogsPage()))),
                 const SizedBox(height: 32),
                 _logoutButton(),
               ],
@@ -249,6 +252,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
 // =================== Change Password Dialog ===================
+  // =================== Change Password Dialog (Revised) ===================
   Future<void> _changePasswordDialog() async {
     final _currentPasswordController = TextEditingController();
     final _newPasswordController = TextEditingController();
@@ -259,16 +263,22 @@ class _ProfilePageState extends State<ProfilePage> {
       context: context,
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        // Adding elevation for "general setting" look
         elevation: 16,
         child: Container(
+          // Wrap content in a container for background/padding control
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
           ),
-          child: Form(
-            key: _formKey,
-            child: SingleChildScrollView(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(
+              // Adjust padding to only handle the keyboard inset dynamically
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Form(
+              key: _formKey,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -326,7 +336,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   const SizedBox(height: 24),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    // CHANGE: Align buttons to the right
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       TextButton(
                         style: TextButton.styleFrom(
@@ -340,6 +351,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         onPressed: () => Navigator.pop(context),
                         child: const Text('Cancel'),
                       ),
+                      const SizedBox(width: 12), // Add space between buttons
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue.shade600,
@@ -361,10 +373,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           );
 
                           try {
-                            // Reauthenticate
                             await user.reauthenticateWithCredential(cred);
-
-                            // Update password
                             await user
                                 .updatePassword(_newPasswordController.text);
 
@@ -401,7 +410,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-// =================== Payment Info Dialog ===================
+  // =================== Payment Info Dialog ===================
   Future<void> _showPayrollDialog() async {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -414,6 +423,7 @@ class _ProfilePageState extends State<ProfilePage> {
         TextEditingController(text: data['accountNumber'] ?? '');
     final _ifscController = TextEditingController(text: data['ifsc'] ?? '');
     final _salaryController =
+        // FIX: Changed TextController to TextEditingController
         TextEditingController(text: data['salary']?.toString() ?? '');
 
     final _formKey = GlobalKey<FormState>();

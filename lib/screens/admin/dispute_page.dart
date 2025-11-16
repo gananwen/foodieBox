@@ -1,57 +1,68 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../../util/styles.dart'; // 🔹 Your shared style file
-import 'rating_page.dart'; // 🔹 Import the rating page
+
+// ⭐️ Defined Internal Styles for Modern Look ⭐️
+const Color _kPrimaryColor = Colors.blueAccent;
+const Color _kAppBackgroundColor = Color(0xFFF7F9FC); // Light background
+const Color _kTextColor = Color(0xFF333333); // Dark text
+
+const TextStyle _kLabelTextStyle =
+    TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _kTextColor);
+const TextStyle _kHintTextStyle = TextStyle(fontSize: 14, color: Colors.grey);
+// ⭐️ END OF INTERNAL STYLES ⭐️
 
 class DisputePage extends StatefulWidget {
-  const DisputePage({super.key});
+  final Map<String, dynamic> review;
+  final String adminId; // pass current admin UID
+
+  const DisputePage({super.key, required this.review, required this.adminId});
 
   @override
   State<DisputePage> createState() => _DisputePageState();
 }
 
-class _DisputePageState extends State<DisputePage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  final List<Map<String, dynamic>> reviewData = [
-    {
-      'vendorName': 'The Green Leaf Cafe',
-      'orderId': '0020',
-      'customer': 'Sophie Hart',
-      'rating': 4,
-      'feedback':
-          'The paper bag didn’t close properly, but the items still in good condition. The delivery also take more time than it should be…',
-      'status': 'Open',
-    },
-    {
-      'vendorName': 'Urban Coffee House',
-      'orderId': '0018',
-      'customer': 'Liam Johnson',
-      'rating': 2,
-      'feedback': 'Coffee was cold and packaging was leaking.',
-      'status': 'Pending',
-    },
-    {
-      'vendorName': 'Spice Garden',
-      'orderId': '0012',
-      'customer': 'Maria Lopez',
-      'rating': 3,
-      'feedback': 'Food was okay, but service could improve.',
-      'status': 'Resolved',
-    },
-  ];
+class _DisputePageState extends State<DisputePage> {
+  late Map<String, dynamic> review;
+  bool _loadingInfo = true;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    review = widget.review;
+    _fetchRelatedInfo();
   }
 
-  // Color mapping for statuses
+  /// 🔹 Fetch only emails for user and vendor from users collection
+  Future<void> _fetchRelatedInfo() async {
+    try {
+      // User email
+      final userSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(review['userId'])
+          .get();
+      review['userEmail'] = userSnap.data()?['email'] ?? 'N/A';
+
+      // Vendor email
+      final vendorSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(review['vendorId'])
+          .get();
+      review['vendorEmail'] = vendorSnap.data()?['email'] ?? 'N/A';
+
+      setState(() {
+        _loadingInfo = false;
+      });
+    } catch (e) {
+      setState(() {
+        _loadingInfo = false;
+      });
+    }
+  }
+
   Color _statusColor(String status) {
     switch (status) {
       case 'Open':
-        return Colors.orange.shade600;
+        return Colors.red.shade600; // Red for urgency/attention
       case 'Pending':
         return Colors.blue.shade600;
       case 'Resolved':
@@ -61,271 +72,328 @@ class _DisputePageState extends State<DisputePage>
     }
   }
 
-  Widget _buildStarRating(int stars) {
-    return Row(
-      children: List.generate(
-        5,
-        (index) => Icon(
-          index < stars ? Icons.star : Icons.star_border,
-          color: index < stars ? Colors.amber : Colors.grey.shade400,
-          size: 20,
-        ),
+  // ⭐️ NEW: Helper to build a styled data row
+  Widget _buildDataRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: _kPrimaryColor.withOpacity(0.8)),
+          const SizedBox(width: 8),
+          Text('$label:',
+              style: _kLabelTextStyle.copyWith(
+                  fontSize: 15, fontWeight: FontWeight.w500)),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: _kLabelTextStyle.copyWith(
+                  fontSize: 15, fontWeight: FontWeight.w400),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildStarRating(double stars) {
+    return Row(
+      children: List.generate(5, (index) {
+        if (stars >= index + 1) {
+          return const Icon(Icons.star, color: Colors.amber, size: 20);
+        } else if (stars > index && stars < index + 1) {
+          return const Icon(Icons.star_half, color: Colors.amber, size: 20);
+        } else {
+          return Icon(Icons.star_border, color: Colors.grey.shade400, size: 20);
+        }
+      }),
     );
   }
 
   Widget _buildReviewCard(Map<String, dynamic> review) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Vendor & Order Info
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.image_outlined,
-                    color: Colors.black45, size: 26),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(review['vendorName'],
-                        style: kLabelTextStyle.copyWith(fontSize: 16)),
-                    Text('OrderID #${review['orderId']}',
-                        style: kHintTextStyle.copyWith(fontSize: 13)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-
-          // Customer Info + Rating
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 45,
-                height: 45,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFDADADA),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.person_outline,
-                    color: Colors.black54, size: 26),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(review['customer'],
-                        style: kLabelTextStyle.copyWith(fontSize: 15)),
-                    const SizedBox(height: 4),
-                    _buildStarRating(review['rating']),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Feedback text
-          Container(
-            width: double.infinity,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              review['feedback'],
-              style: kHintTextStyle.copyWith(
-                color: Colors.black87,
-                fontSize: 14,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
+        borderRadius: BorderRadius.circular(16), // Softer corners
+        boxShadow: [
+          // Modern, soft shadow
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
+      child: _loadingInfo
+          ? const Center(
+              child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: CircularProgressIndicator(color: _kPrimaryColor),
+            ))
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Status Tag
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                      color: _statusColor(review['status']).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8)),
+                  child: Text(review['status'],
+                      style: TextStyle(
+                          color: _statusColor(review['status']),
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(height: 16),
+
+                // 2. Data Rows
+                _buildDataRow(
+                    Icons.receipt_long, 'Order ID', review['orderId']),
+                _buildDataRow(
+                    Icons.person_outline, 'User Email', review['userEmail']),
+                _buildDataRow(
+                    Icons.storefront, 'Vendor Email', review['vendorEmail']),
+
+                const Divider(height: 24),
+
+                // 3. Rating & Feedback
+                Text('Rating:', style: _kLabelTextStyle.copyWith(fontSize: 15)),
+                const SizedBox(height: 6),
+                _buildStarRating((review['rating'] as num?)?.toDouble() ?? 0.0),
+
+                const SizedBox(height: 16),
+
+                Text('Feedback:',
+                    style: _kLabelTextStyle.copyWith(fontSize: 15)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: _kAppBackgroundColor,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(review['feedback'],
+                      style: _kHintTextStyle.copyWith(
+                          fontSize: 14,
+                          fontStyle: FontStyle.italic,
+                          color: _kTextColor)),
+                ),
+              ],
+            ),
     );
   }
 
-  // 🔹 Confirmation dialog before actions
-  void _showConfirmationDialog(String actionLabel, IconData icon, Color color) {
-    showDialog(
+  /// 🔹 Update status with reason & log
+  Future<void> _updateStatus(String newStatus) async {
+    TextEditingController reasonController = TextEditingController();
+
+    await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        title: Row(
-          children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(width: 10),
-            Text(actionLabel,
-                style: kLabelTextStyle.copyWith(
-                    fontSize: 16, color: Colors.black)),
-          ],
-        ),
-        content: Text(
-          'Are you sure you want to $actionLabel?',
-          style: kHintTextStyle.copyWith(fontSize: 14),
+      builder: (_) => AlertDialog(
+        title: Text('Reason for $newStatus', style: _kLabelTextStyle),
+        content: TextField(
+          controller: reasonController,
+          maxLines: 3,
+          decoration: InputDecoration(
+            hintText: 'Enter reason for changing status',
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10)), // Modern border
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child:
-                const Text('Cancel', style: TextStyle(color: Colors.black54)),
+            child: const Text('Cancel'),
           ),
-          TextButton(
-            onPressed: () {
+          ElevatedButton(
+            onPressed: () async {
+              final reason = reasonController.text.trim();
+              if (reason.isEmpty) return;
+
+              final docRef = FirebaseFirestore.instance
+                  .collection('reviews')
+                  .doc(review['id']);
+
+              await docRef.update({'status': newStatus});
+
+              // Save moderation log
+              await FirebaseFirestore.instance
+                  .collection('moderationLogs')
+                  .add({
+                'reviewId': review['id'],
+                'adminId': widget.adminId,
+                'action': newStatus,
+                'reason': reason,
+                'timestamp': FieldValue.serverTimestamp(),
+              });
+
+              setState(() {
+                review['status'] = newStatus;
+              });
+
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('$actionLabel confirmed')),
-              );
             },
-            child: Text('Confirm', style: TextStyle(color: color)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _statusColor(newStatus),
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Confirm $newStatus'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActionButton(IconData icon, String label, Color color) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade400),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: InkWell(
-        onTap: () => _showConfirmationDialog(label, icon, color),
-        borderRadius: BorderRadius.circular(6),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          child: Row(
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 12),
-              Text(label,
-                  style: kLabelTextStyle.copyWith(
-                      fontSize: 14, color: Colors.black87)),
-            ],
+  /// 🔹 Delete review with reason & log
+  Future<void> _deleteReview() async {
+    TextEditingController reasonController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Reason for Deletion'),
+        content: TextField(
+          controller: reasonController,
+          maxLines: 3,
+          decoration: InputDecoration(
+            hintText: 'Enter reason for deleting review',
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10)), // Modern border
           ),
         ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          ElevatedButton(
+              onPressed: () async {
+                final reason = reasonController.text.trim();
+                if (reason.isEmpty) return;
+
+                await FirebaseFirestore.instance
+                    .collection('reviews')
+                    .doc(review['id'])
+                    .delete();
+
+                // Save moderation log
+                await FirebaseFirestore.instance
+                    .collection('moderationLogs')
+                    .add({
+                  'reviewId': review['id'],
+                  'adminId': widget.adminId,
+                  'action': 'Deleted',
+                  'reason': reason,
+                  'timestamp': FieldValue.serverTimestamp(),
+                });
+
+                Navigator.pop(context); // close dialog
+                Navigator.pop(context); // go back to panel
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade600,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Confirm Deletion')),
+        ],
       ),
     );
   }
 
-  Widget _buildTabContent(String status) {
-    final filtered = reviewData.where((r) => r['status'] == status).toList();
-
-    if (filtered.isEmpty) {
-      return Center(
-          child: Text('No $status reviews found.',
-              style: kHintTextStyle.copyWith(fontSize: 14)));
-    }
-
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Text('Review Details',
-            style: kLabelTextStyle.copyWith(
-                fontSize: 16, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 12),
-        _buildReviewCard(filtered.first),
-        const SizedBox(height: 20),
-        Text('Moderation Actions',
-            style: kLabelTextStyle.copyWith(
-                fontSize: 16, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 12),
-        _buildActionButton(Icons.delete_outline, 'Delete Review', Colors.red),
-        _buildActionButton(Icons.visibility_off_outlined, 'Hide Review',
-            Colors.orange.shade700),
-        _buildActionButton(
-            Icons.warning_amber_outlined, 'Warn Vendor', Colors.amber.shade800),
-      ],
+  // ⭐️ NEW: Unified action button helper for a modern look
+  Widget _buildActionButton(
+      String label, IconData icon, Color color, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: ElevatedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 20),
+        label: Text(label, style: const TextStyle(fontSize: 15)),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          minimumSize:
+              const Size(double.infinity, 50), // Full width, tall button
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12), // Modern rounded corners
+          ),
+          elevation: 3, // Subtle lift
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: _kAppBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0,
+        elevation: 1, // Slight elevation for definition
+        surfaceTintColor:
+            Colors.white, // Ensures appbar doesn't inherit background tint
         leading: IconButton(
-          icon:
-              const Icon(Icons.arrow_back_ios_new, color: kTextColor, size: 20),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const LowRatingsPanel()),
-            );
-          },
+          icon: const Icon(Icons.arrow_back_ios_new, color: _kTextColor),
+          onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Review Moderation',
-          style: TextStyle(color: kTextColor, fontSize: 18),
-        ),
-        centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(44),
-          child: TabBar(
-            controller: _tabController,
-            labelColor: Colors.black,
-            unselectedLabelColor: Colors.black54,
-            indicatorColor: Colors.black,
-            indicatorWeight: 1.5,
-            labelStyle: kHintTextStyle.copyWith(
-                fontSize: 14, fontWeight: FontWeight.w600),
-            unselectedLabelStyle: kHintTextStyle.copyWith(
-                fontSize: 14, fontWeight: FontWeight.w400),
-            tabs: const [
-              Tab(text: 'Open'),
-              Tab(text: 'Pending'),
-              Tab(text: 'Resolved'),
-            ],
-          ),
-        ),
+        title: const Text('Review Moderation',
+            style: TextStyle(
+                color: _kTextColor, fontSize: 18, fontWeight: FontWeight.bold)),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildTabContent('Open'),
-          _buildTabContent('Pending'),
-          _buildTabContent('Resolved'),
-        ],
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Review Details Header
+            Text('Review Details',
+                style: _kLabelTextStyle.copyWith(
+                    fontSize: 18, color: _kPrimaryColor)),
+            const SizedBox(height: 8),
+            // Main Review Card
+            _buildReviewCard(review),
+
+            const SizedBox(height: 30),
+
+            // Action Buttons Header
+            Text('Moderation Actions',
+                style: _kLabelTextStyle.copyWith(
+                    fontSize: 18, color: _kPrimaryColor)),
+            const SizedBox(height: 12),
+
+            // Action Buttons
+            _buildActionButton(
+              'Mark as Pending',
+              Icons.hourglass_empty,
+              Colors.blue.shade600,
+              () => _updateStatus('Pending'),
+            ),
+            _buildActionButton(
+              'Mark as Resolved',
+              Icons.check_circle_outline,
+              Colors.green.shade600,
+              () => _updateStatus('Resolved'),
+            ),
+
+            const SizedBox(height: 12),
+            const Divider(),
+            const SizedBox(height: 8),
+
+            _buildActionButton(
+              'Delete Review Permanently',
+              Icons.delete_forever,
+              Colors.red.shade600,
+              _deleteReview,
+            ),
+          ],
+        ),
       ),
     );
   }
-}
-
-// ------------------ For Standalone Testing ------------------
-void main() {
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: DisputePage(),
-  ));
 }

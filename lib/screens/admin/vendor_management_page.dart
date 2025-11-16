@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'vendor_register_page.dart';
 import 'admin_home_page.dart';
 
 class VendorManagementPage extends StatefulWidget {
@@ -44,16 +43,6 @@ class _VendorManagementPageState extends State<VendorManagementPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: Colors.blue,
-        icon: const Icon(Icons.person_add_alt_1_rounded, color: Colors.white),
-        label: const Text("Register Vendor",
-            style: TextStyle(color: Colors.white)),
-        onPressed: () {
-          Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const VendorRegisterPage()));
-        },
-      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -151,8 +140,7 @@ class _VendorManagementPageState extends State<VendorManagementPage> {
               child: OutlinedButton(
                 onPressed: () => setState(() => _selectedFilter = filter),
                 style: OutlinedButton.styleFrom(
-                  minimumSize:
-                      Size(80, 36), // 👈 Fixed width to prevent wrapping
+                  minimumSize: Size(80, 36),
                   backgroundColor: selected ? Colors.blue : Colors.white,
                   side: BorderSide(
                       color: selected ? Colors.blue : Colors.grey.shade300),
@@ -161,7 +149,7 @@ class _VendorManagementPageState extends State<VendorManagementPage> {
                 ),
                 child: Text(
                   filter,
-                  overflow: TextOverflow.ellipsis, // 👈 Prevents overflow
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
                     color: selected ? Colors.white : Colors.black,
@@ -439,72 +427,169 @@ class _VendorManagementPageState extends State<VendorManagementPage> {
       String docId, Map<String, dynamic> raw) async {
     await showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(raw['storeName'] ?? 'Vendor Details'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _detailRow(Icons.phone, 'Phone', raw['storePhone'] ?? 'N/A'),
-              _detailRow(
-                  Icons.location_on, 'Address', raw['storeAddress'] ?? 'N/A'),
-              if ((raw['vendorType'] ?? '').toString().isNotEmpty)
-                _detailRow(Icons.category, 'Type', raw['vendorType']),
-              _detailRow(Icons.star, 'Rating', (raw['rating'] ?? 0).toString()),
-              const SizedBox(height: 12),
-              if (raw['businessLicenseUrl'] != null)
-                _linkRow('Business License', raw['businessLicenseUrl']),
-              if (raw['businessPhotoUrl'] != null)
-                _linkRow('Store Photo', raw['businessPhotoUrl']),
-              if (raw['halalCertificateUrl'] != null)
-                _linkRow('Halal Certificate', raw['halalCertificateUrl']),
-            ],
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Text(
+                    raw['storeName'] ?? 'Vendor Details',
+                    style: const TextStyle(
+                        fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Basic Info Section
+                  _sectionTitle('Basic Information'),
+                  _detailRow(Icons.phone, 'Phone', raw['storePhone'] ?? 'N/A'),
+                  _detailRow(Icons.location_on, 'Address',
+                      raw['storeAddress'] ?? 'N/A'),
+                  if ((raw['vendorType'] ?? '').toString().isNotEmpty)
+                    _detailRow(Icons.category, 'Type', raw['vendorType']),
+                  _detailRow(
+                      Icons.star, 'Rating', (raw['rating'] ?? 0).toString()),
+
+                  const SizedBox(height: 16),
+
+                  // Documents / Links Section
+                  _sectionTitle('Documents & Photos'),
+                  if (raw['businessLicenseUrl'] != null)
+                    _imageLinkRow(
+                        'Business License', raw['businessLicenseUrl']),
+                  if (raw['businessPhotoUrl'] != null)
+                    _imageLinkRow('Store Photo', raw['businessPhotoUrl']),
+                  if (raw['halalCertificateUrl'] != null)
+                    _imageLinkRow(
+                        'Halal Certificate', raw['halalCertificateUrl']),
+
+                  const SizedBox(height: 24),
+
+                  // Close Button
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8))),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 12),
+                          child: Text('Close', style: TextStyle(fontSize: 14)),
+                        )),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close'))
+      ),
+    );
+  }
+
+  Widget _imageLinkRow(String label, String url) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Colors.black87),
+          ),
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: () async {
+              try {
+                final uri = Uri.parse(url);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Could not launch URL')),
+                    );
+                  }
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                url,
+                height: 120,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return SizedBox(
+                    height: 120,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                },
+                errorBuilder: (_, __, ___) => Container(
+                  height: 120,
+                  color: Colors.grey[200],
+                  child: const Center(
+                      child: Icon(Icons.broken_image,
+                          size: 40, color: Colors.grey)),
+                ),
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+            fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
       ),
     );
   }
 
   Widget _detailRow(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: Colors.grey[700]),
-          const SizedBox(width: 8),
-          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
-          Expanded(child: Text(value)),
-        ],
-      ),
-    );
-  }
-
-  Widget _linkRow(String label, String url) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Icon(Icons.link, size: 20, color: Colors.grey[700]),
-          const SizedBox(width: 8),
-          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Icon(icon, size: 22, color: Colors.grey[700]),
+          const SizedBox(width: 12),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Colors.black87),
+          ),
           Expanded(
-            child: GestureDetector(
-              onTap: () async {
-                final uri = Uri.parse(url);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
-              child: Text(
-                url,
-                style: const TextStyle(
-                    color: Colors.blue, decoration: TextDecoration.underline),
-              ),
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 14, color: Colors.black87),
             ),
           ),
         ],

@@ -1,10 +1,22 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:foodiebox/screens/admin/admin_home_page.dart';
-import '../../util/styles.dart';
 import 'dispute_page.dart';
 
+// ⭐️ Defined Internal Styles for Modern Look ⭐️
+const Color _kPrimaryActionColor = Colors.blueAccent;
+const Color _kAppBackgroundColor = Color(0xFFF7F9FC); // Light background
+const Color _kTextColor = Color(0xFF333333); // Dark text
+
+const TextStyle _kLabelTextStyle =
+    TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _kTextColor);
+const TextStyle _kHintTextStyle =
+    TextStyle(fontSize: 14, color: Color.fromARGB(255, 60, 59, 59));
+// ⭐️ END OF INTERNAL STYLES ⭐️
+
 class LowRatingsPanel extends StatefulWidget {
-  const LowRatingsPanel({super.key});
+  final String adminId; // pass current admin UID for logging actions
+  const LowRatingsPanel({super.key, required this.adminId});
 
   @override
   State<LowRatingsPanel> createState() => _LowRatingsPanelState();
@@ -13,54 +25,6 @@ class LowRatingsPanel extends StatefulWidget {
 class _LowRatingsPanelState extends State<LowRatingsPanel>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
-  final List<Map<String, dynamic>> lowRatings = [
-    {
-      'name': 'Sophie Hart',
-      'id': '0034',
-      'date': '14/06/2025',
-      'rating': 3,
-      'feedback': 'Food was cold and delivery was slow.',
-      'status': 'Open',
-      'isNew': true,
-    },
-    {
-      'name': 'Artie Lang',
-      'id': '0014',
-      'date': '03/04/2025',
-      'rating': 2,
-      'feedback': 'Incorrect order received.',
-      'status': 'Pending',
-      'isNew': false,
-    },
-    {
-      'name': 'Dave David',
-      'id': '0012',
-      'date': '09/06/2024',
-      'rating': 1,
-      'feedback': 'Terrible service, very rude staff.',
-      'status': 'Resolved',
-      'isNew': false,
-    },
-    {
-      'name': 'Maria Geller',
-      'id': '0007',
-      'date': '05/02/2024',
-      'rating': 3,
-      'feedback': 'Average experience, could be better.',
-      'status': 'Open',
-      'isNew': false,
-    },
-    {
-      'name': 'Chandler Bing',
-      'id': '0005',
-      'date': '10/01/2024',
-      'rating': 2,
-      'feedback': 'Late delivery, food quality not good.',
-      'status': 'Open',
-      'isNew': false,
-    },
-  ];
 
   @override
   void initState() {
@@ -74,113 +38,139 @@ class _LowRatingsPanelState extends State<LowRatingsPanel>
     super.dispose();
   }
 
-  // 🔹 Status color
+  /// 🔹 Stream to fetch low ratings in real-time
+  Stream<List<Map<String, dynamic>>> _reviewsStream() {
+    return FirebaseFirestore.instance
+        .collection('reviews')
+        .where('rating', isLessThanOrEqualTo: 3)
+        .orderBy('rating', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      List<Map<String, dynamic>> reviews = [];
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+
+        // Ensure missing status field
+        if (!data.containsKey('status')) {
+          await doc.reference.update({'status': 'Open'});
+        }
+
+        // Fetch user email only
+        String userEmail = '-';
+        if (data['userId'] != null && data['userId'] != '') {
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(data['userId'])
+              .get();
+          if (userDoc.exists) {
+            final u = userDoc.data()!;
+            userEmail = u['email'] ?? '-';
+          }
+        }
+
+        // Fetch vendor email only
+        String vendorEmail = '-';
+        if (data['vendorId'] != null && data['vendorId'] != '') {
+          final vendorDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(data['vendorId'])
+              .get();
+          if (vendorDoc.exists) {
+            final v = vendorDoc.data()!;
+            vendorEmail = v['email'] ?? '-';
+          }
+        }
+
+        reviews.add({
+          'id': doc.id,
+          'orderId': data['orderId'] ?? '',
+          'userId': data['userId'] ?? '',
+          'vendorId': data['vendorId'] ?? '',
+          'rating': data['rating'] ?? 0,
+          'feedback': data['reviewText'] ?? '',
+          'timestamp': (data['timestamp'] as Timestamp?)?.toDate(),
+          'status': data['status'] ?? 'Open',
+          'userEmail': userEmail,
+          'vendorEmail': vendorEmail,
+        });
+      }
+
+      return reviews;
+    });
+  }
+
   Color _statusColor(String status) {
     switch (status) {
       case 'Open':
-        return Colors.green.shade600;
+        return Colors.red.shade600; // Consistent with DisputePage
       case 'Pending':
-        return Colors.orange.shade600;
+        return Colors.blue.shade600;
       case 'Resolved':
-        return Colors.red.shade600;
+        return Colors.green.shade600;
       default:
         return Colors.grey;
     }
   }
 
-  // 🔹 Star Rating
-  Widget _buildStarRating(int stars) {
+  // ⭐️ Star rating widget that supports int & double (fractional) ⭐️
+  Widget _buildStarRating(double stars) {
     return Row(
-      children: List.generate(
-        5,
-        (index) => Padding(
-          padding: const EdgeInsets.only(left: 1.0),
-          child: Icon(
-            index < stars ? Icons.star : Icons.star_border,
-            color: index < stars ? Colors.amber : Colors.grey.shade400,
-            size: 16,
-          ),
-        ),
-      ),
+      children: List.generate(5, (index) {
+        if (stars >= index + 1) {
+          return const Icon(Icons.star, color: Colors.amber, size: 16);
+        } else if (stars > index && stars < index + 1) {
+          return const Icon(Icons.star_half, color: Colors.amber, size: 16);
+        } else {
+          return Icon(Icons.star_border, color: Colors.grey.shade400, size: 16);
+        }
+      }),
     );
   }
 
-  // 🔹 Popup Dialog (View/Delete)
-  void _showPopupDialog({
-    required String title,
-    required Widget content,
-    bool requireConfirm = false,
-  }) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: kCardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(
-          title,
-          style:
-              const TextStyle(color: kTextColor, fontWeight: FontWeight.bold),
-        ),
-        content: content,
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close', style: TextStyle(color: kTextColor))),
-          if (requireConfirm)
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimaryActionColor),
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(content: Text('$title confirmed')));
-              },
-              child:
-                  const Text('Confirm', style: TextStyle(color: Colors.white)),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // 🔹 Compact Rating Card (tappable)
   Widget _buildRatingCard(Map<String, dynamic> data) {
     return GestureDetector(
       onTap: () {
-        // ✅ Navigate to DisputePage
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const DisputePage()),
+          MaterialPageRoute(
+            builder: (_) => DisputePage(
+              review: data,
+              adminId: widget.adminId,
+            ),
+          ),
         );
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border.all(color: Colors.grey.shade300, width: 1),
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.15),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+          padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🔹 Top section: avatar + details + status
               Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.person_outline,
-                          color: Colors.black54, size: 28),
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: _kAppBackgroundColor,
+                      shape: BoxShape.circle,
                     ),
+                    child: const Icon(Icons.person_outline,
+                        color: _kTextColor, size: 28),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -190,25 +180,28 @@ class _LowRatingsPanelState extends State<LowRatingsPanel>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Flexible(
+                            Expanded(
                               child: Text(
-                                data['name'],
-                                style: kLabelTextStyle.copyWith(fontSize: 16),
+                                data['userEmail'] ?? '-',
+                                style: _kLabelTextStyle.copyWith(
+                                    fontSize: 16, fontWeight: FontWeight.bold),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
+                                  horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: _statusColor(data['status']),
-                                borderRadius: BorderRadius.circular(12),
+                                color: _statusColor(data['status'])
+                                    .withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(16),
                               ),
                               child: Text(
                                 data['status'],
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10.5,
+                                style: TextStyle(
+                                  color: _statusColor(data['status']),
+                                  fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -216,78 +209,30 @@ class _LowRatingsPanelState extends State<LowRatingsPanel>
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Text('Order ID: ${data['id']}',
-                            style: kHintTextStyle.copyWith(fontSize: 13)),
-                        Text('Date: ${data['date']}',
-                            style: kHintTextStyle.copyWith(fontSize: 13)),
+                        Text('Order ID: ${data['orderId']}',
+                            style: _kHintTextStyle.copyWith(fontSize: 13)),
+                        Text(
+                            'Date: ${data['timestamp'] != null ? data['timestamp'].toString().split(' ')[0] : '-'}',
+                            style: _kHintTextStyle.copyWith(fontSize: 13)),
+                        Text('Vendor: ${data['vendorEmail'] ?? '-'}',
+                            style: _kHintTextStyle.copyWith(fontSize: 13)),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              _buildStarRating(data['rating']),
-              const SizedBox(height: 6),
+              const Divider(height: 24),
+              _buildStarRating((data['rating'] as num?)?.toDouble() ?? 0.0),
+              const SizedBox(height: 8),
               Text(
-                data['feedback'],
-                style: kHintTextStyle.copyWith(
+                data['feedback'] ?? '',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: _kHintTextStyle.copyWith(
                   fontSize: 13,
                   color: Colors.black87,
                   fontStyle: FontStyle.italic,
                 ),
-              ),
-              const Divider(height: 20, thickness: 0.5, color: Colors.grey),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.remove_red_eye_outlined,
-                        color: Colors.black54),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: () {
-                      _showPopupDialog(
-                        title: "Rating Details",
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text("Customer: ${data['name']}",
-                                style: kHintTextStyle),
-                            Text("Order ID: ${data['id']}",
-                                style: kHintTextStyle),
-                            Text("Date: ${data['date']}",
-                                style: kHintTextStyle),
-                            const SizedBox(height: 6),
-                            _buildStarRating(data['rating']),
-                            const SizedBox(height: 8),
-                            Text("Feedback:", style: kLabelTextStyle),
-                            Text(data['feedback'],
-                                style: kHintTextStyle.copyWith(
-                                    fontStyle: FontStyle.italic)),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 16),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline,
-                        color: Colors.redAccent),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: () {
-                      _showPopupDialog(
-                        title: "Delete Confirmation",
-                        content: const Text(
-                          "Are you sure you want to delete this rating?",
-                          style: kHintTextStyle,
-                        ),
-                        requireConfirm: true,
-                      );
-                    },
-                  ),
-                ],
               ),
             ],
           ),
@@ -296,21 +241,38 @@ class _LowRatingsPanelState extends State<LowRatingsPanel>
     );
   }
 
-  // 🔹 Filter by tab status
   Widget _buildRatingList(String status) {
-    final filtered = lowRatings.where((r) => r['status'] == status).toList();
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _reviewsStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+              child: CircularProgressIndicator(color: _kPrimaryActionColor));
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
 
-    if (filtered.isEmpty) {
-      return Center(
-        child: Text('No $status cases found.', style: kHintTextStyle),
-      );
-    }
+        final reviews = snapshot.data ?? [];
+        final filtered = reviews.where((r) => r['status'] == status).toList();
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemCount: filtered.length,
-      itemBuilder: (context, index) {
-        return _buildRatingCard(filtered[index]);
+        if (filtered.isEmpty) {
+          return Center(
+              child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Text('No $status cases found.',
+                style: _kHintTextStyle.copyWith(fontSize: 16)),
+          ));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(
+              horizontal: 16, vertical: 16), // Increased vertical padding
+          itemCount: filtered.length,
+          itemBuilder: (context, index) {
+            return _buildRatingCard(filtered[index]);
+          },
+        );
       },
     );
   }
@@ -318,13 +280,15 @@ class _LowRatingsPanelState extends State<LowRatingsPanel>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kAppBackgroundColor,
+      backgroundColor: _kAppBackgroundColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
-        elevation: 0,
+        elevation: 2, // Added slight elevation to app bar
+        surfaceTintColor: Colors.white,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: kTextColor),
+          icon: const Icon(Icons.arrow_back_ios_new,
+              color: _kTextColor), // Changed icon to ios_new
           onPressed: () {
             Navigator.push(
               context,
@@ -335,14 +299,15 @@ class _LowRatingsPanelState extends State<LowRatingsPanel>
         title: const Text(
           'Dispute Resolution Panel',
           style: TextStyle(
-              color: kTextColor, fontWeight: FontWeight.bold, fontSize: 18),
+              color: _kTextColor, fontWeight: FontWeight.bold, fontSize: 18),
         ),
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: kPrimaryActionColor,
-          labelColor: kPrimaryActionColor,
-          unselectedLabelColor: Colors.grey,
+          indicatorColor: _kPrimaryActionColor, // Blue accent
+          labelColor: _kPrimaryActionColor, // Blue accent
+          unselectedLabelColor: Colors.grey.shade600,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold),
           tabs: const [
             Tab(text: 'Open'),
             Tab(text: 'Pending'),
@@ -360,12 +325,4 @@ class _LowRatingsPanelState extends State<LowRatingsPanel>
       ),
     );
   }
-}
-
-// ------------------ For Standalone Testing ------------------
-void main() {
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: LowRatingsPanel(),
-  ));
 }

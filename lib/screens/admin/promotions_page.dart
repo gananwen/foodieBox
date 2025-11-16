@@ -31,6 +31,10 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
   static const Color _primary = Color(0xFF1565C0);
   static const double _cardElevation = 6.0;
 
+  // New lists
+  final List<String> _vendorTypes = ['all', 'pickup', 'delivery'];
+  final List<String> _orderTypes = ['BlindBox', 'Grocery', 'All'];
+
   @override
   void initState() {
     super.initState();
@@ -135,6 +139,29 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
 
       final vouchers = snapshot.docs.map((doc) {
         final data = doc.data();
+
+        // Correct mapping
+        String orderTypeRaw = (data['applicableOrderType'] ?? 'All').toString();
+        String orderTypeFixed;
+        switch (orderTypeRaw.toLowerCase()) {
+          case 'blindbox':
+            orderTypeFixed = 'BlindBox';
+            break;
+          case 'grocery':
+            orderTypeFixed = 'Grocery';
+            break;
+          case 'all':
+          default:
+            orderTypeFixed = 'All';
+        }
+
+        String vendorTypeRaw =
+            (data['applicableVendorType'] ?? 'all').toString();
+        String vendorTypeFixed =
+            ['all', 'pickup', 'delivery'].contains(vendorTypeRaw.toLowerCase())
+                ? vendorTypeRaw.toLowerCase()
+                : 'all';
+
         return {
           'id': doc.id,
           'name': data['name'] ?? '',
@@ -143,7 +170,8 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
           'discountType': data['discountType'] ?? '',
           'discountValue': data['discountValue'] ?? 0,
           'minSpend': data['minSpend'] ?? 0,
-          'applicableOrderType': data['applicableOrderType'] ?? '',
+          'applicableOrderType': orderTypeFixed,
+          'applicableVendorType': vendorTypeFixed,
           'firstTimeOnly': data['firstTimeOnly'] ?? false,
           'weekendOnly': data['weekendOnly'] ?? false,
           'startDate': data['startDate'],
@@ -186,11 +214,15 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
 
   void _applyVoucherFilters() {
     final q = _searchController.text.trim().toLowerCase();
+
     _filteredVouchers = _allVouchers.where((v) {
       return v['name'].toLowerCase().contains(q) ||
           v['code'].toLowerCase().contains(q) ||
-          v['description'].toLowerCase().contains(q);
+          v['description'].toLowerCase().contains(q) ||
+          v['applicableOrderType'].toLowerCase().contains(q) ||
+          v['applicableVendorType'].toLowerCase().contains(q);
     }).toList();
+
     setState(() {});
   }
 
@@ -508,17 +540,19 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
       color: Colors.white,
       child: InkWell(
         borderRadius: BorderRadius.circular(_cardRadius),
-        onTap: () {},
+        onTap: () => _showPromotionDetails(promo),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Banner
             ClipRRect(
-              borderRadius: const BorderRadius.only(
+              borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(_cardRadius),
                 topRight: Radius.circular(_cardRadius),
               ),
               child: AspectRatio(
                 aspectRatio: 16 / 9,
-                child: banner != null && banner.toString().isNotEmpty
+                child: banner != null && banner.isNotEmpty
                     ? Image.network(
                         banner,
                         fit: BoxFit.cover,
@@ -533,59 +567,85 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
                     : Container(
                         color: Colors.grey.shade100,
                         child: const Center(
-                            child: Icon(Icons.photo,
-                                size: 40, color: Colors.black26)),
+                          child: Icon(Icons.photo,
+                              size: 40, color: Colors.black26),
+                        ),
                       ),
               ),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      promo['title'],
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      promo['vendor'] ?? 'Unknown Vendor',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          TextStyle(color: Colors.grey.shade700, fontSize: 13),
-                    ),
-                    const Spacer(),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _statusColor(status).withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            status,
-                            style: TextStyle(
-                                color: _statusColor(status),
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12),
-                          ),
+
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    promo['title'],
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    promo['vendor'] ?? 'Unknown Vendor',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _statusColor(status).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        const Spacer(),
-                        Text(
-                          "${promo['discountPercentage']}%",
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 13),
+                        child: Text(
+                          status,
+                          style: TextStyle(
+                              color: _statusColor(status),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        "${promo['discountPercentage']}%",
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Action buttons
+                  if (status != 'Active')
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        _smallButton(
+                          text: 'Approve',
+                          color: Colors.green.shade700,
+                          onTap: () => _updateStatus(
+                              vendorId: promo['vendorId'],
+                              promoId: promo['id'],
+                              status: 'Active'),
+                        ),
+                        const SizedBox(width: 6),
+                        _smallButton(
+                          text: 'Decline',
+                          color: Colors.red.shade700,
+                          onTap: () => _updateStatus(
+                              vendorId: promo['vendorId'],
+                              promoId: promo['id'],
+                              status: 'Declined'),
                         ),
                       ],
                     ),
-                  ],
-                ),
+                ],
               ),
             ),
           ],
@@ -613,50 +673,68 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
             ),
           );
         },
-        child: Padding(
+        child: Container(
           padding: const EdgeInsets.all(12),
+          constraints: const BoxConstraints(
+              minHeight: 120), // minimum height for button alignment
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment:
+                MainAxisAlignment.spaceBetween, // push buttons to bottom
             children: [
-              Text(voucher['name'],
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 6),
-              Text(voucher['code'],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
-              const SizedBox(height: 6),
-              Text(voucher['description'],
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
-              const Spacer(),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    voucher['name'],
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    voucher['code'],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    voucher['description'],
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                  ),
+                ],
+              ),
+
+              // Buttons at the bottom
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   _smallButton(
-                      text: 'Edit',
-                      color: Colors.blue.shade700,
-                      onTap: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => VoucherFormScreen(
-                              voucher: voucher,
-                              onSaved: _fetchAllVouchers,
-                            ),
+                    text: 'Edit',
+                    color: Colors.blue.shade700,
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => VoucherFormScreen(
+                            voucher: voucher,
+                            onSaved: _fetchAllVouchers,
                           ),
-                        );
-                      }),
+                        ),
+                      );
+                    },
+                  ),
                   const SizedBox(width: 8),
                   _smallButton(
-                      text: 'Delete',
-                      color: Colors.red.shade700,
-                      onTap: () => _deleteVoucher(voucher['id'])),
+                    text: 'Delete',
+                    color: Colors.red.shade700,
+                    onTap: () => _deleteVoucher(voucher['id']),
+                  ),
                 ],
-              )
+              ),
             ],
           ),
         ),
@@ -694,6 +772,8 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
       context: context,
       builder: (context) {
         final banner = promo['bannerURL'];
+        final status = promo['status'];
+
         return Dialog(
           insetPadding:
               const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -716,9 +796,96 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
                         borderRadius: BorderRadius.circular(10),
                         child: AspectRatio(
                           aspectRatio: 16 / 9,
-                          child: Image.network(banner, fit: BoxFit.cover),
+                          child: Image.network(
+                            banner,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (c, child, p) => p == null
+                                ? child
+                                : const Center(
+                                    child: CircularProgressIndicator()),
+                            errorBuilder: (_, __, ___) => Container(
+                              color: Colors.grey.shade200,
+                              child:
+                                  const Center(child: Icon(Icons.broken_image)),
+                            ),
+                          ),
                         ),
                       ),
+                    const SizedBox(height: 12),
+                    Text(
+                      "Vendor: ${promo['vendor'] ?? 'Unknown'}",
+                      style:
+                          TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      "Product Type: ${promo['productType'] ?? '-'}",
+                      style:
+                          TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      "Discount: ${promo['discountPercentage'] ?? 0}%",
+                      style:
+                          TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      "Redemptions: ${promo['claimedRedemptions'] ?? 0} / ${promo['totalRedemptions'] ?? 0}",
+                      style:
+                          TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                    ),
+                    const SizedBox(height: 12),
+                    // --------- ACTION BUTTONS ---------
+                    if (status != 'Active') // Only show buttons if not approved
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (status != 'Active')
+                            _smallButton(
+                              text: 'Approve',
+                              color: Colors.green.shade700,
+                              onTap: () {
+                                Navigator.pop(context);
+                                _updateStatus(
+                                  vendorId: promo['vendorId'],
+                                  promoId: promo['id'],
+                                  status: 'Active',
+                                );
+                              },
+                            ),
+                          const SizedBox(width: 6),
+                          if (status != 'Declined')
+                            _smallButton(
+                              text: 'Decline',
+                              color: Colors.red.shade700,
+                              onTap: () {
+                                Navigator.pop(context);
+                                _updateStatus(
+                                  vendorId: promo['vendorId'],
+                                  promoId: promo['id'],
+                                  status: 'Declined',
+                                );
+                              },
+                            ),
+                          const SizedBox(width: 6),
+                          if (status == 'Active')
+                            _smallButton(
+                              text: 'Suspend',
+                              color: Colors.orange.shade700,
+                              onTap: () {
+                                Navigator.pop(context);
+                                _updateStatus(
+                                  vendorId: promo['vendorId'],
+                                  promoId: promo['id'],
+                                  status: 'Suspended',
+                                );
+                              },
+                            ),
+                        ],
+                      )
+                    else
+                      const SizedBox(height: 0), // No buttons when approved
                   ],
                 ),
               ),

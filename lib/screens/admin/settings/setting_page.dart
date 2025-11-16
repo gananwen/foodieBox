@@ -4,10 +4,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:foodiebox/screens/admin/admin_home_page.dart';
 import 'package:foodiebox/screens/admin/profile_page.dart';
 import 'general_settings_page.dart';
-import 'payment_gateaways_page.dart';
-import 'notifications_settings_page.dart';
-import 'data_backup_page.dart';
+import 'admin_action_history_page.dart';
+import 'data_backup_page.dart'; // Assuming this imports FirestoreBackupSimulator
 import 'help_modal.dart';
+
+// ⭐️ Defined Internal Styles for Modern Look ⭐️
+const Color _kPrimaryActionColor = Color(0xFF1E88E5); // Vibrant Blue
+const Color _kAppBackgroundColor =
+    Color(0xFFF5F7F9); // Light, neutral background
+const Color _kTextColor = Color(0xFF1F2937); // Dark text
+const Color _kSecondaryTextColor = Color(0xFF6B7280); // Grey hint text
+// ⭐️ END OF INTERNAL STYLES ⭐️
 
 class SettingsApp extends StatefulWidget {
   const SettingsApp({super.key});
@@ -48,22 +55,17 @@ class _SettingsAppState extends State<SettingsApp> {
           MaterialPageRoute(builder: (_) => const GeneralSettingsPage()),
         );
         break;
-      case 'Payment Gateways':
+      case 'Admin Action History':
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const PaymentGatewaysPage()),
-        );
-        break;
-      case 'Notifications':
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const NotificationsSettingsPage()),
+          MaterialPageRoute(builder: (_) => const AdminActionHistoryPage()),
         );
         break;
       case 'Data & Backup':
+        // Assuming FirestoreBackupSimulator is imported via data_backup_page.dart
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const DataBackupPage()),
+          MaterialPageRoute(builder: (_) => const FirestoreBackupSimulator()),
         );
         break;
       case 'Help':
@@ -84,6 +86,7 @@ class _SettingsAppState extends State<SettingsApp> {
             padding: const EdgeInsets.only(bottom: 12),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
+              // Ensure this asset path is correct
               child: Image.asset(
                 'assets/images/App_icons.png',
                 height: 48,
@@ -91,28 +94,112 @@ class _SettingsAppState extends State<SettingsApp> {
               ),
             ),
           ),
-          children: const [
-            SizedBox(height: 12),
-            Text(
+          children: [
+            const SizedBox(height: 12),
+            const Text(
               'FoodieBox Admin helps you efficiently manage restaurants, orders, and delivery integrations in one secure dashboard.',
               style: TextStyle(
                 fontSize: 15,
-                color: Color(0xFF374151),
+                color: _kTextColor,
                 height: 1.5,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'Tap "View Licenses" below to see open-source attributions.',
               style: TextStyle(
                 fontSize: 13,
-                color: Color(0xFF6B7280),
+                color: _kSecondaryTextColor,
               ),
             ),
           ],
         );
         break;
     }
+  }
+
+  // ===================== Section Title Helper =====================
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16.0, 24, 0, 10),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          title.toUpperCase(), // Uppercase for a modern look
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: _kSecondaryTextColor,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===================== Settings Tile Helper (Revised) =====================
+  Widget _buildSettingsTile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    int badgeCount = 0,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(
+          bottom: 1), // Minimal vertical spacing between tiles
+      decoration: const BoxDecoration(
+        color: Colors.white,
+      ),
+      child: ListTile(
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+        leading: Icon(icon,
+            color: _kPrimaryActionColor, size: 24), // Icon uses Blue accent
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: _kTextColor,
+          ),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (badgeCount > 0)
+              Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade600,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$badgeCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            const Icon(Icons.chevron_right, color: Color(0xFF9CA3AF), size: 24),
+          ],
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  // ===================== Separator Helper =====================
+  // This will be used to divide the tiles within a section
+  Widget _buildTileSeparator() {
+    return Container(
+      margin: const EdgeInsets.only(left: 16),
+      height: 1,
+      color: Colors.grey.shade200,
+    );
   }
 
   @override
@@ -122,235 +209,211 @@ class _SettingsAppState extends State<SettingsApp> {
     final avatarUrl = userData?['avatarUrl'];
     final screenWidth = MediaQuery.of(context).size.width;
 
-    final horizontalPadding =
-        screenWidth < 600 ? 16.0 : screenWidth * 0.2; // Responsive margins
+    // Adjusted responsive padding for cleaner look on large screens
+    final horizontalPadding = screenWidth < 600 ? 0.0 : screenWidth * 0.15;
 
-    return Theme(
-      data: Theme.of(context).copyWith(
-        colorScheme: Theme.of(context)
-            .colorScheme
-            .copyWith(surfaceTint: Colors.transparent),
-      ),
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF7F7F7),
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, size: 24),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AdminHomePage()),
-              );
-            },
-          ),
-          title: const Text('Settings'),
-          centerTitle: true,
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.transparent,
-          elevation: 0.5,
+    return Scaffold(
+      backgroundColor: _kAppBackgroundColor, // Light neutral background
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new,
+              color: _kTextColor, size: 24),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminHomePage()),
+            );
+          },
         ),
-        body: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              vertical: 8.0,
-              horizontal: horizontalPadding,
-            ),
-            child: Column(
-              children: [
-                // ===================== Profile Section =====================
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const ProfilePage()),
-                    );
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 6,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0, vertical: 20.0),
-                    margin: const EdgeInsets.only(bottom: 16.0),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 30,
-                          backgroundColor: Colors.grey.shade200,
-                          backgroundImage: avatarUrl != null
-                              ? NetworkImage(avatarUrl)
-                              : null,
-                          child: avatarUrl == null
-                              ? const Icon(Icons.person,
-                                  size: 36, color: Colors.grey)
-                              : null,
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      displayName,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF1F2937),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Icon(Icons.edit,
-                                      size: 18, color: Colors.grey.shade600),
-                                ],
-                              ),
-                              Text(
-                                email,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade600,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // ===================== Settings Sections =====================
-                _buildSectionTitle('General'),
-                _buildSettingsTile(context,
-                    icon: Icons.settings_outlined,
-                    title: 'General',
-                    onTap: () => _navigateTo('General')),
-                _buildSettingsTile(context,
-                    icon: Icons.account_balance_wallet_outlined,
-                    title: 'Payment Gateways',
-                    onTap: () => _navigateTo('Payment Gateways')),
-                _buildSettingsTile(context,
-                    icon: Icons.notifications_none_outlined,
-                    title: 'Notifications',
-                    onTap: () => _navigateTo('Notifications'),
-                    badgeCount: 3),
-                _buildSettingsTile(context,
-                    icon: Icons.refresh,
-                    title: 'Data & Backup',
-                    onTap: () => _navigateTo('Data & Backup')),
-
-                _buildSectionTitle('Support'),
-                _buildSettingsTile(context,
-                    icon: Icons.help_outline,
-                    title: 'Help',
-                    onTap: () => _navigateTo('Help')),
-                _buildSettingsTile(context,
-                    icon: Icons.info_outline,
-                    title: 'About',
-                    onTap: () => _navigateTo('About')),
-              ],
-            ),
-          ),
-        ),
+        title: const Text('Settings',
+            style: TextStyle(color: _kTextColor, fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 1, // Slight shadow
       ),
-    );
-  }
-
-  // ===================== Section Title Helper =====================
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF6B7280),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            vertical: 16.0,
+            horizontal: horizontalPadding,
           ),
-        ),
-      ),
-    );
-  }
-
-  // ===================== Settings Tile Helper =====================
-  Widget _buildSettingsTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    int badgeCount = 0,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ListTile(
-        leading: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Icon(icon, color: Colors.grey.shade700, size: 24),
-            if (badgeCount > 0)
-              Positioned(
-                top: -6,
-                right: -6,
+          child: Column(
+            children: [
+              // ===================== Profile Section (Card) =====================
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ProfilePage()),
+                  );
+                },
                 child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  constraints:
-                      const BoxConstraints(minWidth: 18, minHeight: 18),
-                  child: Center(
-                    child: Text(
-                      '$badgeCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius:
+                        BorderRadius.circular(16), // Larger rounded corner
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
-                    ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(20.0),
+                  margin: const EdgeInsets.only(bottom: 24.0),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 32,
+                        backgroundColor: _kPrimaryActionColor
+                            .withOpacity(0.1), // Blue tinted background
+                        backgroundImage:
+                            avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                        child: avatarUrl == null
+                            ? Icon(Icons.person,
+                                size: 40,
+                                color: _kPrimaryActionColor) // Blue icon
+                            : null,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              displayName,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: _kTextColor,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              email,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: _kSecondaryTextColor,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right,
+                          color: _kPrimaryActionColor,
+                          size: 28), // Blue chevron
+                    ],
                   ),
                 ),
               ),
-          ],
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 16,
-            color: Color(0xFF1F2937),
+
+              // ===================== Settings Sections (List Grouped) =====================
+
+              // --- Group: General ---
+              _buildSectionTitle('General'),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildSettingsTile(context,
+                        icon: Icons.settings_outlined,
+                        title: 'General',
+                        onTap: () => _navigateTo('General')),
+                    _buildTileSeparator(),
+                    _buildSettingsTile(context,
+                        icon: Icons.history_rounded,
+                        title: 'Admin Action History',
+                        onTap: () => _navigateTo('Admin Action History'),
+                        badgeCount: 0),
+                    _buildTileSeparator(),
+                    _buildSettingsTile(context,
+                        icon: Icons.cloud_sync_outlined,
+                        title: 'Data & Backup',
+                        onTap: () => _navigateTo('Data & Backup')),
+                  ],
+                ),
+              ),
+
+              // --- Group: Support ---
+              _buildSectionTitle('Support'),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildSettingsTile(context,
+                        icon: Icons
+                            .support_agent_outlined, // Changed icon for help
+                        title: 'Help',
+                        onTap: () => _navigateTo('Help')),
+                    _buildTileSeparator(),
+                    _buildSettingsTile(context,
+                        icon: Icons.info_outline,
+                        title: 'About',
+                        onTap: () => _navigateTo('About')),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+              // --- Logout Button ---
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    await _auth.signOut();
+                    if (!context.mounted) return;
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              const AdminHomePage()), // Navigate to home or login after logout
+                      (route) => false,
+                    );
+                  },
+                  icon: const Icon(Icons.logout, color: Colors.red),
+                  label: const Text('Log Out',
+                      style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16)),
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey.shade300)),
+                    elevation: 1,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 40),
+            ],
           ),
         ),
-        trailing:
-            const Icon(Icons.chevron_right, color: Color(0xFF9CA3AF), size: 24),
-        onTap: onTap,
       ),
     );
   }
