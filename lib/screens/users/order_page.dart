@@ -9,7 +9,6 @@ import 'package:intl/intl.dart';
 import 'pickup_confirmation_page.dart';
 import 'order_history_detail_page.dart';
 
-
 class OrdersPage extends StatefulWidget {
   const OrdersPage({super.key});
 
@@ -74,10 +73,8 @@ class _OrdersPageState extends State<OrdersPage>
     );
   }
 
-
   Widget _buildOrderList(BuildContext context,
       {required bool isOngoing, String? userId}) {
-        
     // --- ( ✨ UPDATED STATUSES - CASE INSENSITIVE FIX ✨ ) ---
     // We now check for both lowercase and uppercase versions
     final ongoingStatuses = [
@@ -88,7 +85,7 @@ class _OrdersPageState extends State<OrdersPage>
       'paid_pending_pickup' // <-- ADDED
     ];
     // --- END FIX ---
-    
+
     final historyStatuses = ['completed', 'cancelled'];
 
     if (userId == null) {
@@ -121,14 +118,16 @@ class _OrdersPageState extends State<OrdersPage>
                 child: Text(
                   'Database Index Required. Please create the index in your Firebase console (check the error log for the link).',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                  style:
+                      TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
                 ),
               ),
             );
           }
           // --- END ADDED ---
           return Center(
-              child: Text('An error occurred: ${snapshot.error}', style: kHintTextStyle));
+              child: Text('An error occurred: ${snapshot.error}',
+                  style: kHintTextStyle));
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -223,7 +222,7 @@ class _OrdersPageState extends State<OrdersPage>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(order.vendorName,
+                  child: Text(order.vendorName ?? 'Store',
                       style: kLabelTextStyle.copyWith(fontSize: 16),
                       overflow: TextOverflow.ellipsis),
                 ),
@@ -242,7 +241,7 @@ class _OrdersPageState extends State<OrdersPage>
             const SizedBox(height: 8),
             Text(formattedDateTime,
                 style: kHintTextStyle.copyWith(fontSize: 13)),
-            
+
             // --- FIX: Check if address is null before showing it ---
             if (order.address != null && order.address!.isNotEmpty)
               Padding(
@@ -252,13 +251,16 @@ class _OrdersPageState extends State<OrdersPage>
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
               ),
-            
+
             // --- ADDED: Show Pickup ID if it's a pickup order ---
             if (order.orderType == 'Pickup' && order.pickupId != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4.0),
                 child: Text('Pickup ID: ${order.pickupId!}',
-                    style: kHintTextStyle.copyWith(fontSize: 13, color: kPrimaryActionColor, fontWeight: FontWeight.bold)),
+                    style: kHintTextStyle.copyWith(
+                        fontSize: 13,
+                        color: kPrimaryActionColor,
+                        fontWeight: FontWeight.bold)),
               ),
             // --- END ADDED ---
 
@@ -268,15 +270,18 @@ class _OrdersPageState extends State<OrdersPage>
               children: [
                 Text('Total: RM${order.total.toStringAsFixed(2)}',
                     style: kLabelTextStyle.copyWith(fontSize: 15)),
-                
+
                 // --- FIX: Show correct icon for delivery or pickup ---
-                if (order.orderType == 'Delivery' && order.driverId != null && isOngoing)
+                if (order.orderType == 'Delivery' &&
+                    order.driverId != null &&
+                    isOngoing)
                   const Icon(Icons.local_shipping,
                       color: kPrimaryActionColor, size: 20),
 
                 if (order.orderType == 'Pickup' && isOngoing)
                   const Icon(Icons.store, // Icon for pickup
-                      color: kPrimaryActionColor, size: 20),
+                      color: kPrimaryActionColor,
+                      size: 20),
                 // --- END FIX ---
               ],
             ),
@@ -310,7 +315,7 @@ class _OrdersPageState extends State<OrdersPage>
       case 'paid_pending_pickup':
         color = Colors.blue;
         break;
-      case 'received':
+      case 'Received':
       case 'pending':
       default:
         color = kPrimaryActionColor;

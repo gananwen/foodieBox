@@ -62,7 +62,7 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
   int _getStepFromStatus(String status, String orderType) {
     if (orderType == 'Delivery') {
       switch (status) {
-        case 'received':
+        case 'Received':
           return 0;
         case 'Preparing':
           return 1;
@@ -77,14 +77,14 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
     } else {
       // Logic for 'Pickup' if it ever uses this page
       switch (status) {
-        case 'received':
+        case 'Received':
           return 0;
         case 'Preparing':
           return 1;
         case 'Ready for Pickup':
           return 2; // Index 2 is 'Ready for Pickup'
         case 'completed':
-          return 3; 
+          return 3;
         default:
           return 0;
       }
@@ -109,11 +109,10 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
   }
   // --- END NEW ---
 
-
   Future<VendorModel> _fetchVendor(String vendorId) async {
     // Find the first vendor ID from the list
     if (vendorId.isEmpty) throw Exception('No vendor ID found');
-    
+
     final doc = await FirebaseFirestore.instance
         .collection('vendors')
         .doc(vendorId)
@@ -121,7 +120,6 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
     if (!doc.exists) throw Exception('Vendor not found');
     return VendorModel.fromMap(doc.data() as Map<String, dynamic>);
   }
-
 
   Future<LatLng> _getVendorLatLng(String address) async {
     try {
@@ -159,19 +157,22 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
               orderSnapshot.data!.id);
 
           // --- This page is for DELIVERY only ---
-          if (order.orderType == 'Pickup' || order.lat == null || order.lng == null) {
+          if (order.orderType == 'Pickup' ||
+              order.lat == null ||
+              order.lng == null) {
             // Send user back if they somehow get here with a pickup order
-            Navigator.of(context).pop(); 
-            return const Center(child: Text('Tracking is for delivery orders.'));
+            Navigator.of(context).pop();
+            return const Center(
+                child: Text('Tracking is for delivery orders.'));
           }
-          
+
           final LatLng userLocation = LatLng(order.lat!, order.lng!);
 
           // --- UPDATED: Use the first vendor from the vendorIds list ---
           if (order.vendorIds.isEmpty) {
             return const Center(child: Text('Order has no vendor.'));
           }
-          
+
           if (_vendorFuture == null) {
             _vendorFuture = _fetchVendor(order.vendorIds.first);
             _vendorLatLngFuture = _vendorFuture!
@@ -180,14 +181,15 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
           // --- END UPDATED ---
 
           // --- REAL-TIME STATUS LOGIC ---
-          final int currentStep = _getStepFromStatus(order.status, order.orderType);
+          final int currentStep =
+              _getStepFromStatus(order.status, order.orderType);
 
           // If order is marked "completed", navigate to rating page
           if (order.status == 'completed' && order.orderType == 'Delivery') {
-             WidgetsBinding.instance.addPostFrameCallback((_) {
-               // Use demo driver for now, replace with 'order.driverId' when ready
-               _navigateToRatingPage(fixedDriver, order.id);
-             });
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              // Use demo driver for now, replace with 'order.driverId' when ready
+              _navigateToRatingPage(fixedDriver, order.id);
+            });
           }
           // --- END REAL-TIME STATUS ---
 
@@ -238,11 +240,11 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
                       const SizedBox(height: 24),
                       _buildTimeline(currentStep, order.orderType),
                       const Divider(height: 32),
-                      
+
                       // Show driver info if status is Delivering or Delivered
                       if (currentStep >= 3) _buildDriverInfo(fixedDriver),
                       if (currentStep >= 3) const Divider(height: 32),
-                      
+
                       _buildOrderSummary(order.items, order.total),
                     ],
                   ),
@@ -304,17 +306,21 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
       stepsToShow = ['Order Received', 'Preparing', 'Delivering', 'Delivered'];
     } else {
       // Skip "Delivering"
-      stepsToShow = ['Order Received', 'Preparing', 'Ready for Pickup', 'Completed'];
+      stepsToShow = [
+        'Order Received',
+        'Preparing',
+        'Ready for Pickup',
+        'Completed'
+      ];
     }
     // --- END UPDATED ---
 
     return Column(
       children: List.generate(stepsToShow.length, (index) {
-        
         // --- UPDATED: Map timeline index to status index ---
         int stepIndex = index;
-        if(orderType == 'Delivery' && index >= 2) {
-           stepIndex = index + 1; // Skip step 2 ('Ready for Pickup')
+        if (orderType == 'Delivery' && index >= 2) {
+          stepIndex = index + 1; // Skip step 2 ('Ready for Pickup')
         }
         // --- END UPDATED ---
 
