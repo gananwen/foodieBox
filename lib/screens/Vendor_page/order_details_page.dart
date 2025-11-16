@@ -15,10 +15,28 @@ class OrderDetailsPage extends StatefulWidget {
 }
 
 class _OrderDetailsPageState extends State<OrderDetailsPage> {
-  // ... (initState, _updateOrderStatus, _buildSectionHeader, _buildPriceRow, _buildStatusButton, _buildOrderItemList, _buildInfoRow 都保持不变) ...
   late String _currentStatus;
   final OrderRepository _repo = OrderRepository();
   bool _isLoading = false;
+
+  // --- ( ✨ 1. DEFINE STATUS FLOWS ✨ ) ---
+  // These lists define the step-by-step progress for each order type.
+  // Make sure the strings match your Firebase 'status' field exactly.
+
+  final List<String> _pickupFlow = [
+    'paid_pending_pickup',
+    'Preparing',
+    'Ready for Pickup',
+    'Completed' // 'Picked Up' could also go here if you have it
+  ];
+
+  final List<String> _deliveryFlow = [
+    'paid_pending_pickup', // Or 'Received' if you use that for Delivery
+    'Preparing',
+    'Ready for Pickup', // This is the "Request Lalamove" step
+    'Delivering',
+    'Completed' // 'Delivered' could also go here
+  ];
 
   @override
   void initState() {
@@ -26,6 +44,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     _currentStatus = widget.order.status;
   }
 
+  // --- ( 2. UPDATE STATUS FUNCTION - UNCHANGED ) ---
   Future<void> _updateOrderStatus(String newStatus) async {
     setState(() => _isLoading = true);
     try {
@@ -68,6 +87,91 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     }
   }
 
+  // --- ( 3. ✨ NEW AND IMPROVED STATUS BUTTON LOGIC ✨ ) ---
+  Widget _buildStatusButton(String title, String statusKey) {
+    // Get the correct flow based on order type
+    final List<String> statusFlow =
+        widget.order.orderType == 'Pickup' ? _pickupFlow : _deliveryFlow;
+
+    // Find the index of the current status and this button's status
+    final int currentStatusIndex = statusFlow.indexOf(_currentStatus);
+    final int buttonStatusIndex = statusFlow.indexOf(statusKey);
+
+    // Determine the button's state
+    final bool isActive = (currentStatusIndex == buttonStatusIndex);
+    final bool isNextStep = (buttonStatusIndex == currentStatusIndex + 1);
+    final bool isClickable = isNextStep && !_isLoading;
+
+    // --- 1. Active Status (Solid, Highlighted, Not Clickable) ---
+    if (isActive) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: kSecondaryAccentColor,
+            foregroundColor: kTextColor,
+            minimumSize: const Size(double.infinity, 50),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onPressed: null, // Not clickable
+          child:
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ),
+      );
+    }
+
+    // --- 2. Next Step (Outlined, Clickable) ---
+    if (isNextStep) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+        child: OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: kTextColor,
+            minimumSize: const Size(double.infinity, 50),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            side: BorderSide(color: kTextColor.withOpacity(0.3), width: 1.5),
+          ),
+          onPressed: isClickable ? () => _updateOrderStatus(statusKey) : null,
+          child: _isLoading
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: kTextColor,
+                  ),
+                )
+              : Text(title),
+        ),
+      );
+    }
+
+    // --- 3. All Other Statuses (Disabled, Grayed Out) ---
+    // This includes past statuses and future statuses that are not the next step
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+      child: OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: kTextColor.withOpacity(0.3),
+          backgroundColor: kCardColor.withOpacity(0.5), // Grayed out background
+          minimumSize: const Size(double.infinity, 50),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          side: BorderSide(color: kTextColor.withOpacity(0.1), width: 1.5),
+        ),
+        onPressed: null, // Not clickable
+        child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
+  // --- ( HELPER WIDGETS - UNCHANGED ) ---
+
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(top: 24.0, bottom: 8.0, left: 16.0),
@@ -109,53 +213,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  Widget _buildStatusButton(String title, String statusKey) {
-    final bool isSelected = (_currentStatus == statusKey);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
-      child: isSelected
-          ? ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kSecondaryAccentColor,
-                foregroundColor: kTextColor,
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: null,
-              child: Text(title,
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-            )
-          : OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: kTextColor,
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                side:
-                    BorderSide(color: kTextColor.withOpacity(0.3), width: 1.5),
-              ),
-              onPressed: _isLoading
-                  ? null
-                  : () {
-                      _updateOrderStatus(statusKey);
-                    },
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: kTextColor,
-                      ),
-                    )
-                  : Text(title),
-            ),
-    );
-  }
-
   Widget _buildOrderItemList(List<OrderItem> items) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -173,17 +230,28 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           return ListTile(
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-            leading: Text(
+            leading: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '${item.quantity}x', // Show quantity
+                  style: TextStyle(
+                      color: kTextColor.withOpacity(0.7), fontSize: 13),
+                ),
+              ],
+            ),
+            title: Text(
+              item.name,
+              style: const TextStyle(
+                  color: kTextColor, fontWeight: FontWeight.w600),
+            ),
+            trailing: Text(
               'RM${item.price.toStringAsFixed(2)}',
               style: const TextStyle(
                 color: kTextColor,
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
               ),
-            ),
-            title: Text(
-              item.name,
-              style: const TextStyle(color: kTextColor),
             ),
           );
         },
@@ -236,12 +304,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   }
 
   Widget _buildOrderInfoCard(OrderModel order) {
-    // ... (Timestamp 和 OrderID 逻辑不变) ...
     final String formattedTimestamp =
         DateFormat('dd MMM yyyy, hh:mm a').format(order.timestamp.toDate());
     final String orderId = order.id.substring(0, 6).toUpperCase();
 
-    // ... (pickupDateString 逻辑不变) ...
     String pickupDateString = 'N/A';
     final DateTime orderDate = order.timestamp.toDate();
     if (order.pickupDay == 'Today') {
@@ -250,6 +316,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       final tomorrow = orderDate.add(const Duration(days: 1));
       pickupDateString = DateFormat('dd MMM yyyy (Tomorrow)').format(tomorrow);
     } else if (order.pickupDay != null) {
+      // Fallback for other date strings
       pickupDateString = order.pickupDay!;
     }
 
@@ -265,7 +332,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ... (ID, Timestamp, Pickup Date, Pickup Slot, Pickup Code 不变) ...
           _buildInfoRow(
             Icons.confirmation_number_outlined,
             'Order ID',
@@ -278,7 +344,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             formattedTimestamp,
           ),
           const Divider(color: kAppBackgroundColor),
-
           if (order.orderType == 'Pickup') ...[
             _buildInfoRow(
               Icons.calendar_today_outlined,
@@ -300,20 +365,16 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               ),
             ]
           ] else ...[
-            // --- ( ✨ 关键修复 ✨ ) ---
-            // 'order.address' 是 String? (nullable)
-            // 我们必须给它一个备用值，以防它是 null
             _buildInfoRow(
               Icons.location_on_outlined,
               'Delivery Address',
-              order.address ?? 'N/A', // <-- 修复了错误
+              order.address ?? 'N/A', // Fixed potential null bug
             ),
-            // --- ( ✨ 结束修复 ✨ ) ---
             const Divider(color: kAppBackgroundColor),
             _buildInfoRow(
               Icons.delivery_dining_outlined,
               'Delivery Option',
-              order.deliveryOption, // (这个是 String, 不是 nullable, 所以没问题)
+              order.deliveryOption,
             ),
           ]
         ],
@@ -321,9 +382,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
+  // --- ( 4. ✨ MAIN BUILD FUNCTION - WITH CLEANED UP STATUS SECTION ✨ ) ---
   @override
   Widget build(BuildContext context) {
-    // ... (build 方法的其余部分不变) ...
     final double total = widget.order.total;
     final double subtotal = widget.order.subtotal;
     final double deliveryFee = widget.order.deliveryFee;
@@ -397,22 +458,26 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 ],
               ),
             ),
+
+            // --- ( ✨ 5. CLEANED UP STATUS SECTION ✨ ) ---
             _buildSectionHeader('Status'),
-            _buildStatusButton('Paid (Pending Pickup)', 'paid_pending_pickup'),
-            _buildStatusButton('Preparing', 'Preparing'),
             if (widget.order.orderType == 'Pickup') ...[
+              // --- Pickup Flow Buttons ---
+              _buildStatusButton(
+                  'Paid (Pending Pickup)', 'paid_pending_pickup'),
+              _buildStatusButton('Preparing', 'Preparing'),
               _buildStatusButton('Ready for Pickup', 'Ready for Pickup'),
+              _buildStatusButton('Completed', 'Completed'),
             ] else ...[
+              // --- Delivery Flow Buttons ---
+              _buildStatusButton(
+                  'Paid (Pending Pickup)', 'paid_pending_pickup'),
+              _buildStatusButton('Preparing', 'Preparing'),
               _buildStatusButton(
                   'Ready for Pickup (Request Lalamove)', 'Ready for Pickup'),
-              _buildStatusButton(
-                  'Delivering',
-                  (widget.order.driverId != null &&
-                          widget.order.driverId!.isNotEmpty)
-                      ? 'Delivering'
-                      : _currentStatus),
+              _buildStatusButton('Delivering', 'Delivering'), // (Fixed logic)
+              _buildStatusButton('Completed', 'Completed'),
             ],
-            _buildStatusButton('Completed', 'Completed'),
             const SizedBox(height: 40),
           ],
         ),

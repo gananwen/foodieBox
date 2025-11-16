@@ -33,7 +33,7 @@ class OrderRepository {
           'paid_pending_pickup',
           'Delivered',
           'Picked Up'
-          'Cancelled' // <-- ( ✨ NEWLY ADDED ✨ )
+              'Cancelled' // <-- ( ✨ NEWLY ADDED ✨ )
         ])
         .orderBy('timestamp', descending: true)
         .snapshots()
@@ -131,5 +131,31 @@ class OrderRepository {
         'totalSales': totalSales,
       };
     });
+  }
+
+  Stream<List<OrderModel>> getHistoryOrdersStream() {
+    final vendorId = _vendorId;
+    if (vendorId == null) {
+      throw Exception('User not logged in');
+    }
+
+    return _db
+        .collection('orders')
+        .where('vendorIds', arrayContains: vendorId)
+        // ( 关键 ) 查询 "Completed" 和 "Cancelled" 状态
+        .where('status', whereIn: ['Completed', 'Cancelled'])
+        // ( 索引 ) 这个查询需要一个新的索引
+        .orderBy('timestamp', descending: true)
+        .limit(50) // (可选：对历史记录进行分页或限制)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs.map((doc) {
+            final Map<String, dynamic>? data = doc.data();
+            if (data == null) {
+              throw Exception('Found order with empty data: ${doc.id}');
+            }
+            return OrderModel.fromMap(data, doc.id);
+          }).toList();
+        });
   }
 }

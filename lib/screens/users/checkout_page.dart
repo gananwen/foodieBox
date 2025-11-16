@@ -84,12 +84,14 @@ class _CheckoutPage extends State<CheckoutPage> {
     // --- UPDATED: Check for BlindBox or Grocery ---
     // Note: 'Blind Box' (with space) comes from product.dart
     List<String> cartVendorTypes = widget.items
-        .map((item) => item.product.productType == 'Blind Box' ? 'BlindBox' : 'Grocery')
+        .map((item) =>
+            item.product.productType == 'Blind Box' ? 'BlindBox' : 'Grocery')
         .toSet()
         .toList();
-    
+
     // Prioritize BlindBox promo if it exists in a mixed cart
-    String productType = cartVendorTypes.contains('BlindBox') ? 'Blindbox' : 'Grocery';
+    String productType =
+        cartVendorTypes.contains('BlindBox') ? 'Blindbox' : 'Grocery';
     // --- END UPDATED ---
 
     try {
@@ -104,7 +106,8 @@ class _CheckoutPage extends State<CheckoutPage> {
           .map((doc) => PromotionModel.fromMap(doc.data(), doc.id))
           .where((promo) =>
               promo.startDate.isBefore(now) &&
-              (promo.totalRedemptions == 0 || promo.claimedRedemptions < promo.totalRedemptions))
+              (promo.totalRedemptions == 0 ||
+                  promo.claimedRedemptions < promo.totalRedemptions))
           .toList();
 
       if (mounted && promos.isNotEmpty) {
@@ -129,13 +132,14 @@ class _CheckoutPage extends State<CheckoutPage> {
       return;
     }
     setState(() => _isLoadingVouchers = true);
-    
+
     final vouchers = await _voucherRepo.fetchAllActiveVouchers();
-    
+
     // --- NEW: Get all vendor types from cart ---
     // Note: 'Blind Box' (with space) comes from product.dart
     final cartVendorTypes = widget.items
-        .map((item) => item.product.productType == 'Blind Box' ? 'BlindBox' : 'Grocery')
+        .map((item) =>
+            item.product.productType == 'Blind Box' ? 'BlindBox' : 'Grocery')
         .toSet()
         .toList();
     // --- END NEW ---
@@ -144,8 +148,8 @@ class _CheckoutPage extends State<CheckoutPage> {
     for (var voucher in vouchers) {
       // --- UPDATED: Pass all cart vendor types ---
       final message = await _voucherRepo.getEligibilityStatus(
-        voucher: voucher, 
-        subtotal: currentSubtotal, 
+        voucher: voucher,
+        subtotal: currentSubtotal,
         currentOrderType: 'delivery',
         cartVendorTypes: cartVendorTypes,
       );
@@ -198,8 +202,7 @@ class _CheckoutPage extends State<CheckoutPage> {
       _selectedContactPhone = addressData['contactPhone'];
       _selectedAddressLabel = addressData['label'] ?? 'Address';
       if (addressData['lat'] != null && addressData['lng'] != null) {
-        _selectedAddressLatLng =
-            LatLng(addressData['lat'], addressData['lng']);
+        _selectedAddressLatLng = LatLng(addressData['lat'], addressData['lng']);
       }
     });
   }
@@ -218,17 +221,19 @@ class _CheckoutPage extends State<CheckoutPage> {
     final subtotalAfterPromo = subtotal - promoDiscount;
     final voucherDiscountOnSubtotal =
         selectedVoucher?.calculateDiscount(subtotalAfterPromo) ?? 0.0;
-        
-    final finalDeliveryFee = (selectedVoucher?.freeDelivery ?? false) ? 0.0 : deliveryFee;
+
+    final finalDeliveryFee =
+        (selectedVoucher?.freeDelivery ?? false) ? 0.0 : deliveryFee;
 
     if (voucherDiscountOnSubtotal != voucherDiscount) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-         if (mounted) setState(() => voucherDiscount = voucherDiscountOnSubtotal);
+        if (mounted)
+          setState(() => voucherDiscount = voucherDiscountOnSubtotal);
       });
     }
     return subtotalAfterPromo - voucherDiscountOnSubtotal + finalDeliveryFee;
   }
-  
+
   void _selectPaymentMethod() {
     showModalBottomSheet(
       context: context,
@@ -280,20 +285,25 @@ class _CheckoutPage extends State<CheckoutPage> {
       backgroundColor: Colors.grey[100], // Background like image
       builder: (context) {
         if (_isLoadingVouchers) {
-          return const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()));
+          return const SizedBox(
+              height: 200, child: Center(child: CircularProgressIndicator()));
         }
         if (voucherList.isEmpty) {
-          return const SizedBox(height: 200, child: Center(child: Padding(
-            padding: EdgeInsets.all(20.0),
-            child: Text("No vouchers available right now."),
-          )));
+          return const SizedBox(
+              height: 200,
+              child: Center(
+                  child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: Text("No vouchers available right now."),
+              )));
         }
 
         final subtotalAfterPromo = subtotal - promoDiscount;
 
         // Use ConstrainedBox to set max height
         return ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.7),
           child: Container(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -311,7 +321,7 @@ class _CheckoutPage extends State<CheckoutPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // --- List of Vouchers ---
                 Expanded(
                   child: ListView.separated(
@@ -328,7 +338,7 @@ class _CheckoutPage extends State<CheckoutPage> {
                         onTap: () {
                           // Allow tapping ineligible to show reason
                           if (!isEligible) {
-                             ScaffoldMessenger.of(context).showSnackBar(
+                            ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(eligibilityMessage),
                                 backgroundColor: Colors.red,
@@ -341,7 +351,8 @@ class _CheckoutPage extends State<CheckoutPage> {
                             voucherCode = voucher.code;
                             voucherLabel = voucher.title;
                             selectedVoucher = voucher;
-                            voucherDiscount = voucher.calculateDiscount(subtotalAfterPromo);
+                            voucherDiscount =
+                                voucher.calculateDiscount(subtotalAfterPromo);
                             voucherError = '';
                           });
                           Navigator.pop(context);
@@ -366,7 +377,8 @@ class _CheckoutPage extends State<CheckoutPage> {
                               children: [
                                 // --- Title and Info Icon ---
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Expanded(
                                       child: Text(
@@ -377,17 +389,20 @@ class _CheckoutPage extends State<CheckoutPage> {
                                         ),
                                       ),
                                     ),
-                                    Icon(Icons.info_outline, color: Colors.grey[400]),
+                                    Icon(Icons.info_outline,
+                                        color: Colors.grey[400]),
                                   ],
                                 ),
                                 const SizedBox(height: 8),
                                 // --- Code and Eligibility ---
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Row(
                                       children: [
-                                        Icon(Icons.label, color: Colors.green[600], size: 16),
+                                        Icon(Icons.label,
+                                            color: Colors.green[600], size: 16),
                                         const SizedBox(width: 4),
                                         Text(
                                           'Code: ${voucher.code}',
@@ -502,7 +517,8 @@ class _CheckoutPage extends State<CheckoutPage> {
       );
     }
     IconData iconData = Icons.location_on;
-    if (_selectedAddressLabel == 'Home') iconData = Icons.home;
+    if (_selectedAddressLabel == 'Home')
+      iconData = Icons.home;
     else if (_selectedAddressLabel == 'Office') iconData = Icons.work;
 
     return InkWell(
@@ -512,9 +528,7 @@ class _CheckoutPage extends State<CheckoutPage> {
         decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(color: Colors.grey.shade200, blurRadius: 4)
-            ],
+            boxShadow: [BoxShadow(color: Colors.grey.shade200, blurRadius: 4)],
             border: Border.all(color: Colors.grey.shade300)),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -614,7 +628,9 @@ class _CheckoutPage extends State<CheckoutPage> {
               onPressed: _showVoucherSelector,
               icon: const Icon(Icons.local_offer, size: 18),
               label: Text(
-                voucherCode.isEmpty ? 'Select Voucher' : 'Voucher: $voucherCode',
+                voucherCode.isEmpty
+                    ? 'Select Voucher'
+                    : 'Voucher: $voucherCode',
                 style: const TextStyle(fontSize: 14),
               ),
               style: ElevatedButton.styleFrom(
@@ -622,9 +638,8 @@ class _CheckoutPage extends State<CheckoutPage> {
                   vertical: 14,
                   horizontal: 16,
                 ),
-                backgroundColor: voucherCode.isEmpty
-                    ? Colors.white
-                    : Colors.amber.shade100,
+                backgroundColor:
+                    voucherCode.isEmpty ? Colors.white : Colors.amber.shade100,
                 foregroundColor: Colors.black,
                 elevation: 2,
                 shape: RoundedRectangleBorder(
@@ -672,28 +687,34 @@ class _CheckoutPage extends State<CheckoutPage> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(color: Colors.grey.shade200, blurRadius: 4)],
+                boxShadow: [
+                  BoxShadow(color: Colors.grey.shade200, blurRadius: 4)
+                ],
               ),
               child: Column(
                 children: [
-                   Row(
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text('Subtotal', style: kLabelTextStyle),
-                      Text('RM${subtotal.toStringAsFixed(2)}', style: kLabelTextStyle),
+                      Text('RM${subtotal.toStringAsFixed(2)}',
+                          style: kLabelTextStyle),
                     ],
                   ),
                   const SizedBox(height: 8),
                   if (_isLoadingPromo)
-                    const Text('Checking for promotions...', style: kHintTextStyle),
+                    const Text('Checking for promotions...',
+                        style: kHintTextStyle),
                   if (promoDiscount > 0)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(automaticPromo?.title ?? 'Promotion',
-                            style: kHintTextStyle.copyWith(color: Colors.green)),
+                            style:
+                                kHintTextStyle.copyWith(color: Colors.green)),
                         Text('-RM${promoDiscount.toStringAsFixed(2)}',
-                            style: kHintTextStyle.copyWith(color: Colors.green)),
+                            style:
+                                kHintTextStyle.copyWith(color: Colors.green)),
                       ],
                     ),
                   const SizedBox(height: 8),
@@ -701,12 +722,11 @@ class _CheckoutPage extends State<CheckoutPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Delivery fee', style: kHintTextStyle),
-                      Text(
-                        'RM${deliveryFee.toStringAsFixed(2)}', 
-                        style: (selectedVoucher?.freeDelivery ?? false)
-                          ? kHintTextStyle.copyWith(decoration: TextDecoration.lineThrough)
-                          : kHintTextStyle
-                      ),
+                      Text('RM${deliveryFee.toStringAsFixed(2)}',
+                          style: (selectedVoucher?.freeDelivery ?? false)
+                              ? kHintTextStyle.copyWith(
+                                  decoration: TextDecoration.lineThrough)
+                              : kHintTextStyle),
                     ],
                   ),
                   if (voucherDiscount > 0)
@@ -716,9 +736,11 @@ class _CheckoutPage extends State<CheckoutPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(voucherLabel,
-                              style: kHintTextStyle.copyWith(color: Colors.green)),
+                              style:
+                                  kHintTextStyle.copyWith(color: Colors.green)),
                           Text('-RM${voucherDiscount.toStringAsFixed(2)}',
-                              style: kHintTextStyle.copyWith(color: Colors.green)),
+                              style:
+                                  kHintTextStyle.copyWith(color: Colors.green)),
                         ],
                       ),
                     ),
@@ -729,9 +751,11 @@ class _CheckoutPage extends State<CheckoutPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(voucherLabel,
-                              style: kHintTextStyle.copyWith(color: Colors.green)),
+                              style:
+                                  kHintTextStyle.copyWith(color: Colors.green)),
                           Text('Free Delivery',
-                              style: kHintTextStyle.copyWith(color: Colors.green)),
+                              style:
+                                  kHintTextStyle.copyWith(color: Colors.green)),
                         ],
                       ),
                     ),
@@ -750,7 +774,8 @@ class _CheckoutPage extends State<CheckoutPage> {
                       const Text('Total', style: kLabelTextStyle),
                       Text(
                         'RM${getTotal().toStringAsFixed(2)}',
-                        style: kLabelTextStyle.copyWith(fontSize: 18, color: kPrimaryActionColor),
+                        style: kLabelTextStyle.copyWith(
+                            fontSize: 18, color: kPrimaryActionColor),
                       ),
                     ],
                   ),
@@ -834,7 +859,8 @@ class _CheckoutPage extends State<CheckoutPage> {
 
     // --- NEW: Get all vendor types from cart ---
     final cartVendorTypes = widget.items
-        .map((item) => item.product.productType == 'Blind Box' ? 'BlindBox' : 'Grocery')
+        .map((item) =>
+            item.product.productType == 'Blind Box' ? 'BlindBox' : 'Grocery')
         .toSet()
         .toList();
     // --- END NEW ---
@@ -843,21 +869,23 @@ class _CheckoutPage extends State<CheckoutPage> {
       final subtotalAfterPromo = subtotal - promoDiscount;
       // --- UPDATED: Pass all cart vendor types ---
       final eligibilityMessage = await _voucherRepo.getEligibilityStatus(
-        voucher: selectedVoucher!, 
-        subtotal: subtotalAfterPromo, 
+        voucher: selectedVoucher!,
+        subtotal: subtotalAfterPromo,
         currentOrderType: 'delivery',
         cartVendorTypes: cartVendorTypes,
       );
       // --- END UPDATED ---
       if (eligibilityMessage != "Eligible") {
-         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('The selected voucher is no longer eligible.'), backgroundColor: Colors.red),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('The selected voucher is no longer eligible.'),
+              backgroundColor: Colors.red),
         );
         setState(() => _isLoading = false);
         return;
       }
     }
-    
+
     final itemsData = widget.items.map((item) {
       return {
         'name': item.product.title,
@@ -869,11 +897,12 @@ class _CheckoutPage extends State<CheckoutPage> {
       };
     }).toList();
 
-    final allVendorIds = widget.items.map((item) => item.vendorId).toSet().toList();
-    
+    final allVendorIds =
+        widget.items.map((item) => item.vendorId).toSet().toList();
+
     String vendorName = 'Multiple Stores';
     String vendorType = 'Mixed';
-    
+
     if (allVendorIds.length == 1) {
       try {
         final vendorDoc = await FirebaseFirestore.instance
@@ -890,7 +919,8 @@ class _CheckoutPage extends State<CheckoutPage> {
     }
 
     final finalTotal = getTotal();
-    final finalDeliveryFee = (selectedVoucher?.freeDelivery ?? false) ? 0.0 : deliveryFee;
+    final finalDeliveryFee =
+        (selectedVoucher?.freeDelivery ?? false) ? 0.0 : deliveryFee;
 
     // --- ( ✨ UPDATED ORDER DATA ✨ ) ---
     // Added promoLabel and voucherLabel to save to Firebase
@@ -913,7 +943,7 @@ class _CheckoutPage extends State<CheckoutPage> {
       'voucherCode': selectedVoucher?.code,
       'voucherLabel': selectedVoucher?.title, // <-- ( ✨ NEW ✨ )
       'vendorIds': allVendorIds,
-      'status': 'received',
+      'status': 'Received',
       'items': itemsData,
       'timestamp': FieldValue.serverTimestamp(),
       'vendorName': vendorName,
@@ -931,7 +961,7 @@ class _CheckoutPage extends State<CheckoutPage> {
         await _voucherRepo.incrementVoucherRedemption(selectedVoucher!.id);
       }
       if (automaticPromo != null) {
-         await FirebaseFirestore.instance
+        await FirebaseFirestore.instance
             .collection('promotions')
             .doc(automaticPromo!.id)
             .update({

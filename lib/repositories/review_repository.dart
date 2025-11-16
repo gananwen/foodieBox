@@ -17,6 +17,7 @@ class ReviewRepository {
       'hasBeenReviewed': true,
       'rating': review.rating,
       'reviewText': review.reviewText,
+      'reviewTimestamp': review.timestamp,
     });
 
     // 3. Update the vendor's average rating using a transaction
