@@ -1,17 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class VendorModel {
-  final String uid; // 必须和 User.uid 相同
+  final String uid;
   final String storeName;
   final String storeAddress;
   final String storePhone;
-  final String vendorType; // <-- (来自你的注册页面)
+  final String vendorType;
   final String businessPhotoUrl;
   final String businessLicenseUrl;
   final String halalCertificateUrl;
-  final bool isApproved; // 管理员审批
+  final bool isApproved;
   final double rating;
-  final List<String> storeHours; // e.g., ["Mon: 9-5", "Tue: 9-5"]
+  final List<String> storeHours;
   final bool hasExpiryDeals;
   final int reviewCount;
 
@@ -20,13 +20,13 @@ class VendorModel {
     required this.storeName,
     required this.storeAddress,
     required this.storePhone,
-    required this.vendorType, // <-- (来自你的注册页面)
+    required this.vendorType,
     required this.businessPhotoUrl,
     required this.businessLicenseUrl,
     this.halalCertificateUrl = '',
-    this.isApproved = false, // 默认未批准
+    this.isApproved = false,
     this.rating = 0.0,
-    this.storeHours = const [], // 默认为空
+    this.storeHours = const [],
     this.hasExpiryDeals = false, // Default to false
     this.reviewCount = 0,
   });
@@ -39,7 +39,8 @@ class VendorModel {
       storeAddress: map['storeAddress'] ?? '',
       storePhone: map['storePhone'] ?? '',
       vendorType: map['vendorType'] ?? 'Grocery', // <-- (添加了默认值)
-      businessPhotoUrl: map['businessPhotoUrl'] ?? 'https://placehold.co/600x400/FFF8E1/E6A000?text=Store',
+      businessPhotoUrl: map['businessPhotoUrl'] ??
+          'https://placehold.co/600x400/FFF8E1/E6A000?text=Store',
       businessLicenseUrl: map['businessLicenseUrl'] ?? '',
       halalCertificateUrl: map['halalCertificateUrl'] ?? '',
       isApproved: map['isApproved'] ?? false,

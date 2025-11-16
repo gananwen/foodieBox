@@ -7,8 +7,6 @@ class Product {
   final String productType;
   final String category;
   final String subCategory;
-  // --- END NEW FIELDS ---
-
   final String expiryDate;
   final double originalPrice;
   final double discountedPrice;

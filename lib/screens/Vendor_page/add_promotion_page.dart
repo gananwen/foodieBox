@@ -1,15 +1,21 @@
 // 路径: lib/pages/vendor_home/add_promotion_page.dart
-import 'dart:io'; // <-- ( ✨ 新增 ✨ )
-import 'package:firebase_auth/firebase_auth.dart'; // <-- ( ✨ NEW IMPORT ✨ )
+import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // <-- ( ✨ 新增 ✨ )
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../util/styles.dart';
 import '../../models/promotion.dart';
 import '../../repositories/promotion_repository.dart';
 
 class AddPromotionPage extends StatefulWidget {
-  const AddPromotionPage({super.key});
+  // --- ( ✨ 1. ADD THIS ✨ ) ---
+  final String vendorType;
+
+  const AddPromotionPage({
+    super.key,
+    required this.vendorType, // <-- ( ✨ 2. ADD THIS ✨ )
+  });
 
   @override
   State<AddPromotionPage> createState() => _AddPromotionPageState();
@@ -20,12 +26,12 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
   final _repo = PromotionRepository();
   bool _isLoading = false;
 
-  // --- ( ✨ 新增状态 ✨ ) ---\
   File? _imageFile;
   final ImagePicker _picker = ImagePicker();
 
   String _dealTitle = '';
-  String? _selectedProductType;
+  // --- ( ✨ 3. MODIFY THIS ✨ ) ---
+  late String _selectedProductType; // (No longer nullable)
   DateTime? _startDate;
   DateTime? _endDate;
   TimeOfDay? _startTime;
@@ -33,7 +39,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
   int _discountPercentage = 0;
   int _totalRedemptions = 0;
 
-  // ... (所有 controllers 保持不变) ...
   final TextEditingController _discountPercController = TextEditingController();
   final TextEditingController _totalRedemptionsController =
       TextEditingController();
@@ -41,6 +46,13 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
   final TextEditingController _endDateController = TextEditingController();
   final TextEditingController _startTimeController = TextEditingController();
   final TextEditingController _endTimeController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // --- ( ✨ 4. SET THE VENDOR TYPE AUTOMATICALLY ✨ ) ---
+    _selectedProductType = widget.vendorType;
+  }
 
   @override
   void dispose() {
@@ -53,7 +65,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     super.dispose();
   }
 
-  // ... (日期/时间选择函数 _selectDate, _selectTime 保持不变) ...
+  // ... ( _selectDate, _selectTime, _pickImage functions are all correct ) ...
   Future<void> _selectDate(BuildContext context, bool isStartDate) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -92,7 +104,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     }
   }
 
-  // --- ( ✨ 新增函数：选择图片 ✨ ) ---
   Future<void> _pickImage() async {
     try {
       final XFile? pickedFile =
@@ -111,12 +122,10 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     }
   }
 
-  // --- ( ✨ 重大修改：_savePromotion 函数 ✨ ) ---
   Future<void> _savePromotion() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
 
-      // --- ( ✨ NEW: Get vendorId ✨ ) ---
       final vendorId = FirebaseAuth.instance.currentUser?.uid;
       if (vendorId == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -126,18 +135,9 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
         );
         return;
       }
-      // --- ( ✨ END NEW ✨ ) ---
 
-      // 额外验证
-      if (_selectedProductType == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Please select a product type'),
-              backgroundColor: kPrimaryActionColor),
-        );
-        return;
-      }
-      // --- ( ✨ NEW: Validate image ✨ ) ---
+      // --- ( ✨ 5. VALIDATION IS SIMPLER ✨ ) ---
+      // (We can remove the _selectedProductType check, it's now guaranteed)
       if (_imageFile == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -146,16 +146,13 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
         );
         return;
       }
-      // --- ( ✨ END NEW ✨ ) ---
 
       setState(() => _isLoading = true);
 
-      // ( ✨ 修改的逻辑 ✨ )
       String? newPromoId;
       String? bannerUrl;
 
       try {
-        // 步骤 1: 组合日期和时间 (不变)
         final DateTime startDateTime = DateTime(
           _startDate!.year,
           _startDate!.month,
@@ -171,10 +168,10 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           _endTime!.minute,
         );
 
-        // 步骤 2: 创建模型 (不带 URL)
         final newPromotion = PromotionModel(
           title: _dealTitle,
-          productType: _selectedProductType!,
+          // --- ( ✨ 6. USE THE LOCKED-IN TYPE ✨ ) ---
+          productType: _selectedProductType,
           startDate: startDateTime,
           endDate: endDateTime,
           discountPercentage: _discountPercentage,
@@ -184,13 +181,10 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           status: 'Active', // <-- ( ✨ NEWLY ADDED: Set default status ✨ )
         );
 
-        // 步骤 3: 保存到 Firestore (现在返回 ID)
         newPromoId = await _repo.addPromotion(newPromotion);
 
-        // 步骤 4: 如果有图片，上传图片
         if (_imageFile != null) {
           bannerUrl = await _repo.uploadBannerImage(_imageFile!, newPromoId);
-          // 步骤 5: 更新 Firestore 文档的 bannerUrl
           await _repo.updatePromotionBannerUrl(newPromoId, bannerUrl);
         }
 
@@ -204,7 +198,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           Navigator.of(context).pop();
         }
       } catch (e) {
-        // (错误处理)
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -220,17 +213,15 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     }
   }
 
-  // ... (_buildTextField, _buildDateTimePicker, _buildProductTypeRadio 保持不变) ...
-  Widget _buildTextField({
-    required String label,
-    required Function(String?) onSaved,
-    String? Function(String?)? validator,
-    TextInputType inputType = TextInputType.text,
-    TextEditingController? controller,
-    bool readOnly = false,
-    VoidCallback? onTap,
-  }) {
-    // ... (不变)
+  // ... ( _buildTextField, _buildDateTimePicker are unchanged ) ...
+  Widget _buildTextField(
+      {required String label,
+      required Function(String?) onSaved,
+      String? Function(String?)? validator,
+      TextInputType inputType = TextInputType.text,
+      TextEditingController? controller,
+      bool readOnly = false,
+      VoidCallback? onTap}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -288,11 +279,10 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     );
   }
 
-  Widget _buildDateTimePicker({
-    required String label,
-    required TextEditingController controller,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildDateTimePicker(
+      {required String label,
+      required TextEditingController controller,
+      required VoidCallback onTap}) {
     return _buildTextField(
       label: label,
       onSaved: (value) {},
@@ -308,6 +298,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     );
   }
 
+  // ( ✨ 7. THIS FUNCTION IS NO LONGER USED, but we leave it here )
   Widget _buildProductTypeRadio(String title) {
     return RadioListTile<String>(
       title: Text(title, style: const TextStyle(color: kTextColor)),
@@ -342,9 +333,9 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- 1. ( ✨ 已修改 ✨ ) 上传横幅图片 ---
+              // --- (Image picker is unchanged) ---
               GestureDetector(
-                onTap: _pickImage, // <-- ( ✨ 绑定函数 ✨ )
+                onTap: _pickImage,
                 child: Container(
                   height: 150,
                   width: double.infinity,
@@ -354,7 +345,6 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
                     border:
                         Border.all(color: kTextColor.withAlpha(51), width: 1.5),
                   ),
-                  // ( ✨ 动态显示 ✨ )
                   child: _imageFile != null
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(10),
@@ -379,19 +369,38 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
               ),
               const SizedBox(height: 24),
 
-              // ... (所有其他表单字段保持不变) ...
               _buildTextField(
                 label: 'Deal Title',
                 onSaved: (value) => _dealTitle = value!,
               ),
+
+              // --- ( ✨ 8. REMOVE THE RADIO BUTTONS ✨ ) ---
+              // (We replace them with a "locked" display field)
               const Padding(
                 padding: EdgeInsets.only(left: 12.0, bottom: 4.0),
-                child: Text('Choose Products',
+                child: Text('Product Type (Locked)',
                     style: TextStyle(fontSize: 12, color: kTextColor)),
               ),
-              _buildProductTypeRadio('Blindbox'),
-              _buildProductTypeRadio('Grocery'),
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                decoration: BoxDecoration(
+                  color: kCardColor.withOpacity(0.5), // (Slightly grayed out)
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: kTextColor.withAlpha(51)),
+                ),
+                child: Text(
+                  _selectedProductType, // (This is set in initState)
+                  style: const TextStyle(
+                      color: kTextColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold),
+                ),
+              ),
               const SizedBox(height: 16),
+              // --- ( ✨ END OF REPLACEMENT ✨ ) ---
+
               Row(
                 children: [
                   Expanded(
