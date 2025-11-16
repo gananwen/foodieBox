@@ -10,7 +10,9 @@ class PromotionModel {
   final int discountPercentage; // e.g., 20 (代表 20%)
   final int totalRedemptions; // 总共可以被兑换的次数
   final int claimedRedemptions; // 已经被兑换的次数
-  final String vendorId; // <-- ( ✨ THIS IS REQUIRED ✨ )
+  final String vendorId;
+  final String status;
+  final num minSpend; // <-- Corrected to num
 
   PromotionModel({
     this.id,
@@ -22,7 +24,9 @@ class PromotionModel {
     required this.discountPercentage,
     required this.totalRedemptions,
     this.claimedRedemptions = 0, // 默认为 0
-    required this.vendorId, // <-- ( ✨ THIS IS REQUIRED ✨ )
+    required this.vendorId,
+    this.status = 'Active',
+    this.minSpend = 0, // <-- Corrected to num with default
   });
 
   // 从 Firestore 转换
@@ -37,7 +41,9 @@ class PromotionModel {
       discountPercentage: map['discountPercentage'] ?? 0,
       totalRedemptions: map['totalRedemptions'] ?? 0,
       claimedRedemptions: map['claimedRedemptions'] ?? 0,
-      vendorId: map['vendorId'] ?? '', // <-- ( ✨ THIS IS REQUIRED ✨ )
+      vendorId: map['vendorId'] ?? '',
+      status: map['status'] ?? 'Active',
+      minSpend: map['minSpend'] ?? 0, // <-- Correct read
     );
   }
 
@@ -52,7 +58,9 @@ class PromotionModel {
       'discountPercentage': discountPercentage,
       'totalRedemptions': totalRedemptions,
       'claimedRedemptions': claimedRedemptions,
-      'vendorId': vendorId, // <-- ( ✨ THIS IS REQUIRED ✨ )
+      'vendorId': vendorId,
+      'status': status,
+      'minSpend': minSpend, // <-- Correct write
     };
   }
 
@@ -67,7 +75,9 @@ class PromotionModel {
     int? discountPercentage,
     int? totalRedemptions,
     int? claimedRedemptions,
-    String? vendorId, // <-- ( ✨ THIS IS REQUIRED ✨ )
+    String? vendorId,
+    String? status,
+    num? minSpend,
   }) {
     return PromotionModel(
       id: id ?? this.id,
@@ -79,7 +89,9 @@ class PromotionModel {
       discountPercentage: discountPercentage ?? this.discountPercentage,
       totalRedemptions: totalRedemptions ?? this.totalRedemptions,
       claimedRedemptions: claimedRedemptions ?? this.claimedRedemptions,
-      vendorId: vendorId ?? this.vendorId, // <-- ( ✨ THIS IS REQUIRED ✨ )
+      vendorId: vendorId ?? this.vendorId,
+      status: status ?? this.status,
+      minSpend: minSpend ?? this.minSpend,
     );
   }
 }

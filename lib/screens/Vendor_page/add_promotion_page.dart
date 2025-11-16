@@ -176,8 +176,9 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           endDate: endDateTime,
           discountPercentage: _discountPercentage,
           totalRedemptions: _totalRedemptions,
-          vendorId: vendorId,
-          bannerUrl: '', //
+          vendorId: vendorId, // <-- ( ✨ ADDED VENDOR ID ✨ )
+          bannerUrl: '', // 暂时为空
+          status: 'Active', // <-- ( ✨ NEWLY ADDED: Set default status ✨ )
         );
 
         newPromoId = await _repo.addPromotion(newPromotion);

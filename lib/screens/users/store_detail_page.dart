@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:foodiebox/models/vendor.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:foodiebox/models/vendor.dart';
+// import 'package:foodiebox/models/vendor.dart'; // Duplicate import, removed one
 import 'package:foodiebox/models/product.dart';
 import 'package:foodiebox/util/styles.dart';
 import 'category_product_page.dart';
@@ -228,7 +228,9 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                     Text(widget.vendor.rating.toStringAsFixed(1),
                         style: kLabelTextStyle.copyWith(fontSize: 15)),
                     const SizedBox(width: 4),
-                    const Text("(100+)", style: kHintTextStyle),
+                    // --- ( ✨ FIXED: Replaced placeholder with real reviewCount ✨ ) ---
+                    Text("(${widget.vendor.reviewCount})", style: kHintTextStyle),
+                    // --- ( ✨ END FIX ✨ ) ---
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -507,7 +509,11 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
               final doc = snapshot.data!.docs[index];
               final product =
                   Product.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-              return _buildProductCard(product);
+              
+              // --- ( ✨ MODIFICATION ✨ ) ---
+              // We pass context to read the cart provider
+              return _buildProductCard(context, product);
+              // --- ( ✨ END MODIFICATION ✨ ) ---
             },
             childCount: snapshot.data!.docs.length,
           ),
@@ -516,123 +522,205 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
     );
   }
 
-  Widget _buildProductCard(Product product) {
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProductDetailPage(
-              product: product,
-              vendor: widget.vendor,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: kCardColor,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black12,
-                blurRadius: 3,
-                offset: const Offset(0, 1))
-          ],
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                product.imageUrl,
-                width: 70,
-                height: 70,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  width: 70,
-                  height: 70,
-                  color: Colors.grey.shade200,
-                  child:
-                      const Icon(Icons.image_not_supported, color: Colors.grey),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(product.title,
-                      style: kLabelTextStyle.copyWith(fontSize: 16)),
-                  const SizedBox(height: 4),
-                  Text(product.description,
-                      style: kHintTextStyle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text(
-                        'RM${product.discountedPrice.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: kPrimaryActionColor),
-                      ),
-                      const SizedBox(width: 8),
-                      if (product.originalPrice > product.discountedPrice)
-                        Text(
-                          'RM${product.originalPrice.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey,
-                            decoration: TextDecoration.lineThrough,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.add_circle_outline,
-                  color: kPrimaryActionColor, size: 30),
-              onPressed: () {
-                final cart = context.read<CartProvider>();
-                
-                final bool canAdd = cart.itemCount == 0 ||
-                    (cart.items.isNotEmpty && cart.itemsList.first.vendorId == widget.vendor.uid);
-                
-                if (!canAdd) {
-                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('You can only order from one store at a time.'),
-                      backgroundColor: Colors.red,
-                      duration: const Duration(seconds: 3),
+  // --- ( ✨ MODIFICATION: Added context and cart checks ✨ ) ---
+  Widget _buildProductCard(BuildContext context, Product product) {
+    // Get the cart provider to check item quantities
+    final cart = context.watch<CartProvider>();
+
+    // Check stock levels
+    final bool isOutOfStock = product.quantity <= 0;
+    final int cartQuantity = cart.getQuantityInCart(product.id!);
+    final bool canAddMore = (cartQuantity + 1) <= product.quantity;
+
+    return Opacity(
+      opacity: isOutOfStock ? 0.5 : 1.0, // Make item transparent if out of stock
+      child: InkWell(
+        onTap: isOutOfStock
+            ? null // Disable tap if out of stock
+            : () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ProductDetailPage(
+                      product: product,
+                      vendor: widget.vendor,
                     ),
-                  );
-                  return;
-                }
-
-                cart.addItem(product, widget.vendor, 1);
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${product.title} added to cart!'),
-                    backgroundColor: kPrimaryActionColor,
-                    duration: const Duration(seconds: 2),
                   ),
                 );
               },
-            ),
-          ],
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: kCardColor,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 3,
+                  offset: const Offset(0, 1))
+            ],
+          ),
+          child: Stack(
+            children: [
+              Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      product.imageUrl,
+                      width: 70,
+                      height: 70,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: 70,
+                        height: 70,
+                        color: Colors.grey.shade200,
+                        child:
+                            const Icon(Icons.image_not_supported, color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(product.title,
+                            style: kLabelTextStyle.copyWith(fontSize: 16)),
+                        const SizedBox(height: 4),
+                        Text(product.description,
+                            style: kHintTextStyle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Text(
+                              'RM${product.discountedPrice.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: kPrimaryActionColor),
+                            ),
+                            const SizedBox(width: 8),
+                            if (product.originalPrice > product.discountedPrice)
+                              Text(
+                                'RM${product.originalPrice.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                          ],
+                        ),
+                        // --- ( ✨ NEW: Show Stock ✨ ) ---
+                        const SizedBox(height: 4),
+                        Text(
+                          isOutOfStock
+                              ? 'Out of Stock'
+                              : 'Stock: ${product.quantity}',
+                          style: kHintTextStyle.copyWith(
+                            fontSize: 13,
+                            color: product.quantity < 5 && !isOutOfStock
+                                ? Colors.red
+                                : Colors.grey,
+                            fontWeight: isOutOfStock ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        // --- ( ✨ END NEW ✨ ) ---
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.add_circle_outline,
+                        color: isOutOfStock ? Colors.grey : kPrimaryActionColor, // Disable color
+                        size: 30),
+                    onPressed: isOutOfStock
+                        ? null // Disable button if out of stock
+                        : () {
+                            // Read cart provider for action
+                            final cart = context.read<CartProvider>();
+                            
+                            // 1. Check if user is mixing stores
+                            final bool canAdd = cart.itemCount == 0 ||
+                                (cart.items.isNotEmpty && cart.itemsList.first.vendorId == widget.vendor.uid);
+                            
+                            if (!canAdd) {
+                               ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text('You can only order from one store at a time.'),
+                                  backgroundColor: Colors.red,
+                                  duration: const Duration(seconds: 3),
+                                ),
+                              );
+                              return;
+                            }
+
+                            // 2. Check if stock is available
+                            if (!canAddMore) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                      'No more stock available for ${product.title}. You have $cartQuantity in cart.'),
+                                  backgroundColor: Colors.red,
+                                  duration: const Duration(seconds: 3),
+                                ),
+                              );
+                              return;
+                            }
+
+                            // 3. Add item
+                            cart.addItem(product, widget.vendor, 1);
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('${product.title} added to cart!'),
+                                backgroundColor: kPrimaryActionColor,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                  ),
+                ],
+              ),
+              // --- ( ✨ NEW: Out of Stock Overlay ✨ ) ---
+              if (isOutOfStock)
+                Positioned.fill(
+                  child: Container(
+                    alignment: Alignment.centerLeft,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.white.withOpacity(0.5), // Semi-transparent overlay
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade700,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      margin: const EdgeInsets.only(left: 80), // Align with text
+                      child: const Text(
+                        'OUT OF STOCK',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              // --- ( ✨ END NEW ✨ ) ---
+            ],
+          ),
         ),
       ),
     );
   }
+  // --- ( ✨ END MODIFICATION ✨ ) ---
 
   void _showTimeSlotModal(BuildContext context) {
     showModalBottomSheet(

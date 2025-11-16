@@ -5,11 +5,14 @@ import 'package:foodiebox/providers/cart_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:foodiebox/util/styles.dart';
 import 'dart:math'; // To generate the pickup ID
-import 'pickup_confirmation_page.dart';
+// --- ( ✨ NEW IMPORTS ✨ ) ---
+import 'package:foodiebox/screens/users/qr_payment_page.dart';
+// --- ( ✨ END NEW IMPORTS ✨ ) ---
 import 'package:foodiebox/enums/checkout_type.dart';
 import 'package:foodiebox/models/promotion.dart';
 import 'package:foodiebox/models/voucher_model.dart';
 import 'package:foodiebox/repositories/voucher_repository.dart';
+import 'package:foodiebox/repositories/promotion_repository.dart'; // Added repo import for consistency
 
 class PickupPaymentPage extends StatefulWidget {
   final double subtotal;
@@ -26,13 +29,13 @@ class PickupPaymentPage extends StatefulWidget {
 }
 
 class _PickupPaymentPageState extends State<PickupPaymentPage> {
-  String selectedPayment = 'Credit/Debit Card';
   bool _isLoading = false;
   User? _user;
 
   late double subtotal;
 
   final VoucherRepository _voucherRepo = VoucherRepository();
+  // final PromotionRepository _promoRepo = PromotionRepository(); // Assuming this is needed in the future
 
   PromotionModel? automaticPromo;
   double promoDiscount = 0.0;
@@ -60,35 +63,47 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
     await _fetchVouchers(subtotal - promoDiscount);
   }
 
-  Future<void> _fetchAutomaticPromo() async {
+  Future<void> _fetchAutomaticPromo() {
+    if (widget.items.isEmpty) {
+      setState(() => _isLoadingPromo = false);
+      return Future.value(); 
+    }
+    final String vendorId = widget.items.first.vendorId;
+    final String productType = widget.items.first.product.productType == 'Blindbox'
+        ? 'Blindbox'
+        : 'Grocery';
+
     try {
       final now = DateTime.now();
-      // --- UPDATED: Check for BlindBox or Grocery ---
-      // Note: 'Blind Box' (with space) comes from product.dart
-      final productType = widget.items.isNotEmpty
-          ? (widget.items.first.product.productType == 'Blind Box'
-              ? 'BlindBox'
-              : 'Grocery')
-          : 'Grocery'; // Default to grocery for pickup
-      // --- END UPDATED ---
-
-      final snapshot = await FirebaseFirestore.instance
-          .collection('promotions')
-          .where('productType', isEqualTo: productType)
-          .where('endDate', isGreaterThanOrEqualTo: now)
-          .get();
+      
+      FirebaseFirestore.instance
+          .collection('vendors')
+          .doc(vendorId) 
+          .collection('promotions') 
+          .where('endDate', isGreaterThanOrEqualTo: now) 
+          .get()
+          .then((snapshot) {
 
       final promos = snapshot.docs
           .map((doc) => PromotionModel.fromMap(doc.data(), doc.id))
-          .where((promo) =>
-              promo.startDate.isBefore(now) &&
-              (promo.totalRedemptions == 0 ||
-                  promo.claimedRedemptions < promo.totalRedemptions))
-          .toList();
+          .toList(); 
 
-      if (mounted && promos.isNotEmpty) {
+      final validPromos = promos.where((promo) =>
+              promo.productType == productType && 
+              promo.startDate.isBefore(now) &&
+              (promo.totalRedemptions == 0 || promo.claimedRedemptions < promo.totalRedemptions) &&
+              subtotal >= promo.minSpend 
+          ).toList();
+
+      if (mounted && validPromos.isNotEmpty) {
+        validPromos.sort((a, b) {
+          int minSpendComp = b.minSpend.compareTo(a.minSpend);
+          if (minSpendComp != 0) return minSpendComp;
+          return b.discountPercentage.compareTo(a.discountPercentage);
+        });
+
         setState(() {
-          automaticPromo = promos.first;
+          automaticPromo = validPromos.first; 
           promoDiscount =
               subtotal * (automaticPromo!.discountPercentage / 100.0);
           _isLoadingPromo = false;
@@ -96,10 +111,12 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
       } else if (mounted) {
         setState(() => _isLoadingPromo = false);
       }
+    });
     } catch (e) {
       if (mounted) setState(() => _isLoadingPromo = false);
       print("Error fetching automatic promo: $e");
     }
+    return Future.value();
   }
 
   Future<void> _fetchVouchers(double currentSubtotal) async {
@@ -111,27 +128,22 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
 
     final vouchers = await _voucherRepo.fetchAllActiveVouchers();
 
-    // --- NEW: Get the single vendor type from cart ---
-    // Note: 'Blind Box' (with space) comes from product.dart
     final cartVendorTypes = widget.items.isNotEmpty
         ? [
-            (widget.items.first.product.productType == 'Blind Box'
-                ? 'BlindBox'
+            (widget.items.first.product.productType == 'Blindbox'
+                ? 'Blindbox'
                 : 'Grocery')
           ]
-        : <String>['Grocery']; // Default to grocery if cart is empty
-    // --- END NEW ---
+        : <String>['Grocery'];
 
     List<VoucherEligibility> processedList = [];
     for (var voucher in vouchers) {
-      // --- UPDATED: Pass the cart vendor type ---
       final message = await _voucherRepo.getEligibilityStatus(
         voucher: voucher,
         subtotal: currentSubtotal,
         currentOrderType: 'pickup',
         cartVendorTypes: cartVendorTypes,
       );
-      // --- END UPDATED ---
       processedList.add(VoucherEligibility(
         voucher: voucher,
         eligibilityMessage: message,
@@ -139,7 +151,6 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
       ));
     }
 
-    // Sort the list: Eligible first, then Not Eligible
     processedList.sort((a, b) {
       if (a.isEligible && !b.isEligible) return -1;
       if (!a.isEligible && b.isEligible) return 1;
@@ -159,6 +170,7 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
     final voucherDiscountOnSubtotal =
         selectedVoucher?.calculateDiscount(subtotalAfterPromo) ?? 0.0;
 
+    // Corrected: Update state variable here (must be done in a post frame callback if outside setState)
     if (voucherDiscountOnSubtotal != voucherDiscount) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted)
@@ -175,47 +187,6 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
     return '$letter-$digits';
   }
 
-  void _selectPaymentMethod() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.credit_card),
-              title: const Text('Credit/Debit Card'),
-              onTap: () {
-                setState(() => selectedPayment = 'Credit/Debit Card');
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.money),
-              title: const Text('Cash at Counter'),
-              onTap: () {
-                setState(() => selectedPayment = 'Cash at Counter');
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.account_balance_wallet),
-              title: const Text('E-Wallet'),
-              onTap: () {
-                setState(() => selectedPayment = 'E-Wallet');
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // --- VOUCHER MODAL - STYLED TO MATCH IMAGE & SORTED ---
   void _showVoucherSelector() {
     showModalBottomSheet(
       context: context,
@@ -223,7 +194,7 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      backgroundColor: Colors.grey[100], // Background like image
+      backgroundColor: Colors.grey[100], 
       builder: (context) {
         if (_isLoadingVouchers) {
           return const SizedBox(
@@ -252,7 +223,7 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
               children: [
                 Center(
                   child: Text(
-                    'Choose a Promo Code', // Title from image
+                    'Choose a Promo Code', 
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -373,9 +344,9 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
       },
     );
   }
-  // --- END VOUCHER MODAL ---
 
-  Future<void> _placePickupOrder() async {
+  // --- ( ✨ MODIFIED: Replaced _placePickupOrder with _proceedToPayment ✨ ) ---
+  Future<void> _proceedToPayment() async {
     final cart = context.read<CartProvider>();
     if (_user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -402,27 +373,23 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
 
     setState(() => _isLoading = true);
 
-    // --- NEW: Get the single vendor type from cart ---
-    // Note: 'Blind Box' (with space) comes from product.dart
+    // Validate voucher one last time
     final cartVendorTypes = widget.items.isNotEmpty
         ? [
-            (widget.items.first.product.productType == 'Blind Box'
-                ? 'BlindBox'
+            (widget.items.first.product.productType == 'Blindbox'
+                ? 'Blindbox'
                 : 'Grocery')
           ]
         : <String>['Grocery'];
-    // --- END NEW ---
 
     if (selectedVoucher != null) {
       final subtotalAfterPromo = subtotal - promoDiscount;
-      // --- UPDATED: Pass the cart vendor type ---
       final eligibilityMessage = await _voucherRepo.getEligibilityStatus(
         voucher: selectedVoucher!,
         subtotal: subtotalAfterPromo,
         currentOrderType: 'pickup',
         cartVendorTypes: cartVendorTypes,
       );
-      // --- END UPDATED ---
       if (eligibilityMessage != "Eligible") {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -434,6 +401,7 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
       }
     }
 
+    // Prepare all order data
     final itemsData = widget.items.map((item) {
       return {
         'name': item.product.title,
@@ -470,8 +438,7 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
     final double total = getTotal();
     final double totalDiscount = promoDiscount + voucherDiscount;
 
-    // --- ( ✨ UPDATED ORDER DATA ✨ ) ---
-    // Added promoLabel and voucherLabel to save to Firebase
+    // This is the data we will pass to the QR payment page
     final orderData = {
       'userId': _user!.uid,
       'orderType': 'Pickup',
@@ -480,72 +447,39 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
       'vendorName': vendorName,
       'vendorAddress': vendorAddress,
       'vendorType': vendorType,
-      'paymentMethod': selectedPayment,
+      'paymentMethod': 'QR Pay', // <-- NEW
       'subtotal': subtotal,
       'discount': totalDiscount,
       'total': total,
       'vendorIds': [vendorId],
-      'promoCode': null, // Deprecated, but keeping for schema
-      'promoLabel': automaticPromo?.title, // <-- ( ✨ NEW ✨ )
+      'promoCode': null, 
+      'promoLabel': automaticPromo?.title, 
       'voucherCode': selectedVoucher?.code,
-      'voucherLabel': selectedVoucher?.title, // <-- ( ✨ NEW ✨ )
-      'status': 'paid_pending_pickup',
+      'voucherLabel': selectedVoucher?.title, 
       'items': itemsData,
       'timestamp': FieldValue.serverTimestamp(),
       'pickupDay': cart.selectedPickupDay,
       'pickupTime': cart.selectedPickupTime,
-      'hasBeenReviewed': false, // <-- ( ✨ ADD THIS LINE ✨ )
+      'hasBeenReviewed': false, 
     };
-    // --- ( ✨ END UPDATED ORDER DATA ✨ ) ---
 
-    try {
-      final docRef =
-          await FirebaseFirestore.instance.collection('orders').add(orderData);
-      final orderId = docRef.id;
-
-      if (selectedVoucher != null) {
-        await _voucherRepo.incrementVoucherRedemption(selectedVoucher!.id);
-      }
-      if (automaticPromo != null) {
-        await FirebaseFirestore.instance
-            .collection('promotions')
-            .doc(automaticPromo!.id)
-            .update({
-          'claimedRedemptions': FieldValue.increment(1),
-        });
-      }
-
-      if (mounted) {
-        cart.clearCart();
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Order placed successfully!')),
-      );
-
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PickupConfirmationPage(
-              orderId: orderId,
-              pickupId: pickupId,
-              vendorName: vendorName,
-              vendorAddress: vendorAddress,
-              total: total,
-            ),
+    // --- ( ✨ This is the new navigation ✨ ) ---
+    // We don't create the order here anymore.
+    // We just navigate to the payment page.
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => QrPaymentPage(
+            orderData: orderData,
+            orderType: CheckoutType.pickup,
           ),
-          (route) => route.isFirst,
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed to place order: $e')));
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+        ),
+      );
     }
+    // --- ( ✨ End of new navigation ✨ ) ---
+
+     setState(() => _isLoading = false);
   }
 
   @override
@@ -753,33 +687,6 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            const Text('Payment Method',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            GestureDetector(
-              onTap: _selectPaymentMethod,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(color: Colors.grey.shade200, blurRadius: 4),
-                    ],
-                    border: Border.all(color: Colors.grey.shade300)),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(selectedPayment, style: const TextStyle(fontSize: 16)),
-                    const Icon(Icons.arrow_forward_ios, size: 16),
-                  ],
-                ),
-              ),
-            ),
             const SizedBox(height: 40),
           ],
         ),
@@ -790,14 +697,15 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-                color: Colors.black12, blurRadius: 10, offset: Offset(0, -5))
+                color: Colors.black12, blurRadius: 10, offset: const Offset(0, -5))
           ],
           borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         ),
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _isLoading ? null : _placePickupOrder,
+            // --- ( ✨ MODIFIED: Call _proceedToPayment ✨ ) ---
+            onPressed: _isLoading ? null : _proceedToPayment,
             style: ElevatedButton.styleFrom(
               backgroundColor: kPrimaryActionColor,
               foregroundColor: kTextColor,
@@ -816,7 +724,7 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
                     ),
                   )
                 : Text(
-                    'Pay RM${getTotal().toStringAsFixed(2)} & Get Pickup ID',
+                    'Proceed to Pay RM${getTotal().toStringAsFixed(2)}', // <-- MODIFIED TEXT
                     style: const TextStyle(
                         fontSize: 16, fontWeight: FontWeight.bold),
                   ),

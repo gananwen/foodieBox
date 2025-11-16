@@ -78,15 +78,21 @@ class _OrdersPageState extends State<OrdersPage>
     // --- ( ✨ UPDATED STATUSES - CASE INSENSITIVE FIX ✨ ) ---
     // We now check for both lowercase and uppercase versions
     final ongoingStatuses = [
-      'received',
-      'preparing',
-      'delivering',
-      'pending',
-      'paid_pending_pickup' // <-- ADDED
+      'received', 'Received',
+      'Preparing', 'preparing',
+      'Prepared', 'prepared',
+      'Ready for Pickup', 'ready for pickup',
+      'paid_pending_pickup',
+      'Delivering', 'delivering',
     ];
-    // --- END FIX ---
-
-    final historyStatuses = ['completed', 'cancelled'];
+    
+    final historyStatuses = [
+      'completed', 'Completed',
+      'cancelled', 'Cancelled', // <-- This is the important fix
+      'Delivered', 'delivered',
+      'Picked Up', 'picked up'
+    ];
+    // --- ( ✨ END UPDATED STATUSES ✨ ) ---
 
     if (userId == null) {
       return const Center(
@@ -150,6 +156,7 @@ class _OrdersPageState extends State<OrdersPage>
       },
     );
   }
+
 
   Widget _buildOrderCard(BuildContext context, OrderModel order,
       {required bool isOngoing}) {
@@ -222,7 +229,7 @@ class _OrdersPageState extends State<OrdersPage>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(order.vendorName ?? 'Store',
+                  child: Text(order.vendorName,
                       style: kLabelTextStyle.copyWith(fontSize: 16),
                       overflow: TextOverflow.ellipsis),
                 ),
@@ -241,7 +248,7 @@ class _OrdersPageState extends State<OrdersPage>
             const SizedBox(height: 8),
             Text(formattedDateTime,
                 style: kHintTextStyle.copyWith(fontSize: 13)),
-
+            
             // --- FIX: Check if address is null before showing it ---
             if (order.address != null && order.address!.isNotEmpty)
               Padding(
@@ -270,18 +277,15 @@ class _OrdersPageState extends State<OrdersPage>
               children: [
                 Text('Total: RM${order.total.toStringAsFixed(2)}',
                     style: kLabelTextStyle.copyWith(fontSize: 15)),
-
+                
                 // --- FIX: Show correct icon for delivery or pickup ---
-                if (order.orderType == 'Delivery' &&
-                    order.driverId != null &&
-                    isOngoing)
+                if (order.orderType == 'Delivery' && order.driverId != null && isOngoing)
                   const Icon(Icons.local_shipping,
                       color: kPrimaryActionColor, size: 20),
 
                 if (order.orderType == 'Pickup' && isOngoing)
                   const Icon(Icons.store, // Icon for pickup
-                      color: kPrimaryActionColor,
-                      size: 20),
+                      color: kPrimaryActionColor, size: 20),
                 // --- END FIX ---
               ],
             ),
@@ -290,6 +294,7 @@ class _OrdersPageState extends State<OrdersPage>
       ),
     );
   }
+
 
   TextStyle _getStatusStyle(String status) {
     Color color;
