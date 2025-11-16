@@ -87,8 +87,12 @@ class _VendorHomePageState extends State<VendorHomePage> {
               ),
               // --- ( ✨ 结束修改 ✨ ) ---
 
-              MarketingPage(onBackToDashboard: _goToDashboard),
+              MarketingPage(
+                  onBackToDashboard: _goToDashboard,
+                  bundle: bundle), // <-- ( ✨ 3. Add 'bundle: bundle' here ) ---
+
               OrdersPage(onBackToDashboard: _goToDashboard),
+
               MorePage(
                 onBackToDashboard: _goToDashboard,
                 bundle: bundle,

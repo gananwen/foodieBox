@@ -1,12 +1,14 @@
+// 路径: lib/pages/vendor_page/vendor_login.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // <-- ( ✨ 1. ADD THIS )
 import '../../util/styles.dart';
 import '../../repositories/auth_repository.dart';
 import '../../repositories/user_repository.dart';
-import '../Vendor_page/vendor_home_page.dart';
-// 1. 导入你的供应商注册页面
-import '../Vendor_page/vendor_regieteration_page.dart';
+import '../../screens/Vendor_page/vendor_home_page.dart';
+import '../../screens/Vendor_page/vendor_regieteration_page.dart';
+import '../../models/vendor.dart'; // <-- ( ✨ 2. ADD THIS )
+import '../../screens/Vendor_page/pending_approval_page.dart';
 
 class VendorLoginPage extends StatefulWidget {
   const VendorLoginPage({super.key});
@@ -23,6 +25,9 @@ class _VendorLoginPageState extends State<VendorLoginPage>
   final _passwordController = TextEditingController();
   final AuthRepository _authRepo = AuthRepository();
   final UserRepository _userRepo = UserRepository();
+
+  // --- ( ✨ 4. ADD FIRESTORE INSTANCE ✨ ) ---
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   late AnimationController _controller;
   late Animation<double> _animation;
@@ -49,6 +54,7 @@ class _VendorLoginPageState extends State<VendorLoginPage>
     super.dispose();
   }
 
+  // --- ( ✨ 5. THIS FUNCTION IS NOW UPDATED ✨ ) ---
   Future<void> _signInVendor() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -65,29 +71,47 @@ class _VendorLoginPageState extends State<VendorLoginPage>
     setState(() => _isLoading = true);
 
     try {
+      // Step 1: Sign in with Auth
       final user = await _authRepo.signInWithEmail(email, password);
-      // 检查 user 是否为 null
       if (user == null) {
         throw Exception("Login failed. Please try again.");
       }
 
+      // Step 2: Check the 'users' collection for 'Vendor' role
       final userData = await _userRepo.getUserData(user.uid);
-
       if (userData?.role != 'Vendor') {
-        // 如果不是 Vendor，也登出
-        await _authRepo.signOut();
+        await _authRepo.signOut(); // Log out non-vendors
         throw Exception("Access denied: This account is not a vendor.");
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Vendor login successful")),
-        );
+      // Step 3: Check the 'vendors' collection for 'isApproved' status
+      final vendorDoc = await _db.collection('vendors').doc(user.uid).get();
+      if (!vendorDoc.exists) {
+        await _authRepo.signOut(); // Log out if vendor data is missing
+        throw Exception("Vendor data not found. Please contact support.");
+      }
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const VendorHomePage()),
-        );
+      final vendorData = VendorModel.fromMap(vendorDoc.data()!);
+
+      // Step 4: Navigate based on approval status
+      if (mounted) {
+        if (vendorData.isApproved) {
+          // --- APPROVED: Go to Home Page ---
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Vendor login successful")),
+          );
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const VendorHomePage()),
+          );
+        } else {
+          // --- NOT APPROVED: Go to Pending Page ---
+          await _authRepo.signOut(); // Log them out
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const PendingApprovalPage()),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -122,7 +146,7 @@ class _VendorLoginPageState extends State<VendorLoginPage>
               ),
               const Center(
                 child: Text(
-                  'Vendor Login', // 添加标题
+                  'Vendor Login',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -158,7 +182,7 @@ class _VendorLoginPageState extends State<VendorLoginPage>
                             fontWeight: FontWeight.bold, fontSize: 18),
                       ),
                     ),
-              const SizedBox(height: 20), // 2. (新增) 添加注册链接
+              const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -171,8 +195,7 @@ class _VendorLoginPageState extends State<VendorLoginPage>
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                              const VendorRegistrationPage(), // 跳转到你的注册页
+                          builder: (context) => const VendorRegistrationPage(),
                         ),
                       );
                     },
@@ -195,6 +218,7 @@ class _VendorLoginPageState extends State<VendorLoginPage>
   }
 }
 
+// (This helper class is unchanged)
 class _CustomInputField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
