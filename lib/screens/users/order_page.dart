@@ -74,39 +74,34 @@ class _OrdersPageState extends State<OrdersPage>
     );
   }
 
+
   Widget _buildOrderList(BuildContext context,
       {required bool isOngoing, String? userId}) {
         
     // --- ( ✨ UPDATED STATUSES - CASE INSENSITIVE FIX ✨ ) ---
     // We now check for both lowercase and uppercase versions
     final ongoingStatuses = [
-      'received', 'Received',
-      'Preparing', 'preparing',
-      'Prepared', 'prepared',
-      'Ready for Pickup', 'ready for pickup',
-      'paid_pending_pickup',
-      'Delivering', 'delivering',
+      'received',
+      'preparing',
+      'delivering',
+      'pending',
+      'paid_pending_pickup' // <-- ADDED
     ];
+    // --- END FIX ---
     
-    final historyStatuses = [
-      'completed', 'Completed',
-      'cancelled', 'Cancelled', // <-- This is the important fix
-      'Delivered', 'delivered',
-      'Picked Up', 'picked up'
-    ];
-    // --- ( ✨ END UPDATED STATUSES ✨ ) ---
+    final historyStatuses = ['completed', 'cancelled'];
 
     if (userId == null) {
       return const Center(
-        child: Text('Please log in to view your orders.', style: kHintTextStyle),
+        child:
+            Text('Please log in to view your orders.', style: kHintTextStyle),
       );
     }
 
     final query = FirebaseFirestore.instance
         .collection('orders')
         .where('userId', isEqualTo: userId)
-        .where('status',
-            whereIn: isOngoing ? ongoingStatuses : historyStatuses)
+        .where('status', whereIn: isOngoing ? ongoingStatuses : historyStatuses)
         .orderBy('timestamp', descending: true);
 
     return StreamBuilder<QuerySnapshot>(
@@ -166,8 +161,7 @@ class _OrdersPageState extends State<OrdersPage>
     // --- END UPDATED ---
 
     final TextStyle statusStyle = _getStatusStyle(order.status);
-    final String formattedDateTime =
-        _formatDateTime(order.timestamp.toDate());
+    final String formattedDateTime = _formatDateTime(order.timestamp.toDate());
 
     return GestureDetector(
       // --- ( ✨ UPDATED NAVIGATION LOGIC ✨ ) ---
@@ -229,17 +223,19 @@ class _OrdersPageState extends State<OrdersPage>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(order.vendorName ?? 'Store', // Use safe fallback
+                  child: Text(order.vendorName,
                       style: kLabelTextStyle.copyWith(fontSize: 16),
                       overflow: TextOverflow.ellipsis),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: statusStyle.color?.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(statusText, style: statusStyle.copyWith(fontSize: 12)),
+                  child: Text(statusText,
+                      style: statusStyle.copyWith(fontSize: 12)),
                 ),
               ],
             ),
@@ -247,6 +243,7 @@ class _OrdersPageState extends State<OrdersPage>
             Text(formattedDateTime,
                 style: kHintTextStyle.copyWith(fontSize: 13)),
             
+            // --- FIX: Check if address is null before showing it ---
             if (order.address != null && order.address!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4.0),
@@ -272,33 +269,15 @@ class _OrdersPageState extends State<OrdersPage>
                 Text('Total: RM${order.total.toStringAsFixed(2)}',
                     style: kLabelTextStyle.copyWith(fontSize: 15)),
                 
-                // Show icon based on type (ongoing) or status (history)
-                if (isOngoing)
-                  Icon(
-                    order.orderType == 'Delivery' 
-                      ? Icons.local_shipping 
-                      : Icons.store,
-                    color: kPrimaryActionColor, 
-                    size: 20
-                  )
-                else
-                  Icon(
-                    // --- ( ✨ FIX REMAINS HERE ✨ ) ---
-                    // We use .toLowerCase() to make the check case-insensitive
-                    order.status.toLowerCase() == 'completed' || 
-                    order.status.toLowerCase() == 'delivered' || 
-                    order.status.toLowerCase() == 'picked up'
-                      ? Icons.check_circle_outline
-                      : Icons.cancel_outlined,
-                    color: 
-                    // --- ( ✨ FIX REMAINS HERE ✨ ) ---
-                    order.status.toLowerCase() == 'completed' || 
-                    order.status.toLowerCase() == 'delivered' || 
-                    order.status.toLowerCase() == 'picked up'
-                      ? Colors.green
-                      : Colors.red,
-                    size: 20
-                  ),
+                // --- FIX: Show correct icon for delivery or pickup ---
+                if (order.orderType == 'Delivery' && order.driverId != null && isOngoing)
+                  const Icon(Icons.local_shipping,
+                      color: kPrimaryActionColor, size: 20),
+
+                if (order.orderType == 'Pickup' && isOngoing)
+                  const Icon(Icons.store, // Icon for pickup
+                      color: kPrimaryActionColor, size: 20),
+                // --- END FIX ---
               ],
             ),
           ],

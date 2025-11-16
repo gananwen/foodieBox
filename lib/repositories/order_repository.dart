@@ -10,6 +10,7 @@ class OrderRepository {
 
   String? get _vendorId => _auth.currentUser?.uid;
 
+  // --- ( 这是你现有的函数 - 保持不变 ) ---
   Stream<List<OrderModel>> getOrdersStream(String orderType) {
     final vendorId = _vendorId;
     if (vendorId == null) {
@@ -34,8 +35,6 @@ class OrderRepository {
           'Picked Up'
           'Cancelled' // <-- ( ✨ NEWLY ADDED ✨ )
         ])
-        // --- ( ✨ 结束修复 ✨ ) ---
-
         .orderBy('timestamp', descending: true)
         .snapshots()
         .map((snapshot) {
@@ -49,6 +48,7 @@ class OrderRepository {
         });
   }
 
+  // --- ( 这是你现有的函数 - 保持不变 ) ---
   Future<void> updateOrderStatus(String orderId, String newStatus) async {
     try {
       await _db.collection('orders').doc(orderId).update({'status': newStatus});
@@ -58,6 +58,7 @@ class OrderRepository {
     }
   }
 
+  // --- ( 这是你现有的函数 - 保持不变 ) ---
   Future<void> assignDriverToOrder(String orderId) async {
     try {
       final driversSnapshot = await _db.collection('drivers').get();
@@ -82,6 +83,7 @@ class OrderRepository {
     }
   }
 
+  // --- ( 这是你现有的函数 - 保持不变 ) ---
   Stream<Map<String, dynamic>> getTodaysStatsStream() {
     final vendorId = _vendorId;
     if (vendorId == null) {
@@ -97,15 +99,7 @@ class OrderRepository {
 
     // 3. 计算 UTC+8 时区的 "今天凌晨"
     final startOfTodayInMalaysia = DateTime.utc(
-        nowInMalaysia.year,
-        nowInMalaysia.month,
-        nowInMalaysia.day,
-        0,
-        0,
-        0); // 这创建了 '2025-11-15 00:00:00' (UTC)
-
-    // 4. 将这个 UTC 时间转换回 UTC+8 的 "凌晨"，即减去8小时
-    //    这给了我们 '2025-11-14 16:00:00' (UTC)，这才是 UTC+8 的午夜
+        nowInMalaysia.year, nowInMalaysia.month, nowInMalaysia.day, 0, 0, 0);
     final startOfTodayTimestamp = Timestamp.fromDate(
         startOfTodayInMalaysia.subtract(const Duration(hours: 8)));
     // --- ( ✨ 结束修复 ✨ ) ---

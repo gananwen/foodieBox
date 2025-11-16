@@ -58,4 +58,89 @@ class VendorDataRepository {
     if (uid == null) throw Exception('User not logged in');
     await _db.collection('vendors').doc(uid).update(vendor.toMap());
   }
+
+  Future<void> updateStoreHours(List<String> newHours) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      throw Exception('User not logged in.');
+    }
+
+    try {
+      // Update the 'storeHours' field in the 'vendors' document
+      await _db.collection('vendors').doc(uid).update({
+        'storeHours': newHours,
+      });
+    } catch (e) {
+      print('Error updating store hours: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteVendorAccount(String password) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw Exception('No user is currently logged in.');
+    }
+    final uid = user.uid;
+    final email = user.email;
+
+    if (email == null) {
+      throw Exception('User has no email for re-authentication.');
+    }
+
+    try {
+      // 1. Re-authenticate the user to confirm their identity
+      AuthCredential credential = EmailAuthProvider.credential(
+        email: email,
+        password: password,
+      );
+      await user.reauthenticateWithCredential(credential);
+
+      // --- Deletion Process Starts ---
+
+      // 2. Delete all subcollections (Products)
+      // We do this in batches to avoid memory issues if there are many products
+      final productsRef =
+          _db.collection('vendors').doc(uid).collection('products');
+      await _deleteSubcollection(productsRef);
+
+      // 3. Delete all subcollections (Promotions)
+      final promosRef =
+          _db.collection('vendors').doc(uid).collection('promotions');
+      await _deleteSubcollection(promosRef);
+
+      // 4. Delete the main 'vendors' and 'users' documents
+      WriteBatch mainDocBatch = _db.batch();
+      mainDocBatch.delete(_db.collection('vendors').doc(uid));
+      mainDocBatch.delete(_db.collection('users').doc(uid));
+      await mainDocBatch.commit();
+
+      // 5. Delete the Auth user (This is the very last step)
+      await user.delete();
+    } on FirebaseAuthException {
+      // Re-throw auth exceptions (like 'wrong-password')
+      // so the UI can catch them and display a specific message.
+      rethrow;
+    } catch (e) {
+      // Catch other errors
+      print('Error during account deletion: $e');
+      throw Exception('An error occurred during account deletion.');
+    }
+  }
+
+  // ( ✨ ADD THIS HELPER FUNCTION ✨ )
+  // This helper deletes all documents in a subcollection.
+  Future<void> _deleteSubcollection(CollectionReference collectionRef) async {
+    QuerySnapshot snapshot = await collectionRef.limit(50).get();
+    while (snapshot.docs.isNotEmpty) {
+      WriteBatch batch = _db.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+
+      // Get the next batch
+      snapshot = await collectionRef.limit(50).get();
+    }
+  }
 }
