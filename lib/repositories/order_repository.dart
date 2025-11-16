@@ -35,7 +35,7 @@ class OrderRepository {
           'Payment Rejected', // <-- NEW STATUS
           'Delivered',
           'Picked Up'
-          'Cancelled' // <-- ( ✨ NEWLY ADDED ✨ )
+              'Cancelled' // <-- ( ✨ NEWLY ADDED ✨ )
         ])
         .orderBy('timestamp', descending: true)
         .snapshots()

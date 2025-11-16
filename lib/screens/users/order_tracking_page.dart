@@ -121,6 +121,7 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
   Future<VendorModel> _fetchVendor(String vendorId) async {
     if (vendorId.isEmpty) throw Exception('No vendor ID found');
 
+
     final doc = await FirebaseFirestore.instance
         .collection('vendors')
         .doc(vendorId)
@@ -254,6 +255,7 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
                       const SizedBox(height: 24),
                       _buildTimeline(currentStep, order.orderType, stepsToShow),
                       const Divider(height: 32),
+
 
                       // Show driver info if status is Delivering or Delivered
                       if (isDelivery && currentStep >= 3) _buildDriverInfo(fixedDriver),
