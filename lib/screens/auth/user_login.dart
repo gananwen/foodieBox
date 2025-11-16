@@ -202,18 +202,11 @@ class _LoginPageState extends State<LoginPage>
               const Divider(color: kTextColor),
               const SizedBox(height: 20),
               
-              // --- ( ✨ GOOGLE BUTTON UPDATED, FACEBOOK REMOVED ✨ ) ---
-              ElevatedButton.icon(
+              // --- ( ✨ START OF GOOGLE BUTTON FIX ✨ ) ---
+              // Replaced ElevatedButton.icon with a normal ElevatedButton
+              // and a manual 'Row' to prevent overflow.
+              ElevatedButton(
                 onPressed: _isLoading ? null : _signInWithGoogle,
-                icon: Image.asset(
-                  'assets/images/google_logo.png', // <-- Make sure this image is in your assets/images/ folder
-                  height: 24.0,
-                  width: 24.0,
-                ),
-                label: const Text(
-                  'Sign in with Google',
-                  style: TextStyle(color: Colors.black87, fontSize: 16),
-                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.black87,
@@ -225,12 +218,36 @@ class _LoginPageState extends State<LoginPage>
                   elevation: 2,
                   shadowColor: Colors.grey.withOpacity(0.2),
                 ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset(
+                      'assets/images/google_logo.png', // <-- This still needs the pubspec.yaml fix
+                      height: 22.0, // Slightly smaller to be safe
+                      width: 22.0,
+                    ),
+                    const SizedBox(width: 12), // Add spacing
+                    // Use Flexible to prevent the text from overflowing
+                    Flexible(
+                      child: Text(
+                        'Sign in with Google',
+                        style: TextStyle(
+                          color: Colors.black87, 
+                          fontSize: 15, // Slightly smaller font
+                        ),
+                        overflow: TextOverflow.ellipsis, // Add overflow protection
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              // --- ( ✨ END OF UPDATE ✨ ) ---
+              // --- ( ✨ END OF GOOGLE BUTTON FIX ✨ ) ---
               
               const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              // --- ( This is the 'Wrap' fix you already have, which is correct ) ---
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: <Widget>[
                   const Text("Don't have an account? ",
                       style: TextStyle(color: kTextColor)),
@@ -246,6 +263,7 @@ class _LoginPageState extends State<LoginPage>
                   ),
                 ],
               ),
+              // --- ( END OF FIX ) ---
               const SizedBox(height: 40),
             ],
           ),

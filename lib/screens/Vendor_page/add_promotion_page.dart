@@ -119,7 +119,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
       // --- ( ✨ NEW: Get vendorId ✨ ) ---
       final vendorId = FirebaseAuth.instance.currentUser?.uid;
       if (vendorId == null) {
-         ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text('Error: You are not logged in.'),
               backgroundColor: kPrimaryActionColor),
@@ -181,6 +181,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           totalRedemptions: _totalRedemptions,
           vendorId: vendorId, // <-- ( ✨ ADDED VENDOR ID ✨ )
           bannerUrl: '', // 暂时为空
+          status: 'Active', // <-- ( ✨ NEWLY ADDED: Set default status ✨ )
         );
 
         // 步骤 3: 保存到 Firestore (现在返回 ID)

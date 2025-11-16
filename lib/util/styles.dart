@@ -26,6 +26,8 @@ const TextStyle kLinkTextStyle = TextStyle(
   fontWeight: FontWeight.bold,
 );
 
+
+
 /// --- Gradient Constants ---
 // Soft pink to deeper pink for promotions
 const LinearGradient kPromotionGradient = LinearGradient(

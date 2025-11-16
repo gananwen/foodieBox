@@ -27,11 +27,49 @@ class ProductDetailPage extends StatefulWidget {
 class _ProductDetailPageState extends State<ProductDetailPage> {
   int _quantity = 1;
 
+  // --- ( ✨ NEW WIDGET: To build star rating ✨ ) ---
+  Widget _buildStarRating(double rating) {
+    List<Widget> stars = [];
+    for (int i = 1; i <= 5; i++) {
+      IconData iconData = Icons.star_border;
+      Color color = Colors.grey[300]!;
+      
+      if (rating >= i) {
+        iconData = Icons.star;
+        color = kYellowMedium;
+      } else if (rating > i - 1) {
+        iconData = Icons.star_half;
+        color = kYellowMedium;
+      } else {
+        iconData = Icons.star_border;
+      }
+      stars.add(Icon(iconData, color: color, size: 20));
+    }
+    return Row(children: stars);
+  }
+  // --- ( ✨ END NEW WIDGET ✨ ) ---
+
+
   @override
   Widget build(BuildContext context) {
     // Calculate prices based on quantity
     double currentPrice = widget.product.discountedPrice * _quantity;
     double originalPrice = widget.product.originalPrice * _quantity;
+
+    // --- ( ✨ NEW: Get cart and stock info ✨ ) ---
+    final cart = context.watch<CartProvider>();
+    final cartQuantity = cart.getQuantityInCart(widget.product.id!);
+    final availableStock = widget.product.quantity;
+    final bool isOutOfStock = availableStock <= 0;
+    
+    // Ensure _quantity doesn't start higher than stock if stock is 0
+    if (isOutOfStock && _quantity > 0) {
+      _quantity = 0;
+    } else if (_quantity == 0 && !isOutOfStock) {
+      _quantity = 1;
+    }
+    // --- ( ✨ END NEW ✨ ) ---
+
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -118,24 +156,44 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                         IconButton(
                           icon: const Icon(Icons.remove,
                               size: 20, color: kTextColor),
-                          onPressed: () {
-                            setState(() {
-                              if (_quantity > 1) _quantity--;
-                            });
-                          },
+                          onPressed: isOutOfStock
+                              ? null
+                              : () {
+                                  setState(() {
+                                    if (_quantity > 1) _quantity--;
+                                  });
+                                },
                         ),
                         Text(
-                          _quantity.toString(),
+                          isOutOfStock ? '0' : _quantity.toString(),
                           style: kLabelTextStyle.copyWith(fontSize: 18),
                         ),
                         IconButton(
                           icon: const Icon(Icons.add,
                               size: 20, color: kTextColor),
-                          onPressed: () {
-                            setState(() {
-                              _quantity++;
-                            });
-                          },
+                          // --- ( ✨ MODIFICATION: Check stock ✨ ) ---
+                          onPressed: isOutOfStock
+                              ? null
+                              : () {
+                                  // Check against total stock (not cart quantity)
+                                  if (_quantity + 1 > availableStock) {
+                                    // Show snackbar if user tries to go over stock
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                            'Cannot add more. Only $availableStock in stock.'),
+                                        backgroundColor: Colors.red,
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                  } else {
+                                    setState(() {
+                                      _quantity++;
+                                    });
+                                  }
+                                },
+                          // --- ( ✨ END MODIFICATION ✨ ) ---
                         ),
                       ],
                     ),
@@ -199,6 +257,23 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               ),
               const SizedBox(height: 24),
 
+              // --- ( ✨ NEW: Show Stock ✨ ) ---
+              Text('Availability',
+                  style: kLabelTextStyle.copyWith(fontSize: 18)),
+              const SizedBox(height: 8),
+              Text(
+                isOutOfStock
+                    ? 'This item is out of stock.'
+                    : 'Available Stock: $availableStock',
+                style: kLabelTextStyle.copyWith(
+                  fontSize: 16,
+                  color:
+                      isOutOfStock || availableStock < 5 ? Colors.red : kTextColor,
+                ),
+              ),
+              const SizedBox(height: 24),
+              // --- ( ✨ END NEW ✨ ) ---
+
               // --- Product Detail ---
               Text('Product Detail',
                   style: kLabelTextStyle.copyWith(fontSize: 18)),
@@ -243,21 +318,22 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               ),
               const SizedBox(height: 24),
 
-              // --- Review (Placeholder) ---
-              // NOTE: This data is not in your product.dart model.
-              Text('Review', style: kLabelTextStyle.copyWith(fontSize: 18)),
+              // --- ( ✨ FIXED: Real Vendor Review ✨ ) ---
+              Text('Store Rating', style: kLabelTextStyle.copyWith(fontSize: 18)),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(Icons.star, color: kYellowMedium, size: 20),
-                  const Icon(Icons.star, color: kYellowMedium, size: 20),
-                  const Icon(Icons.star, color: kYellowMedium, size: 20),
-                  const Icon(Icons.star, color: kYellowMedium, size: 20),
-                  Icon(Icons.star, color: Colors.grey[300], size: 20),
+                  // Use the new star rating widget
+                  _buildStarRating(widget.vendor.rating),
                   const SizedBox(width: 8),
-                  const Text('4.0 (128 reviews)', style: kHintTextStyle)
+                  // Use the real rating and review count from the vendor
+                  Text(
+                    '${widget.vendor.rating.toStringAsFixed(1)} (${widget.vendor.reviewCount} reviews)', 
+                    style: kHintTextStyle
+                  )
                 ],
               ),
+              // --- ( ✨ END FIX ✨ ) ---
               const SizedBox(height: 30), // Spacing before button
             ],
           ),
@@ -267,42 +343,73 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
         child: ElevatedButton(
-          // --- MODIFICATION: Add to cart logic ---
-          onPressed: () {
-            // 1. Get the cart provider
-            final cart = context.read<CartProvider>();
+          // --- ( ✨ MODIFICATION: Add to cart logic with stock check ✨ ) ---
+          onPressed: isOutOfStock
+              ? null // Disable button if out of stock
+              : () {
+                  // 1. Get the cart provider (read only)
+                  final cart = context.read<CartProvider>();
 
-            // 2. Add the item with the correct vendor and quantity
-            cart.addItem(widget.product, widget.vendor, _quantity);
+                  // 2. Check if adding this quantity exceeds total stock
+                  //    (Check against quantity to add + quantity already in cart)
+                  if (_quantity + cartQuantity > availableStock) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                            'Cannot add. You have $cartQuantity in cart, and only $availableStock available in stock.'),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                    return;
+                  }
+                  
+                  // 3. Check if user is mixing stores
+                  final bool canAdd = cart.itemCount == 0 ||
+                      (cart.items.isNotEmpty && cart.itemsList.first.vendorId == widget.vendor.uid);
+                  
+                  if (!canAdd) {
+                     ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('You can only order from one store at a time.'),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                    return;
+                  }
 
-            // 3. Show confirmation
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content:
-                    Text('Added $_quantity x ${widget.product.title} to cart!'),
-                backgroundColor: kPrimaryActionColor, // Use your theme color
-                duration: const Duration(seconds: 2),
-              ),
-            );
+                  // 4. Add the item with the correct vendor and quantity
+                  cart.addItem(widget.product, widget.vendor, _quantity);
 
-            // 4. Go back to the previous screen
-            Navigator.of(context).pop();
-          },
-          // --- END MODIFICATION ---
+                  // 5. Show confirmation
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content:
+                          Text('Added $_quantity x ${widget.product.title} to cart!'),
+                      backgroundColor: kPrimaryActionColor, // Use your theme color
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+
+                  // 6. Go back to the previous screen
+                  Navigator.of(context).pop();
+                },
+          // --- ( ✨ END MODIFICATION ✨ ) ---
           style: ElevatedButton.styleFrom(
             backgroundColor: kPrimaryActionColor,
+            disabledBackgroundColor: Colors.grey.shade300, // For out of stock
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          child: const Text(
-            'Add to Cart',
+          child: Text(
+            isOutOfStock ? 'Out of Stock' : 'Add to Cart',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color:
-                  Colors.white, // Assuming you want white text on primary color
+              color: isOutOfStock ? Colors.grey.shade600 : Colors.white, // Assuming white text
             ),
           ),
         ),

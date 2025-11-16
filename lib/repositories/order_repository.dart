@@ -31,6 +31,8 @@ class OrderRepository {
           'Ready for Pickup',
           'Delivering',
           'paid_pending_pickup',
+          'Pending Payment', // <-- NEW STATUS
+          'Payment Rejected', // <-- NEW STATUS
           'Delivered',
           'Picked Up'
           'Cancelled' // <-- ( ✨ NEWLY ADDED ✨ )
@@ -100,6 +102,7 @@ class OrderRepository {
     // 3. 计算 UTC+8 时区的 "今天凌晨"
     final startOfTodayInMalaysia = DateTime.utc(
         nowInMalaysia.year, nowInMalaysia.month, nowInMalaysia.day, 0, 0, 0);
+    // 4. 将 UTC+8 的凌晨时间转换回 UTC 时间戳进行查询
     final startOfTodayTimestamp = Timestamp.fromDate(
         startOfTodayInMalaysia.subtract(const Duration(hours: 8)));
     // --- ( ✨ 结束修复 ✨ ) ---
@@ -132,4 +135,72 @@ class OrderRepository {
       };
     });
   }
+  Stream<List<OrderModel>> getHistoryOrdersStream() {
+    final vendorId = _vendorId;
+    if (vendorId == null) {
+      throw Exception('User not logged in');
+    }
+
+    return _db
+        .collection('orders')
+        .where('vendorIds', arrayContains: vendorId)
+        // ( 关键 ) 查询 "Completed" 和 "Cancelled" 状态
+        .where('status', whereIn: ['Completed', 'Cancelled'])
+        // ( 索引 ) 这个查询需要一个新的索引
+        .orderBy('timestamp', descending: true)
+        .limit(50) // (可选：对历史记录进行分页或限制)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs.map((doc) {
+            final Map<String, dynamic>? data = doc.data();
+            if (data == null) {
+              throw Exception('Found order with empty data: ${doc.id}');
+            }
+            return OrderModel.fromMap(data, doc.id);
+          }).toList();
+        });
+  }
+
+  // --- ( ✨✨✨ IMPORTANT ✨✨✨ ) ---
+  //
+  // This function should ONLY be called by your Admin Panel or
+  // a Firebase Cloud Function *after* an Admin approves the payment.
+  //
+  // DO NOT call this from the customer app.
+  //
+  Future<void> deductStockForOrder(OrderModel order) async {
+    // Use a transaction to ensure this is atomic (all or nothing)
+    await _db.runTransaction((transaction) async {
+      for (final item in order.items) {
+        // 1. Get the reference to the product document
+        final productRef = _db
+            .collection('vendors')
+            .doc(item.vendorId)
+            .collection('products')
+            .doc(item.productId);
+
+        // 2. Get the product document *within the transaction*
+        final productSnapshot = await transaction.get(productRef);
+
+        if (!productSnapshot.exists) {
+          throw Exception(
+              'Product with ID ${item.productId} not found for vendor ${item.vendorId}.');
+        }
+
+        // 3. Get the current stock ('quantity' field in product.dart)
+        final currentStock = (productSnapshot.data()?['quantity'] as num?) ?? 0;
+
+        // 4. Calculate the new stock
+        final newStock = currentStock - item.quantity;
+
+        // 5. Update the product document *within the transaction*
+        // Set new stock, ensuring it doesn't go below 0.
+        transaction.update(productRef, {
+          'quantity': newStock < 0 ? 0 : newStock,
+        });
+      }
+    });
+    print('Stock successfully deducted for order ${order.id}');
+  }
+  // --- ( ✨✨✨ END OF CHANGE ✨✨✨ ) ---
 }

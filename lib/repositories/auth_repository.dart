@@ -6,7 +6,10 @@ import '../models/user.dart';
 class AuthRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn.standard();
+  final GoogleSignIn _googleSignIn =GoogleSignIn.standard();
+
+
+
 
   // ✅ Email Sign-Up
   Future<User?> signUpWithEmail(

@@ -1,6 +1,4 @@
-// 路径: lib/models/order_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-// ( ✨ 关键 ✨ ) 确保你导入了下面这个 order_item.model.dart 文件
 import 'order_item.model.dart';
 
 class OrderModel {
@@ -27,7 +25,7 @@ class OrderModel {
   final double? rating;
   final String? reviewText;
   final Timestamp? reviewTimestamp;
-  final bool? hasBeenReviewed; // <-- ( ✨ ADD THIS LINE ✨ )
+  final bool? hasBeenReviewed;
 
   // (取货字段)
   final String? pickupId;
@@ -42,7 +40,11 @@ class OrderModel {
   // ( ✨ NEWLY ADDED for history summary ✨ )
   final String? promoLabel;
   final String? voucherLabel;
-  // ( ✨ END NEWLY ADDED ✨ )
+  
+  // --- ( ✨ NEWLY ADDED for Payment Proof Flow ✨ ) ---
+  final String? paymentProofUrl;
+  final String? adminRejectionReason;
+  // --- ( ✨ END NEW ✨ ) ---
 
 
   OrderModel({
@@ -67,7 +69,7 @@ class OrderModel {
     this.rating,
     this.reviewText,
     this.reviewTimestamp,
-    this.hasBeenReviewed, // <-- ( ✨ ADD THIS LINE ✨ )
+    this.hasBeenReviewed,
     this.pickupId,
     this.pickupDay,
     this.pickupTime,
@@ -78,6 +80,11 @@ class OrderModel {
 
     this.promoLabel,
     this.voucherLabel,
+
+    // --- ( ✨ NEWLY ADDED for Payment Proof Flow ✨ ) ---
+    this.paymentProofUrl,
+    this.adminRejectionReason,
+    // --- ( ✨ END NEW ✨ ) ---
   });
 
   factory OrderModel.fromMap(Map<String, dynamic> map, String documentId) {
@@ -109,7 +116,7 @@ class OrderModel {
       rating: (map['rating'] as num?)?.toDouble(),
       reviewText: map['reviewText'],
       reviewTimestamp: map['reviewTimestamp'],
-      hasBeenReviewed: map['hasBeenReviewed'], // <-- ( ✨ ADD THIS LINE ✨ )
+      hasBeenReviewed: map['hasBeenReviewed'],
       pickupId: map['pickupId'],
       pickupDay: map['pickupDay'],
       pickupTime: map['pickupTime'],
@@ -118,9 +125,13 @@ class OrderModel {
       vendorType: (map['vendorType'] is String) ? map['vendorType'] : 'Grocery',
       vendorAddress: vendorAddress,
 
-      // ( ✨ NEWLY ADDED for history summary ✨ )
       promoLabel: map['promoLabel'],
       voucherLabel: map['voucherLabel'],
+
+      // --- ( ✨ NEWLY ADDED for Payment Proof Flow ✨ ) ---
+      paymentProofUrl: map['paymentProofUrl'],
+      adminRejectionReason: map['adminRejectionReason'],
+      // --- ( ✨ END NEW ✨ ) ---
     );
   }
 }
