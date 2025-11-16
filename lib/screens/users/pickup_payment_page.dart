@@ -7,9 +7,9 @@ import 'package:foodiebox/util/styles.dart';
 import 'dart:math'; // To generate the pickup ID
 import 'pickup_confirmation_page.dart';
 import 'package:foodiebox/enums/checkout_type.dart';
-// --- CORRECT IMPORTS ---
-import 'package:foodiebox/models/promotion.dart'; // For automatic promos
-import 'package:foodiebox/models/voucher_model.dart'; // For selectable vouchers
+import 'package:foodiebox/models/promotion.dart';
+import 'package:foodiebox/models/voucher_model.dart';
+import 'package:foodiebox/repositories/voucher_repository.dart';
 
 class PickupPaymentPage extends StatefulWidget {
   final double subtotal;
@@ -32,42 +32,49 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
 
   late double subtotal;
 
-  // --- Discount State ---
-  // Automatic Promotion
+  final VoucherRepository _voucherRepo = VoucherRepository();
+
   PromotionModel? automaticPromo;
   double promoDiscount = 0.0;
   bool _isLoadingPromo = true;
 
-  // Selectable Voucher
   VoucherModel? selectedVoucher;
   double voucherDiscount = 0.0;
   String selectedVoucherCode = '';
   String selectedVoucherLabel = '';
   String voucherError = '';
-  List<VoucherModel> availableVouchers = [];
+  List<VoucherEligibility> voucherList = [];
   bool _isLoadingVouchers = true;
-  // --- END Discount State ---
 
   @override
   void initState() {
     super.initState();
     _user = FirebaseAuth.instance.currentUser;
-    subtotal = widget.subtotal; // Initialize subtotal
-    _fetchAutomaticPromo(); // Fetch the automatic store promo
-    _fetchVouchers(); // Fetch the selectable vouchers
+    subtotal = widget.subtotal;
+    _fetchData();
   }
 
-  // --- Fetches the automatic, no-code promotion ---
+  Future<void> _fetchData() async {
+    await _fetchAutomaticPromo();
+    // Pass the subtotal *after* automatic promo to the voucher fetcher
+    await _fetchVouchers(subtotal - promoDiscount);
+  }
+
   Future<void> _fetchAutomaticPromo() async {
     try {
       final now = DateTime.now();
-      // Assumes 'Grocery' for pickup. Change if needed.
-      final productType =
-          widget.items.isNotEmpty ? widget.items.first.product.productType : 'Grocery';
+      // --- UPDATED: Check for BlindBox or Grocery ---
+      // Note: 'Blind Box' (with space) comes from product.dart
+      final productType = widget.items.isNotEmpty
+          ? (widget.items.first.product.productType == 'Blind Box'
+              ? 'BlindBox'
+              : 'Grocery')
+          : 'Grocery'; // Default to grocery for pickup
+      // --- END UPDATED ---
 
       final snapshot = await FirebaseFirestore.instance
           .collection('promotions')
-          .where('productType', isEqualTo: productType) // Match product type
+          .where('productType', isEqualTo: productType)
           .where('endDate', isGreaterThanOrEqualTo: now)
           .get();
 
@@ -75,12 +82,12 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
           .map((doc) => PromotionModel.fromMap(doc.data(), doc.id))
           .where((promo) =>
               promo.startDate.isBefore(now) &&
-              promo.claimedRedemptions < promo.totalRedemptions)
+              (promo.totalRedemptions == 0 ||
+                  promo.claimedRedemptions < promo.totalRedemptions))
           .toList();
 
       if (mounted && promos.isNotEmpty) {
         setState(() {
-          // Apply the first valid automatic promo found
           automaticPromo = promos.first;
           promoDiscount =
               subtotal * (automaticPromo!.discountPercentage / 100.0);
@@ -90,69 +97,75 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
         setState(() => _isLoadingPromo = false);
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingPromo = false);
-      }
+      if (mounted) setState(() => _isLoadingPromo = false);
       print("Error fetching automatic promo: $e");
     }
   }
 
-  // --- Fetches the optional, code-based vouchers ---
-  Future<void> _fetchVouchers() async {
-    try {
-      final now = DateTime.now();
-      final snapshot = await FirebaseFirestore.instance
-          .collection('vouchers')
-          .where('type', whereIn: ['pickup', 'all']) // Vouchers for pickup
-          .where('endDate', isGreaterThanOrEqualTo: now)
-          .get();
-
-      final vouchers = snapshot.docs
-          .map((doc) => VoucherModel.fromMap(doc.data(), doc.id))
-          .where((voucher) =>
-              voucher.startDate.isBefore(now) &&
-              voucher.claimedRedemptions < voucher.totalRedemptions)
-          .toList();
-
-      if (mounted) {
-        setState(() {
-          availableVouchers = vouchers;
-          _isLoadingVouchers = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingVouchers = false);
-      }
-      print("Error fetching vouchers: $e");
+  Future<void> _fetchVouchers(double currentSubtotal) async {
+    if (_user == null) {
+      setState(() => _isLoadingVouchers = false);
+      return;
     }
-  }
+    setState(() => _isLoadingVouchers = true);
 
-  // --- Get total with ALL discounts ---
-  double getTotal() {
-    // Apply automatic promo first, then voucher
-    final subtotalAfterPromo = subtotal - promoDiscount;
-    // Recalculate voucher discount based on new subtotal
-    final voucherDiscountOnSubtotal =
-        selectedVoucher?.calculateDiscount(subtotalAfterPromo) ?? 0.0;
-    
-    // Ensure we are using the correct voucher discount
-    if (voucherDiscountOnSubtotal != voucherDiscount) {
-      // Post-frame update to avoid build errors
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-         if (mounted) {
-           setState(() {
-            voucherDiscount = voucherDiscountOnSubtotal;
-           });
-         }
+    final vouchers = await _voucherRepo.fetchAllActiveVouchers();
+
+    // --- NEW: Get the single vendor type from cart ---
+    // Note: 'Blind Box' (with space) comes from product.dart
+    final cartVendorTypes = widget.items.isNotEmpty
+        ? [
+            (widget.items.first.product.productType == 'Blind Box'
+                ? 'BlindBox'
+                : 'Grocery')
+          ]
+        : <String>['Grocery']; // Default to grocery if cart is empty
+    // --- END NEW ---
+
+    List<VoucherEligibility> processedList = [];
+    for (var voucher in vouchers) {
+      // --- UPDATED: Pass the cart vendor type ---
+      final message = await _voucherRepo.getEligibilityStatus(
+        voucher: voucher,
+        subtotal: currentSubtotal,
+        currentOrderType: 'pickup',
+        cartVendorTypes: cartVendorTypes,
+      );
+      // --- END UPDATED ---
+      processedList.add(VoucherEligibility(
+        voucher: voucher,
+        eligibilityMessage: message,
+        isEligible: message == "Eligible",
+      ));
+    }
+
+    // Sort the list: Eligible first, then Not Eligible
+    processedList.sort((a, b) {
+      if (a.isEligible && !b.isEligible) return -1;
+      if (!a.isEligible && b.isEligible) return 1;
+      return b.voucher.minSpend.compareTo(a.voucher.minSpend);
+    });
+
+    if (mounted) {
+      setState(() {
+        voucherList = processedList;
+        _isLoadingVouchers = false;
       });
     }
-
-    return subtotal - promoDiscount - voucherDiscount;
   }
 
-  double _getVoucherMinSpend() {
-    return selectedVoucher?.minSpend ?? 0.0;
+  double getTotal() {
+    final subtotalAfterPromo = subtotal - promoDiscount;
+    final voucherDiscountOnSubtotal =
+        selectedVoucher?.calculateDiscount(subtotalAfterPromo) ?? 0.0;
+
+    if (voucherDiscountOnSubtotal != voucherDiscount) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted)
+          setState(() => voucherDiscount = voucherDiscountOnSubtotal);
+      });
+    }
+    return subtotal - promoDiscount - voucherDiscount;
   }
 
   String _generatePickupId() {
@@ -202,135 +215,165 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
     );
   }
 
-  // --- THIS MODAL NOW ONLY SHOWS VOUCHERS ---
+  // --- VOUCHER MODAL - STYLED TO MATCH IMAGE & SORTED ---
   void _showVoucherSelector() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      backgroundColor: Colors.grey[100], // Background like image
       builder: (context) {
         if (_isLoadingVouchers) {
-          return const Center(child: CircularProgressIndicator());
+          return const SizedBox(
+              height: 200, child: Center(child: CircularProgressIndicator()));
+        }
+        if (voucherList.isEmpty) {
+          return const SizedBox(
+              height: 200,
+              child: Center(
+                  child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: Text("No vouchers available right now."),
+              )));
         }
 
-        if (availableVouchers.isEmpty) {
-          return const Center(
-              child: Padding(
-            padding: EdgeInsets.all(20.0),
-            child: Text("No vouchers available right now."),
-          ));
-        }
-
-        // Calculate subtotal after automatic promo is applied
         final subtotalAfterPromo = subtotal - promoDiscount;
 
-        return Container(
-          color: Colors.white,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Choose a Voucher', 
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: ListView.separated(
-                  itemCount: availableVouchers.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final voucher = availableVouchers[index];
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.7),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Text(
+                    'Choose a Promo Code', // Title from image
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: voucherList.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final item = voucherList[index];
+                      final voucher = item.voucher;
+                      final isSelected = selectedVoucherCode == voucher.code;
+                      final isEligible = item.isEligible;
+                      final eligibilityMessage = item.eligibilityMessage;
 
-                    // Check min spend against subtotal *after* promo
-                    final meetsMinSpend =
-                        subtotalAfterPromo >= voucher.minSpend;
-                    final isSelected = selectedVoucherCode == voucher.code;
-
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          if (meetsMinSpend) {
+                      return GestureDetector(
+                        onTap: () {
+                          if (!isEligible) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(eligibilityMessage),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          setState(() {
                             selectedVoucher = voucher;
                             selectedVoucherCode = voucher.code;
                             selectedVoucherLabel = voucher.title;
-                            // Calculate discount based on subtotal AFTER promo
                             voucherDiscount =
                                 voucher.calculateDiscount(subtotalAfterPromo);
                             voucherError = '';
-                          } else {
-                            selectedVoucher = voucher;
-                            selectedVoucherCode = voucher.code;
-                            selectedVoucherLabel = voucher.title;
-                            voucherDiscount = 0.0;
-                            voucherError =
-                                'Voucher requires RM${voucher.minSpend.toStringAsFixed(2)} minimum spend (after promo)';
-                          }
-                        });
-                        Navigator.pop(context);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color:
-                              isSelected ? Colors.amber.shade100 : Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSelected
-                                ? Colors.amber
-                                : Colors.grey.shade300,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              voucher.title,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
+                          });
+                          Navigator.pop(context);
+                        },
+                        child: Opacity(
+                          opacity: isEligible ? 1.0 : 0.6,
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected
+                                    ? kPrimaryActionColor
+                                    : Colors.grey.shade300,
+                                width: isSelected ? 2.0 : 1.0,
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  '${voucher.discountLabel} | Code: ${voucher.code}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade700,
-                                  ),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        voucher.title,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    Icon(Icons.info_outline,
+                                        color: Colors.grey[400]),
+                                  ],
                                 ),
-                                Text(
-                                  meetsMinSpend
-                                      ? 'Eligible'
-                                      : 'Min RM${voucher.minSpend.toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: meetsMinSpend
-                                        ? Colors.green
-                                        : Colors.red,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.label,
+                                            color: Colors.green[600], size: 16),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Code: ${voucher.code}',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey[700],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Text(
+                                      eligibilityMessage,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: isEligible
+                                            ? Colors.green[700]
+                                            : Colors.red[700],
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
     );
   }
+  // --- END VOUCHER MODAL ---
 
   Future<void> _placePickupOrder() async {
     final cart = context.read<CartProvider>();
@@ -349,8 +392,8 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
     if (cart.selectedPickupDay == null || cart.selectedPickupTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content:
-              Text('Error: Pickup time not selected. Please go back to the store page.'),
+          content: Text(
+              'Error: Pickup time not selected. Please go back to the store page.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -359,18 +402,37 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
 
     setState(() => _isLoading = true);
 
-    // --- Validate VOUCHER discount ---
-    if (selectedVoucherCode.isNotEmpty && voucherDiscount == 0.0) {
-      final minSpend = _getVoucherMinSpend().toStringAsFixed(2);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Voucher requires RM$minSpend minimum spend.'),
-            backgroundColor: Colors.red),
+    // --- NEW: Get the single vendor type from cart ---
+    // Note: 'Blind Box' (with space) comes from product.dart
+    final cartVendorTypes = widget.items.isNotEmpty
+        ? [
+            (widget.items.first.product.productType == 'Blind Box'
+                ? 'BlindBox'
+                : 'Grocery')
+          ]
+        : <String>['Grocery'];
+    // --- END NEW ---
+
+    if (selectedVoucher != null) {
+      final subtotalAfterPromo = subtotal - promoDiscount;
+      // --- UPDATED: Pass the cart vendor type ---
+      final eligibilityMessage = await _voucherRepo.getEligibilityStatus(
+        voucher: selectedVoucher!,
+        subtotal: subtotalAfterPromo,
+        currentOrderType: 'pickup',
+        cartVendorTypes: cartVendorTypes,
       );
-      setState(() => _isLoading = false);
-      return;
+      // --- END UPDATED ---
+      if (eligibilityMessage != "Eligible") {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('The selected voucher is no longer eligible.'),
+              backgroundColor: Colors.red),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
     }
-    // --- END VALIDATION ---
 
     final itemsData = widget.items.map((item) {
       return {
@@ -408,38 +470,42 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
     final double total = getTotal();
     final double totalDiscount = promoDiscount + voucherDiscount;
 
+    // --- ( ✨ UPDATED ORDER DATA ✨ ) ---
+    // Added promoLabel and voucherLabel to save to Firebase
     final orderData = {
       'userId': _user!.uid,
       'orderType': 'Pickup',
       'pickupId': pickupId,
-      'vendorId': vendorId, // <-- This is the single vendor ID
+      'vendorId': vendorId,
       'vendorName': vendorName,
       'vendorAddress': vendorAddress,
       'vendorType': vendorType,
       'paymentMethod': selectedPayment,
       'subtotal': subtotal,
-      'discount': totalDiscount, // Combined discount
+      'discount': totalDiscount,
       'total': total,
-      'vendorIds': [vendorId], // <-- ADDED (as a list)
-      // --- SAVE PROMO AND VOUCHER ---
-      'promoCode': null, 
-      'promoLabel': automaticPromo?.title, 
-      'voucherCode': selectedVoucher?.code, 
-      'voucherLabel': selectedVoucher?.title, 
-      // --- END ---
+      'vendorIds': [vendorId],
+      'promoCode': null, // Deprecated, but keeping for schema
+      'promoLabel': automaticPromo?.title, // <-- ( ✨ NEW ✨ )
+      'voucherCode': selectedVoucher?.code,
+      'voucherLabel': selectedVoucher?.title, // <-- ( ✨ NEW ✨ )
       'status': 'paid_pending_pickup',
       'items': itemsData,
       'timestamp': FieldValue.serverTimestamp(),
       'pickupDay': cart.selectedPickupDay,
       'pickupTime': cart.selectedPickupTime,
+      'hasBeenReviewed': false, // <-- ( ✨ ADD THIS LINE ✨ )
     };
+    // --- ( ✨ END UPDATED ORDER DATA ✨ ) ---
 
     try {
       final docRef =
           await FirebaseFirestore.instance.collection('orders').add(orderData);
       final orderId = docRef.id;
 
-      // --- Increment redemption count for BOTH ---
+      if (selectedVoucher != null) {
+        await _voucherRepo.incrementVoucherRedemption(selectedVoucher!.id);
+      }
       if (automaticPromo != null) {
         await FirebaseFirestore.instance
             .collection('promotions')
@@ -448,15 +514,6 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
           'claimedRedemptions': FieldValue.increment(1),
         });
       }
-      if (selectedVoucher != null) {
-        await FirebaseFirestore.instance
-            .collection('vouchers')
-            .doc(selectedVoucher!.id)
-            .update({
-          'claimedRedemptions': FieldValue.increment(1),
-        });
-      }
-      // --- END ---
 
       if (mounted) {
         cart.clearCart();
@@ -505,7 +562,6 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Voucher Code Section ---
             const Text('Voucher Code',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
@@ -565,8 +621,6 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
                 ),
               ),
             const SizedBox(height: 20),
-            // --- END Voucher Code Section ---
-
             const Text('Order Summary',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
@@ -636,11 +690,11 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
                               fontSize: 16, fontWeight: FontWeight.bold)),
                     ],
                   ),
-                  // --- SHOW AUTOMATIC PROMO ---
                   if (_isLoadingPromo)
                     const Padding(
-                      padding: EdgeInsets.only(top: 4.0),
-                      child: Text('Checking for promotions...', style: kHintTextStyle),
+                      padding: const EdgeInsets.only(top: 4.0),
+                      child: Text('Checking for promotions...',
+                          style: kHintTextStyle),
                     ),
                   if (promoDiscount > 0)
                     Padding(
@@ -657,7 +711,6 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
                         ],
                       ),
                     ),
-                  // --- SHOW VOUCHER ---
                   if (voucherDiscount > 0)
                     Padding(
                       padding: const EdgeInsets.only(top: 4.0),

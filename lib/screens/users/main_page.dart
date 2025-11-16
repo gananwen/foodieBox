@@ -7,10 +7,13 @@ import '../../widgets/base_page.dart';
 import 'map_page.dart';
 import 'profile_page.dart';
 import 'filter_page.dart';
-import '../../api/api_config.dart';
 import 'package:provider/provider.dart';
 import 'package:foodiebox/providers/cart_provider.dart';
 import 'package:foodiebox/screens/users/cart_page.dart';
+import 'dart:async'; 
+import 'package:foodiebox/models/promotion.dart';
+
+
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -21,6 +24,57 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> {
   String _currentAddress = "Select Location";
+  
+  // --- ( ✨ NEWLY ADDED for slider ✨ ) ---
+  late final PageController _pageController;
+  Timer? _timer;
+  int _currentPage = 0;
+  // --- ( ✨ END NEWLY ADDED ✨ ) ---
+
+
+  @override
+  void initState() {
+    super.initState();
+    // --- ( ✨ NEWLY ADDED for slider ✨ ) ---
+    // Use viewportFraction to show edges of next/prev cards
+    _pageController = PageController(initialPage: 0, viewportFraction: 0.9);
+    // --- ( ✨ END NEWLY ADDED ✨ ) ---
+  }
+
+  // --- ( ✨ NEW FUNCTION for slider timer ✨ ) ---
+  void _startAutoSlide(int totalPages) {
+    // Cancel any existing timer to avoid duplicates
+    if (_timer != null) {
+      _timer!.cancel();
+    }
+    // Don't start a timer if there's only one (or zero) pages
+    if (totalPages <= 1) return;
+
+    _timer = Timer.periodic(const Duration(seconds: 5), (Timer timer) {
+      if (_currentPage < totalPages - 1) {
+        _currentPage++;
+      } else {
+        _currentPage = 0;
+      }
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          _currentPage,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
+  }
+  // --- ( ✨ END NEW FUNCTION ✨ ) ---
+
+  @override
+  void dispose() {
+    // --- ( ✨ NEWLY ADDED for slider ✨ ) ---
+    _timer?.cancel();
+    _pageController.dispose();
+    // --- ( ✨ END NEWLY ADDED ✨ ) ---
+    super.dispose();
+  }
 
   Future<void> _navigateToMapPage() async {
     final selectedLocation = await Navigator.push(
@@ -185,48 +239,10 @@ class _MainPageState extends State<MainPage> {
               ),
             ),
 
-            // --- Promotions Banner ---
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: kPromotionGradient,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child:
-                          const Icon(Icons.image, size: 40, color: Colors.grey),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Promotions',
-                              style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white)),
-                          SizedBox(height: 6),
-                          Text('Check out the latest vouchers available!',
-                              style: TextStyle(color: Colors.white70)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            // --- ( ✨ REPLACED PROMOTIONS BANNER ✨ ) ---
+            _buildPromotionsBanner(context),
+            // --- ( ✨ END REPLACED BANNER ✨ ) ---
+            
             const SizedBox(height: 30),
 
             // --- MODIFIED "Order snacks from" Section ---
@@ -241,9 +257,10 @@ class _MainPageState extends State<MainPage> {
             const SizedBox(height: 30),
 
             // --- MODIFIED "Syok Deals" Section ---
+            // This section correctly shows vendors that YOU (the vendor)
+            // have marked with "hasExpiryDeals". This is correct.
             _buildVendorListSection(
               title: 'Syok Deals: RM10 OFF',
-              // NOW SHOWS ONLY VENDORS WITH PROMOTIONS
               stream: FirebaseFirestore.instance
                   .collection('vendors')
                   .where('hasExpiryDeals', isEqualTo: true)
@@ -254,6 +271,125 @@ class _MainPageState extends State<MainPage> {
       ),
     );
   }
+
+  // --- ( ✨ NEW WIDGET: Replaces the old static banner ✨ ) ---
+  Widget _buildPromotionsBanner(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      // --- ( ✨ FIX: Query the root 'promotions' collection ✨ ) ---
+      // We only get promotions where the end date is in the future
+      stream: FirebaseFirestore.instance
+          .collection('promotions')
+          .where('endDate', isGreaterThan: Timestamp.now())
+          .snapshots(),
+      // --- ( ✨ END FIX ✨ ) ---
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          // Loading Skeleton
+          return Container(
+            height: 150, // Placeholder height
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Center(child: CircularProgressIndicator(color: kPrimaryActionColor)),
+          );
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const SizedBox.shrink(); // Don't show anything if no promotions
+        }
+
+        final promotions = snapshot.data!.docs.map((doc) => 
+            // --- ( ✨ FIX: Use the correct PromotionModel ✨ ) ---
+            PromotionModel.fromMap(doc.data() as Map<String, dynamic>, doc.id)
+            // --- ( ✨ END FIX ✨ ) ---
+        ).where((promo) => promo.bannerUrl.isNotEmpty && promo.vendorId.isNotEmpty).toList(); // Only show promos that have a banner AND a vendor to link to
+
+        if (promotions.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        // (Re)start the timer whenever the data changes
+        _startAutoSlide(promotions.length);
+
+        return SizedBox(
+          height: 150, // Height for the banner
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: promotions.length,
+            itemBuilder: (context, index) {
+              final promo = promotions[index];
+              // Use padding to create space between cards
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: _buildPromotionCard(context, promo),
+              );
+            },
+            onPageChanged: (index) {
+              _currentPage = index; // Update current page for the timer
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  // --- ( ✨ UPDATED WIDGET: Uses PromotionModel ✨ ) ---
+  Widget _buildPromotionCard(BuildContext context, PromotionModel promo) {
+    return GestureDetector(
+      onTap: () async {
+        // When tapped, fetch the vendor and navigate to the store page
+        try {
+          final doc = await FirebaseFirestore.instance
+              .collection('vendors')
+              .doc(promo.vendorId) // <-- Use vendorId from the promotion
+              .get();
+              
+          if (doc.exists) {
+            final vendor = VendorModel.fromMap(doc.data() as Map<String, dynamic>);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => StoreDetailPage(vendor: vendor),
+              ),
+            );
+          }
+        } catch (e) {
+          print("Error navigating to vendor: $e");
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not load store.')),
+          );
+        }
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(
+          promo.bannerUrl, // <-- Use bannerUrl from the promotion
+          fit: BoxFit.cover,
+          width: double.infinity,
+          // Loading and error builders for a better user experience
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return Container(
+              color: Colors.grey.shade200,
+              child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryActionColor)),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: Colors.grey.shade200,
+              child: const Icon(Icons.error, color: Colors.red),
+            );
+          },
+        ),
+      ),
+    );
+  }
+  // --- ( ✨ END UPDATED WIDGETS ✨ ) ---
+
 
   Widget _buildCircleCategory(String label, String imagePath) {
     return Column(
@@ -323,7 +459,7 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  // --- MODIFIED: This card now shows the "HOT DEAL" tag ---
+  // --- This is the card design you like ---
   Widget _buildShopCard(BuildContext context, VendorModel vendor) {
     return GestureDetector(
       onTap: () {
@@ -386,6 +522,7 @@ class _MainPageState extends State<MainPage> {
                   ),
                 ),
                 // --- "HOT DEAL" Tag ---
+                // This is for the "Syok Deals" section
                 if (vendor.hasExpiryDeals)
                   Positioned(
                     top: 0,
@@ -457,6 +594,11 @@ class _MainPageState extends State<MainPage> {
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '(${vendor.reviewCount})', // Shows review count
+                          style: const TextStyle(fontSize: 13, color: Colors.black54),
                         ),
                         const SizedBox(width: 12),
                         const Icon(Icons.delivery_dining,

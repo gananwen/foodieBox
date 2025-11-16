@@ -1,5 +1,6 @@
 // 路径: lib/pages/vendor_home/add_promotion_page.dart
 import 'dart:io'; // <-- ( ✨ 新增 ✨ )
+import 'package:firebase_auth/firebase_auth.dart'; // <-- ( ✨ NEW IMPORT ✨ )
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart'; // <-- ( ✨ 新增 ✨ )
 import 'package:intl/intl.dart';
@@ -19,7 +20,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
   final _repo = PromotionRepository();
   bool _isLoading = false;
 
-  // --- ( ✨ 新增状态 ✨ ) ---
+  // --- ( ✨ 新增状态 ✨ ) ---\
   File? _imageFile;
   final ImagePicker _picker = ImagePicker();
 
@@ -43,7 +44,12 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
 
   @override
   void dispose() {
-    // ... (不变)
+    _discountPercController.dispose();
+    _totalRedemptionsController.dispose();
+    _startDateController.dispose();
+    _endDateController.dispose();
+    _startTimeController.dispose();
+    _endTimeController.dispose();
     super.dispose();
   }
 
@@ -110,6 +116,18 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
 
+      // --- ( ✨ NEW: Get vendorId ✨ ) ---
+      final vendorId = FirebaseAuth.instance.currentUser?.uid;
+      if (vendorId == null) {
+         ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Error: You are not logged in.'),
+              backgroundColor: kPrimaryActionColor),
+        );
+        return;
+      }
+      // --- ( ✨ END NEW ✨ ) ---
+
       // 额外验证
       if (_selectedProductType == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -119,6 +137,16 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
         );
         return;
       }
+      // --- ( ✨ NEW: Validate image ✨ ) ---
+      if (_imageFile == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Please upload a banner image'),
+              backgroundColor: kPrimaryActionColor),
+        );
+        return;
+      }
+      // --- ( ✨ END NEW ✨ ) ---
 
       setState(() => _isLoading = true);
 
@@ -151,6 +179,7 @@ class _AddPromotionPageState extends State<AddPromotionPage> {
           endDate: endDateTime,
           discountPercentage: _discountPercentage,
           totalRedemptions: _totalRedemptions,
+          vendorId: vendorId, // <-- ( ✨ ADDED VENDOR ID ✨ )
           bannerUrl: '', // 暂时为空
         );
 

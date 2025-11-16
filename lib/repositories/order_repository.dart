@@ -22,14 +22,17 @@ class OrderRepository {
         .where('orderType', isEqualTo: orderType) // <-- ( ✨ 正确! ✨ )
 
         // --- ( ✨ 关键修复 ✨ ) ---
-        // 我们把带空格的 'paid pending pickup'
-        // 改成你新数据里带下划线的 'paid_pending_pickup'
+        // 添加了 'Prepared' 状态
         .where('status', whereIn: [
-          'received',
+          'Received',
           'Preparing',
+          'Prepared', // <-- ( ✨ 新增状态 ✨ )
           'Ready for Pickup',
           'Delivering',
-          'paid_pending_pickup' // <-- ( ✨ 修复为下划线版本 ✨ )
+          'paid_pending_pickup',
+          'Delivered',
+          'Picked Up'
+          'Cancelled' // <-- ( ✨ NEWLY ADDED ✨ )
         ])
         // --- ( ✨ 结束修复 ✨ ) ---
 

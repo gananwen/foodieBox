@@ -6,6 +6,9 @@ import 'package:foodiebox/screens/users/order_tracking_page.dart';
 import 'package:foodiebox/util/styles.dart';
 import 'package:foodiebox/widgets/base_page.dart';
 import 'package:intl/intl.dart';
+import 'pickup_confirmation_page.dart';
+import 'order_history_detail_page.dart';
+
 
 class OrdersPage extends StatefulWidget {
   const OrdersPage({super.key});
@@ -70,19 +73,28 @@ class _OrdersPageState extends State<OrdersPage>
       ),
     );
   }
+
   Widget _buildOrderList(BuildContext context,
       {required bool isOngoing, String? userId}) {
-    // --- FIX: Add new pickup status to ongoing list ---
+        
+    // --- ( ✨ UPDATED STATUSES - CASE INSENSITIVE FIX ✨ ) ---
+    // We now check for both lowercase and uppercase versions
     final ongoingStatuses = [
-      'received',
-      'preparing',
-      'delivering',
-      'pending',
-      'paid_pending_pickup' // <-- ADDED
+      'received', 'Received',
+      'Preparing', 'preparing',
+      'Prepared', 'prepared',
+      'Ready for Pickup', 'ready for pickup',
+      'paid_pending_pickup',
+      'Delivering', 'delivering',
     ];
-    // --- END FIX ---
     
-    final historyStatuses = ['completed', 'cancelled'];
+    final historyStatuses = [
+      'completed', 'Completed',
+      'cancelled', 'Cancelled', // <-- This is the important fix
+      'Delivered', 'delivered',
+      'Picked Up', 'picked up'
+    ];
+    // --- ( ✨ END UPDATED STATUSES ✨ ) ---
 
     if (userId == null) {
       return const Center(
@@ -106,8 +118,22 @@ class _OrdersPageState extends State<OrdersPage>
         }
 
         if (snapshot.hasError) {
+          // --- ADDED: Show the index error clearly ---
+          if (snapshot.error.toString().contains('FAILED_PRECONDITION')) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: Text(
+                  'Database Index Required. Please create the index in your Firebase console (check the error log for the link).',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                ),
+              ),
+            );
+          }
+          // --- END ADDED ---
           return Center(
-              child: Text('An error occurred.', style: kHintTextStyle));
+              child: Text('An error occurred: ${snapshot.error}', style: kHintTextStyle));
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -130,27 +156,57 @@ class _OrdersPageState extends State<OrdersPage>
       },
     );
   }
+
   Widget _buildOrderCard(BuildContext context, OrderModel order,
       {required bool isOngoing}) {
-    final String statusText =
-        order.status[0].toUpperCase() + order.status.substring(1);
+    // --- UPDATED: Use the status string directly, handle capitalization ---
+    final String statusText = order.status.isNotEmpty
+        ? order.status[0].toUpperCase() + order.status.substring(1)
+        : 'Unknown';
+    // --- END UPDATED ---
+
     final TextStyle statusStyle = _getStatusStyle(order.status);
     final String formattedDateTime =
         _formatDateTime(order.timestamp.toDate());
 
     return GestureDetector(
-      // --- FIX: Only allow tap to track for delivery orders ---
+      // --- ( ✨ UPDATED NAVIGATION LOGIC ✨ ) ---
       onTap: () {
-        if (isOngoing && order.orderType == 'Delivery') {
+        if (isOngoing) {
+          if (order.orderType == 'Delivery') {
+            // Ongoing Delivery -> Track Page
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => OrderTrackingPage(orderId: order.id),
+              ),
+            );
+          } else if (order.orderType == 'Pickup') {
+            // Ongoing Pickup -> QR Code Page
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PickupConfirmationPage(
+                  orderId: order.id,
+                  pickupId: order.pickupId ?? 'NA',
+                  vendorName: order.vendorName ?? 'Store',
+                  vendorAddress: order.vendorAddress ?? 'No address',
+                  total: order.total,
+                ),
+              ),
+            );
+          }
+        } else {
+          // History Order (Any type) -> Details Page
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => OrderTrackingPage(orderId: order.id),
+              builder: (_) => OrderHistoryDetailsPage(order: order),
             ),
           );
         }
       },
-      // --- END FIX ---
+      // --- ( ✨ END UPDATED NAVIGATION LOGIC ✨ ) ---
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(12),
@@ -173,7 +229,7 @@ class _OrdersPageState extends State<OrdersPage>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(order.vendorName,
+                  child: Text(order.vendorName ?? 'Store', // Use safe fallback
                       style: kLabelTextStyle.copyWith(fontSize: 16),
                       overflow: TextOverflow.ellipsis),
                 ),
@@ -191,7 +247,6 @@ class _OrdersPageState extends State<OrdersPage>
             Text(formattedDateTime,
                 style: kHintTextStyle.copyWith(fontSize: 13)),
             
-            // --- FIX: Check if address is null before showing it ---
             if (order.address != null && order.address!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4.0),
@@ -200,7 +255,15 @@ class _OrdersPageState extends State<OrdersPage>
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
               ),
-            // --- END FIX ---
+            
+            // --- ADDED: Show Pickup ID if it's a pickup order ---
+            if (order.orderType == 'Pickup' && order.pickupId != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Text('Pickup ID: ${order.pickupId!}',
+                    style: kHintTextStyle.copyWith(fontSize: 13, color: kPrimaryActionColor, fontWeight: FontWeight.bold)),
+              ),
+            // --- END ADDED ---
 
             const SizedBox(height: 8),
             Row(
@@ -209,15 +272,33 @@ class _OrdersPageState extends State<OrdersPage>
                 Text('Total: RM${order.total.toStringAsFixed(2)}',
                     style: kLabelTextStyle.copyWith(fontSize: 15)),
                 
-                // --- FIX: Show correct icon for delivery or pickup ---
-                if (order.orderType == 'Delivery' && order.driverId != null && isOngoing)
-                  const Icon(Icons.local_shipping,
-                      color: kPrimaryActionColor, size: 20),
-
-                if (order.orderType == 'Pickup' && isOngoing)
-                  const Icon(Icons.store, // Icon for pickup
-                      color: kPrimaryActionColor, size: 20),
-                // --- END FIX ---
+                // Show icon based on type (ongoing) or status (history)
+                if (isOngoing)
+                  Icon(
+                    order.orderType == 'Delivery' 
+                      ? Icons.local_shipping 
+                      : Icons.store,
+                    color: kPrimaryActionColor, 
+                    size: 20
+                  )
+                else
+                  Icon(
+                    // --- ( ✨ FIX REMAINS HERE ✨ ) ---
+                    // We use .toLowerCase() to make the check case-insensitive
+                    order.status.toLowerCase() == 'completed' || 
+                    order.status.toLowerCase() == 'delivered' || 
+                    order.status.toLowerCase() == 'picked up'
+                      ? Icons.check_circle_outline
+                      : Icons.cancel_outlined,
+                    color: 
+                    // --- ( ✨ FIX REMAINS HERE ✨ ) ---
+                    order.status.toLowerCase() == 'completed' || 
+                    order.status.toLowerCase() == 'delivered' || 
+                    order.status.toLowerCase() == 'picked up'
+                      ? Colors.green
+                      : Colors.red,
+                    size: 20
+                  ),
               ],
             ),
           ],
@@ -225,10 +306,15 @@ class _OrdersPageState extends State<OrdersPage>
       ),
     );
   }
+
   TextStyle _getStatusStyle(String status) {
     Color color;
-    switch (status) {
+    // --- ( ✨ UPDATED STATUS STYLES ✨ ) ---
+    // This switch already uses .toLowerCase(), so it's safe!
+    switch (status.toLowerCase()) {
       case 'completed':
+      case 'delivered':
+      case 'picked up':
         color = Colors.green;
         break;
       case 'cancelled':
@@ -238,19 +324,20 @@ class _OrdersPageState extends State<OrdersPage>
         color = Colors.orange;
         break;
       case 'preparing':
+      case 'prepared':
         color = Colors.amber;
         break;
-      // --- FIX: Add new status color ---
+      case 'ready for pickup':
       case 'paid_pending_pickup':
         color = Colors.blue;
         break;
-      // --- END FIX ---
       case 'received':
       case 'pending':
       default:
         color = kPrimaryActionColor;
         break;
     }
+    // --- ( ✨ END UPDATED STATUS STYLES ✨ ) ---
     return TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: color);
   }
 

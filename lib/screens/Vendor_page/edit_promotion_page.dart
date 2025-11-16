@@ -79,16 +79,53 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
 
   @override
   void dispose() {
-    // ... (不变)
+    _discountPercController.dispose();
+    _totalRedemptionsController.dispose();
+    _titleController.dispose();
+    _startDateController.dispose();
+    _endDateController.dispose();
+    _startTimeController.dispose();
+    _endTimeController.dispose();
     super.dispose();
   }
 
   // ... (日期/时间选择函数 _selectDate, _selectTime 保持不变) ...
   Future<void> _selectDate(BuildContext context, bool isStartDate) async {
-    // ... (不变)
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: isStartDate ? _startDate : _endDate,
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2030),
+    );
+     if (picked != null) {
+      setState(() {
+        if (isStartDate) {
+          _startDate = picked;
+          _startDateController.text = DateFormat('dd MMM yyyy').format(picked);
+        } else {
+          _endDate = picked;
+          _endDateController.text = DateFormat('dd MMM yyyy').format(picked);
+        }
+      });
+    }
   }
+
   Future<void> _selectTime(BuildContext context, bool isStartTime) async {
-    // ... (不变)
+     final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: isStartTime ? _startTime : _endTime,
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStartTime) {
+          _startTime = picked;
+          _startTimeController.text = picked.format(context);
+        } else {
+          _endTime = picked;
+          _endTimeController.text = picked.format(context);
+        }
+      });
+    }
   }
 
   // --- ( ✨ 新增函数：选择图片 ✨ ) ---
@@ -121,7 +158,7 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
 
         // 步骤 1: ( ✨ 新增 ✨ ) 检查是否有新图片
         if (_imageFile != null) {
-          // 如果有，上传它 (这将覆盖旧图片，因为 promo ID 相同)
+          // 如果有, 上传它 (这将覆盖旧图片，因为 promo ID 相同)
           finalBannerUrl =
               await _repo.uploadBannerImage(_imageFile!, widget.promotion.id!);
         }
@@ -143,6 +180,7 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
         );
 
         // 步骤 3: 使用 copyWith 创建更新后的模型
+        // The vendorId is preserved from widget.promotion
         final updatedPromotion = widget.promotion.copyWith(
           title: _dealTitle,
           productType: _selectedProductType,
@@ -340,6 +378,88 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
               ),
               _buildProductTypeRadio('Blindbox'),
               _buildProductTypeRadio('Grocery'),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDateTimePicker(
+                      label: 'Start Time',
+                      controller: _startTimeController,
+                      onTap: () => _selectTime(context, true),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildDateTimePicker(
+                      label: 'End Time',
+                      controller: _endTimeController,
+                      onTap: () => _selectTime(context, false),
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDateTimePicker(
+                      label: 'Start Date',
+                      controller: _startDateController,
+                      onTap: () => _selectDate(context, true),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildDateTimePicker(
+                      label: 'End Date',
+                      controller: _endDateController,
+                      onTap: () => _selectDate(context, false),
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTextField(
+                      label: 'Discount Percentage (e.g., 20)',
+                      controller: _discountPercController,
+                      onSaved: (value) =>
+                          _discountPercentage = int.tryParse(value!)!,
+                      inputType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        final perc = int.tryParse(value);
+                        if (perc == null || perc <= 0 || perc > 100) {
+                          return '1-100';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildTextField(
+                      label: 'Total Redemptions (e.g., 100)',
+                      controller: _totalRedemptionsController,
+                      onSaved: (value) =>
+                          _totalRedemptions = int.tryParse(value!)!,
+                      inputType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        if (int.tryParse(value) == null ||
+                            int.tryParse(value)! <= 0) {
+                          return 'Must be > 0';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
               // ... (所有其他表单字段保持不变) ...
               SizedBox(

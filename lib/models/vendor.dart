@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class VendorModel {
   final String uid; // 必须和 User.uid 相同
   final String storeName;
@@ -10,8 +12,8 @@ class VendorModel {
   final bool isApproved; // 管理员审批
   final double rating;
   final List<String> storeHours; // e.g., ["Mon: 9-5", "Tue: 9-5"]
-  // --- NEW FIELD ---
   final bool hasExpiryDeals;
+  final int reviewCount;
 
   VendorModel({
     required this.uid,
@@ -26,6 +28,7 @@ class VendorModel {
     this.rating = 0.0,
     this.storeHours = const [], // 默认为空
     this.hasExpiryDeals = false, // Default to false
+    this.reviewCount = 0,
   });
 
   // 从 Firestore (Map) 转换
@@ -36,14 +39,14 @@ class VendorModel {
       storeAddress: map['storeAddress'] ?? '',
       storePhone: map['storePhone'] ?? '',
       vendorType: map['vendorType'] ?? 'Grocery', // <-- (添加了默认值)
-      businessPhotoUrl: map['businessPhotoUrl'] ?? '',
+      businessPhotoUrl: map['businessPhotoUrl'] ?? 'https://placehold.co/600x400/FFF8E1/E6A000?text=Store',
       businessLicenseUrl: map['businessLicenseUrl'] ?? '',
       halalCertificateUrl: map['halalCertificateUrl'] ?? '',
       isApproved: map['isApproved'] ?? false,
-      rating: (map['rating'] ?? 0.0).toDouble(),
+      rating: (map['rating'] as num?)?.toDouble() ?? 0.0, // <-- (FIXED)
       storeHours: List<String>.from(map['storeHours'] ?? []),
-      // --- NEW FIELD ---
       hasExpiryDeals: map['hasExpiryDeals'] ?? false,
+      reviewCount: (map['reviewCount'] as num?)?.toInt() ?? 0, // <-- (FIXED)
     );
   }
 
@@ -61,8 +64,8 @@ class VendorModel {
       'isApproved': isApproved,
       'rating': rating,
       'storeHours': storeHours,
-      // --- NEW FIELD ---
       'hasExpiryDeals': hasExpiryDeals,
+      'reviewCount': reviewCount, // <-- (ADDED)
     };
   }
 
@@ -79,8 +82,8 @@ class VendorModel {
     bool? isApproved,
     double? rating,
     List<String>? storeHours,
-    // --- NEW FIELD ---
     bool? hasExpiryDeals,
+    int? reviewCount, // <-- (FIXED)
   }) {
     return VendorModel(
       uid: uid ?? this.uid,
@@ -94,8 +97,8 @@ class VendorModel {
       isApproved: isApproved ?? this.isApproved,
       rating: rating ?? this.rating,
       storeHours: storeHours ?? this.storeHours,
-      // --- NEW FIELD ---
       hasExpiryDeals: hasExpiryDeals ?? this.hasExpiryDeals,
+      reviewCount: reviewCount ?? this.reviewCount, // <-- (FIXED)
     );
   }
 }

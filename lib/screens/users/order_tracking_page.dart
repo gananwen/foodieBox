@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -18,19 +17,26 @@ class OrderTrackingPage extends StatefulWidget {
 }
 
 class _OrderTrackingPageState extends State<OrderTrackingPage> {
+  // --- UPDATED: Use your exact statuses ---
+  // Note: We add "Delivered" as the final step
   final List<String> _steps = [
-    'Order received',
-    'Preparing your order',
-    'Driver on the way',
-    'Order delivered',
+    'Order Received',
+    'Preparing',
+    'Ready for Pickup', // This will be skipped for delivery
+    'Delivering',
+    'Delivered'
   ];
+  // --- END UPDATED ---
 
-  final ValueNotifier<int> _stepNotifier = ValueNotifier(0);
-  Timer? _animationTimer;
   Future<VendorModel>? _vendorFuture;
   Future<LatLng>? _vendorLatLngFuture;
 
-  // Fixed demo driver
+  // --- REMOVED: Demo timer and ValueNotifier ---
+
+  // Track navigation to rating page
+  bool _hasNavigatedToRating = false;
+
+  // Fixed demo driver (can be replaced with real driver from order)
   final DriverModel fixedDriver = DriverModel(
     id: 'demo-driver',
     name: 'Slamet Rahardjo',
@@ -43,40 +49,71 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
   @override
   void initState() {
     super.initState();
-    _startDemoTimer();
+    // --- REMOVED: Demo timer start ---
   }
 
   @override
   void dispose() {
-    _animationTimer?.cancel();
-    _stepNotifier.dispose();
+    // --- REMOVED: Demo timer dispose ---
     super.dispose();
   }
 
-  void _startDemoTimer() {
-    _animationTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (_stepNotifier.value < _steps.length - 1) {
-        _stepNotifier.value++;
-      } else {
-        timer.cancel();
-        _onDemoFinished();
+  // --- NEW: Function to map status to step index ---
+  int _getStepFromStatus(String status, String orderType) {
+    if (orderType == 'Delivery') {
+      switch (status) {
+        case 'received':
+          return 0;
+        case 'Preparing':
+          return 1;
+        // Skip "Ready for Pickup" for delivery
+        case 'Delivering':
+          return 3; // Index 3 is 'Delivering'
+        case 'completed':
+          return 4; // Index 4 is 'Delivered'
+        default:
+          return 0;
       }
-    });
+    } else {
+      // Logic for 'Pickup' if it ever uses this page
+      switch (status) {
+        case 'received':
+          return 0;
+        case 'Preparing':
+          return 1;
+        case 'Ready for Pickup':
+          return 2; // Index 2 is 'Ready for Pickup'
+        case 'completed':
+          return 3; 
+        default:
+          return 0;
+      }
+    }
   }
+  // --- END NEW ---
 
-  void _onDemoFinished() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => RateDriverPage(
-          driver: fixedDriver,
-          orderId: widget.orderId, // <-- pass orderId
+  // --- NEW: Navigation function ---
+  void _navigateToRatingPage(DriverModel driver, String orderId) {
+    if (mounted && !_hasNavigatedToRating) {
+      _hasNavigatedToRating = true; // Prevent multiple navigations
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => RateDriverPage(
+            driver: driver,
+            orderId: orderId,
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
+  // --- END NEW ---
+
 
   Future<VendorModel> _fetchVendor(String vendorId) async {
+    // Find the first vendor ID from the list
+    if (vendorId.isEmpty) throw Exception('No vendor ID found');
+    
     final doc = await FirebaseFirestore.instance
         .collection('vendors')
         .doc(vendorId)
@@ -84,6 +121,7 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
     if (!doc.exists) throw Exception('Vendor not found');
     return VendorModel.fromMap(doc.data() as Map<String, dynamic>);
   }
+
 
   Future<LatLng> _getVendorLatLng(String address) async {
     try {
@@ -113,42 +151,45 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
             .snapshots(),
         builder: (context, orderSnapshot) {
           if (!orderSnapshot.hasData || orderSnapshot.data?.data() == null) {
-            return const Center(child: Text('Order not found.'));
+            return const Center(child: CircularProgressIndicator());
           }
 
           final order = OrderModel.fromMap(
               orderSnapshot.data!.data() as Map<String, dynamic>,
               orderSnapshot.data!.id);
 
-          // --- FIX: Check for null lat/lng ---
-          // This happens if it's a pickup order
-          if (order.lat == null || order.lng == null) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(20.0),
-                child: Text(
-                  'Tracking is not available for this pickup order.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                ),
-              ),
-            );
+          // --- This page is for DELIVERY only ---
+          if (order.orderType == 'Pickup' || order.lat == null || order.lng == null) {
+            // Send user back if they somehow get here with a pickup order
+            Navigator.of(context).pop(); 
+            return const Center(child: Text('Tracking is for delivery orders.'));
           }
           
-          // If not null, we can safely use '!'
           final LatLng userLocation = LatLng(order.lat!, order.lng!);
-          // --- END FIX ---
 
-
-          if (order.items.isEmpty) {
-            return const Center(child: Text('Order has no items.'));
+          // --- UPDATED: Use the first vendor from the vendorIds list ---
+          if (order.vendorIds.isEmpty) {
+            return const Center(child: Text('Order has no vendor.'));
           }
-
+          
           if (_vendorFuture == null) {
-            _vendorFuture = _fetchVendor(order.items.first.vendorId);
+            _vendorFuture = _fetchVendor(order.vendorIds.first);
             _vendorLatLngFuture = _vendorFuture!
                 .then((vendor) => _getVendorLatLng(vendor.storeAddress));
           }
+          // --- END UPDATED ---
+
+          // --- REAL-TIME STATUS LOGIC ---
+          final int currentStep = _getStepFromStatus(order.status, order.orderType);
+
+          // If order is marked "completed", navigate to rating page
+          if (order.status == 'completed' && order.orderType == 'Delivery') {
+             WidgetsBinding.instance.addPostFrameCallback((_) {
+               // Use demo driver for now, replace with 'order.driverId' when ready
+               _navigateToRatingPage(fixedDriver, order.id);
+             });
+          }
+          // --- END REAL-TIME STATUS ---
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
@@ -173,40 +214,40 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
                   },
                 ),
                 const SizedBox(height: 24),
-                ValueListenableBuilder<int>(
-                  valueListenable: _stepNotifier,
-                  builder: (context, step, _) {
-                    return Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                              color: Colors.grey.shade200,
-                              blurRadius: 8,
-                              spreadRadius: 2)
-                        ],
+                // --- UPDATED: Pass the real currentStep ---
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.grey.shade200,
+                          blurRadius: 8,
+                          spreadRadius: 2)
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _steps[currentStep], // Show text for the current step
+                        style: const TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.bold),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _steps[step],
-                            style: const TextStyle(
-                                fontSize: 22, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 24),
-                          _buildTimeline(step),
-                          const Divider(height: 32),
-                          if (step >= 2) _buildDriverInfo(fixedDriver),
-                          if (step >= 2) const Divider(height: 32),
-                          _buildOrderSummary(order.items, order.total),
-                        ],
-                      ),
-                    );
-                  },
+                      const SizedBox(height: 24),
+                      _buildTimeline(currentStep, order.orderType),
+                      const Divider(height: 32),
+                      
+                      // Show driver info if status is Delivering or Delivered
+                      if (currentStep >= 3) _buildDriverInfo(fixedDriver),
+                      if (currentStep >= 3) const Divider(height: 32),
+                      
+                      _buildOrderSummary(order.items, order.total),
+                    ],
+                  ),
                 ),
+                // --- END UPDATED ---
               ],
             ),
           );
@@ -247,18 +288,38 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
     );
   }
 
-  Widget _buildTimeline(int currentStep) {
+  Widget _buildTimeline(int currentStep, String orderType) {
+    // --- UPDATED: Dynamic icons and steps for Delivery ---
     final icons = [
       Icons.receipt_long,
       Icons.outdoor_grill,
+      Icons.store, // Ready for Pickup
       Icons.two_wheeler,
       Icons.home,
     ];
 
+    List<String> stepsToShow = [];
+    if (orderType == 'Delivery') {
+      // Skip "Ready for Pickup"
+      stepsToShow = ['Order Received', 'Preparing', 'Delivering', 'Delivered'];
+    } else {
+      // Skip "Delivering"
+      stepsToShow = ['Order Received', 'Preparing', 'Ready for Pickup', 'Completed'];
+    }
+    // --- END UPDATED ---
+
     return Column(
-      children: List.generate(_steps.length, (index) {
-        final isActive = index <= currentStep;
-        final isCurrent = index == currentStep;
+      children: List.generate(stepsToShow.length, (index) {
+        
+        // --- UPDATED: Map timeline index to status index ---
+        int stepIndex = index;
+        if(orderType == 'Delivery' && index >= 2) {
+           stepIndex = index + 1; // Skip step 2 ('Ready for Pickup')
+        }
+        // --- END UPDATED ---
+
+        final isActive = stepIndex <= currentStep;
+        final isCurrent = stepIndex == currentStep;
 
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,12 +333,12 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    icons[index],
+                    icons[stepIndex], // Use the correct icon
                     color: isActive ? Colors.black : Colors.grey.shade500,
                     size: 20,
                   ),
                 ),
-                if (index < _steps.length - 1)
+                if (index < stepsToShow.length - 1)
                   Container(
                     height: 40,
                     width: 2,
@@ -290,7 +351,7 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
               child: Padding(
                 padding: const EdgeInsets.only(top: 8.0),
                 child: Text(
-                  _steps[index],
+                  stepsToShow[index], // Use the correct step text
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,

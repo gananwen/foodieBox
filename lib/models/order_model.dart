@@ -27,11 +27,23 @@ class OrderModel {
   final double? rating;
   final String? reviewText;
   final Timestamp? reviewTimestamp;
+  final bool? hasBeenReviewed; // <-- ( ✨ ADD THIS LINE ✨ )
 
   // (取货字段)
   final String? pickupId;
   final String? pickupDay; // "Today" or "Tomorrow"
   final String? pickupTime; // "12:00 PM – 1:00 PM"
+
+  
+  final String? vendorName;
+  final String? vendorType;
+  final String? vendorAddress;
+  
+  // ( ✨ NEWLY ADDED for history summary ✨ )
+  final String? promoLabel;
+  final String? voucherLabel;
+  // ( ✨ END NEWLY ADDED ✨ )
+
 
   OrderModel({
     required this.id,
@@ -55,15 +67,25 @@ class OrderModel {
     this.rating,
     this.reviewText,
     this.reviewTimestamp,
+    this.hasBeenReviewed, // <-- ( ✨ ADD THIS LINE ✨ )
     this.pickupId,
     this.pickupDay,
     this.pickupTime,
+    
+    this.vendorName,
+    this.vendorType,
+    this.vendorAddress,
+
+    this.promoLabel,
+    this.voucherLabel,
   });
 
   factory OrderModel.fromMap(Map<String, dynamic> map, String documentId) {
     var itemsList = (map['items'] as List<dynamic>?) ?? [];
     List<OrderItem> parsedItems =
         itemsList.map((item) => OrderItem.fromMap(item)).toList();
+        
+    String? vendorAddress = map['vendorAddress'] is String ? map['vendorAddress'] : null;
 
     return OrderModel(
       id: documentId,
@@ -87,9 +109,18 @@ class OrderModel {
       rating: (map['rating'] as num?)?.toDouble(),
       reviewText: map['reviewText'],
       reviewTimestamp: map['reviewTimestamp'],
+      hasBeenReviewed: map['hasBeenReviewed'], // <-- ( ✨ ADD THIS LINE ✨ )
       pickupId: map['pickupId'],
       pickupDay: map['pickupDay'],
       pickupTime: map['pickupTime'],
+      
+      vendorName: (map['vendorName'] is String) ? map['vendorName'] : 'Unknown Store',
+      vendorType: (map['vendorType'] is String) ? map['vendorType'] : 'Grocery',
+      vendorAddress: vendorAddress,
+
+      // ( ✨ NEWLY ADDED for history summary ✨ )
+      promoLabel: map['promoLabel'],
+      voucherLabel: map['voucherLabel'],
     );
   }
 }
