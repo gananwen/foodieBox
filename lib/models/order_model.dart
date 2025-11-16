@@ -1,6 +1,5 @@
-// 路径: lib/models/order_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'order_item.model.dart'; // 确保这个 import 路径正确
+import 'order_item.model.dart';
 
 class OrderModel {
   final String id;
@@ -22,11 +21,31 @@ class OrderModel {
   final double deliveryFee;
   final List<String> vendorIds;
 
-  // --- ( ✨ 新增字段 ✨ ) ---
-  // 假定客户 App 在订单完成后会更新这些字段
-  final double? rating; // e.g., 4.5
-  final String? reviewText; // e.g., "Great food!"
-  final Timestamp? reviewTimestamp; // 评价的时间
+  // (评价字段)
+  final double? rating;
+  final String? reviewText;
+  final Timestamp? reviewTimestamp;
+  final bool? hasBeenReviewed;
+
+  // (取货字段)
+  final String? pickupId;
+  final String? pickupDay; // "Today" or "Tomorrow"
+  final String? pickupTime; // "12:00 PM – 1:00 PM"
+
+  
+  final String? vendorName;
+  final String? vendorType;
+  final String? vendorAddress;
+  
+  // ( ✨ NEWLY ADDED for history summary ✨ )
+  final String? promoLabel;
+  final String? voucherLabel;
+  
+  // --- ( ✨ NEWLY ADDED for Payment Proof Flow ✨ ) ---
+  final String? paymentProofUrl;
+  final String? adminRejectionReason;
+  // --- ( ✨ END NEW ✨ ) ---
+
 
   OrderModel({
     required this.id,
@@ -47,17 +66,33 @@ class OrderModel {
     this.deliveryOption = 'Standard',
     this.deliveryFee = 0.0,
     required this.vendorIds,
-
-    // --- ( ✨ 新增字段 ✨ ) ---
     this.rating,
     this.reviewText,
     this.reviewTimestamp,
+    this.hasBeenReviewed,
+    this.pickupId,
+    this.pickupDay,
+    this.pickupTime,
+    
+    this.vendorName,
+    this.vendorType,
+    this.vendorAddress,
+
+    this.promoLabel,
+    this.voucherLabel,
+
+    // --- ( ✨ NEWLY ADDED for Payment Proof Flow ✨ ) ---
+    this.paymentProofUrl,
+    this.adminRejectionReason,
+    // --- ( ✨ END NEW ✨ ) ---
   });
 
   factory OrderModel.fromMap(Map<String, dynamic> map, String documentId) {
     var itemsList = (map['items'] as List<dynamic>?) ?? [];
     List<OrderItem> parsedItems =
         itemsList.map((item) => OrderItem.fromMap(item)).toList();
+        
+    String? vendorAddress = map['vendorAddress'] is String ? map['vendorAddress'] : null;
 
     return OrderModel(
       id: documentId,
@@ -78,12 +113,25 @@ class OrderModel {
       deliveryOption: map['deliveryOption'] ?? 'Standard',
       deliveryFee: (map['deliveryFee'] as num?)?.toDouble() ?? 0.0,
       vendorIds: List<String>.from(map['vendorIds'] ?? []),
-
-      // --- ( ✨ 新增字段 ✨ ) ---
-      // (使用 'as num?' 来安全地处理 double 和 int)
       rating: (map['rating'] as num?)?.toDouble(),
       reviewText: map['reviewText'],
       reviewTimestamp: map['reviewTimestamp'],
+      hasBeenReviewed: map['hasBeenReviewed'],
+      pickupId: map['pickupId'],
+      pickupDay: map['pickupDay'],
+      pickupTime: map['pickupTime'],
+      
+      vendorName: (map['vendorName'] is String) ? map['vendorName'] : 'Unknown Store',
+      vendorType: (map['vendorType'] is String) ? map['vendorType'] : 'Grocery',
+      vendorAddress: vendorAddress,
+
+      promoLabel: map['promoLabel'],
+      voucherLabel: map['voucherLabel'],
+
+      // --- ( ✨ NEWLY ADDED for Payment Proof Flow ✨ ) ---
+      paymentProofUrl: map['paymentProofUrl'],
+      adminRejectionReason: map['adminRejectionReason'],
+      // --- ( ✨ END NEW ✨ ) ---
     );
   }
 }

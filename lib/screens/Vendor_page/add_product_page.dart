@@ -7,11 +7,13 @@ import '../../util/styles.dart';
 import 'widgets/product_form.dart';
 import '../../models/product.dart';
 import '../../repositories/product_repository.dart';
-// --- (新增) 导入类别数据 ---
 import '../../util/categories.dart';
 
 class AddProductPage extends StatefulWidget {
-  const AddProductPage({super.key});
+  // --- ( ✨ 关键修改 ✨ ) ---
+  final String vendorType; // 接收 vendorType
+  const AddProductPage({super.key, required this.vendorType});
+  // --- ( ✨ 结束修改 ✨ ) ---
 
   @override
   State<AddProductPage> createState() => _AddProductPageState();
@@ -22,26 +24,33 @@ class _AddProductPageState extends State<AddProductPage> {
   final _productRepo = ProductRepository();
   bool _isLoading = false;
 
-  // Controllers
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _expiryDateController = TextEditingController();
   final _originalPriceController = TextEditingController();
   final _discountedPriceController = TextEditingController();
 
-  // State
   File? _pickedImage;
-  String _productType = 'Grocery'; // 默认
+  // --- ( ✨ 关键修改 ✨ ) ---
+  late String _productType; // 不再有默认值
+  // --- ( ✨ 结束修改 ✨ ) ---
   int _quantity = 1;
   bool _isHalal = false;
   bool _isVegan = false;
   bool _isNoPork = false;
 
-  // --- (新增) Category State ---
   String? _selectedCategory;
   String? _selectedSubCategory;
   List<String> _subCategories = [];
-  // ---
+
+  @override
+  void initState() {
+    super.initState();
+    // --- ( ✨ 关键修改 ✨ ) ---
+    // 根据传入的 vendorType 设置产品类型
+    _productType = widget.vendorType;
+    // --- ( ✨ 结束修改 ✨ ) ---
+  }
 
   @override
   void dispose() {
@@ -53,22 +62,17 @@ class _AddProductPageState extends State<AddProductPage> {
     super.dispose();
   }
 
-  // --- (新增) Category Handlers ---
-  void _onTypeChanged(String type) {
-    setState(() {
-      _productType = type;
-      // 重置类别
-      _selectedCategory = null;
-      _selectedSubCategory = null;
-      _subCategories = [];
-    });
-  }
+  // --- ( ✨ 关键修改 ✨ ) ---
+  // 我们不再需要这个函数，因为类型被锁定了
+  // void _onTypeChanged(String type) { ... }
+  // --- ( ✨ 结束修改 ✨ ) ---
 
+  // ... (_onCategoryChanged, _onSubCategoryChanged, _onTagChanged, _onUploadImage, _selectExpiryDate 保持不变) ...
   void _onCategoryChanged(String? newValue) {
     if (newValue == null) return;
     setState(() {
       _selectedCategory = newValue;
-      _selectedSubCategory = null; // 重置子类别
+      _selectedSubCategory = null;
       _subCategories = kGroceryCategories[newValue] ?? [];
     });
   }
@@ -79,7 +83,6 @@ class _AddProductPageState extends State<AddProductPage> {
       _selectedSubCategory = newValue;
     });
   }
-  // ---
 
   void _onTagChanged(String key, bool value) {
     setState(() {
@@ -134,20 +137,19 @@ class _AddProductPageState extends State<AddProductPage> {
     }
   }
 
+  // ( _onAddProduct 逻辑不变, 它已经正确使用了 _productType )
   Future<void> _onAddProduct() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    // --- (新增) 类别验证 ---
     String finalCategory;
     String finalSubCategory;
 
     if (_productType == 'Blindbox') {
-      finalCategory = 'Hot Deals'; // 自动设置
+      finalCategory = 'Hot Deals';
       finalSubCategory = '';
     } else {
-      // Grocery 验证
       if (_selectedCategory == null || _selectedSubCategory == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -160,7 +162,6 @@ class _AddProductPageState extends State<AddProductPage> {
       finalCategory = _selectedCategory!;
       finalSubCategory = _selectedSubCategory!;
     }
-    // ---
 
     if (_pickedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -178,15 +179,13 @@ class _AddProductPageState extends State<AddProductPage> {
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
         productType: _productType,
-        // --- (新增) 保存类别 ---
         category: finalCategory,
         subCategory: finalSubCategory,
-        // ---
         expiryDate: _expiryDateController.text.trim(),
         originalPrice: double.tryParse(_originalPriceController.text) ?? 0.0,
         discountedPrice:
             double.tryParse(_discountedPriceController.text) ?? 0.0,
-        imageUrl: '', // 暂时为空
+        imageUrl: '',
         quantity: _quantity,
         isHalal: _isHalal,
         isVegan: _isVegan,
@@ -257,13 +256,13 @@ class _AddProductPageState extends State<AddProductPage> {
                   pickedImage: _pickedImage,
                   existingImageUrl: '',
                   productType: _productType,
-                  onTypeChanged: _onTypeChanged,
-                  // --- (新增) 传递类别 ---
+                  // --- ( ✨ 关键修改 ✨ ) ---
+                  onTypeChanged: null, // <-- 传入 null 来禁用它
+                  // --- ( ✨ 结束修改 ✨ ) ---
                   selectedCategory: _selectedCategory,
                   selectedSubCategory: _selectedSubCategory,
                   onCategoryChanged: _onCategoryChanged,
                   onSubCategoryChanged: _onSubCategoryChanged,
-                  // ---
                   initialQuantity: _quantity,
                   isHalal: _isHalal,
                   isVegan: _isVegan,

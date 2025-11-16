@@ -9,13 +9,13 @@ import 'more_page.dart';
 import '../../repositories/vendor_data_repository.dart';
 import '../../models/user.dart';
 import '../../models/vendor.dart';
+
 import '../../repositories/order_repository.dart';
 import 'package:intl/intl.dart';
 
 import '../../repositories/notification_repository.dart';
 import '../shared/notifications_page.dart';
 
-// (VendorHomePage 类保持不变)
 class VendorHomePage extends StatefulWidget {
   const VendorHomePage({super.key});
 
@@ -24,7 +24,7 @@ class VendorHomePage extends StatefulWidget {
 }
 
 class _VendorHomePageState extends State<VendorHomePage> {
-  // ... (所有变量和函数 _currentIndex, _repo, _dataFuture, initState, _reloadData, _goToDashboard, _onTabTapped 保持不变) ...
+  // ... (initState, _reloadData, _goToDashboard, _onTabTapped 不变) ...
   int _currentIndex = 0;
   final VendorDataRepository _repo = VendorDataRepository();
   late Future<VendorDataBundle> _dataFuture;
@@ -60,7 +60,6 @@ class _VendorHomePageState extends State<VendorHomePage> {
       body: FutureBuilder<VendorDataBundle>(
         future: _dataFuture,
         builder: (context, snapshot) {
-          // ... (FutureBuilder 的 loading/error/data 逻辑不变) ...
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
                 child: CircularProgressIndicator(color: kPrimaryActionColor));
@@ -79,9 +78,21 @@ class _VendorHomePageState extends State<VendorHomePage> {
 
             final List<Widget> pages = [
               VendorHomePageContent(onTabTapped: _onTabTapped, bundle: bundle),
-              ProductPage(onBackToDashboard: _goToDashboard),
-              MarketingPage(onBackToDashboard: _goToDashboard),
+
+              // --- ( ✨ 关键修改 ✨ ) ---
+              // 我们将 bundle 传递给 ProductPage
+              ProductPage(
+                onBackToDashboard: _goToDashboard,
+                bundle: bundle, // <-- ( ✨ 已添加 ✨ )
+              ),
+              // --- ( ✨ 结束修改 ✨ ) ---
+
+              MarketingPage(
+                  onBackToDashboard: _goToDashboard,
+                  bundle: bundle), // <-- ( ✨ 3. Add 'bundle: bundle' here ) ---
+
               OrdersPage(onBackToDashboard: _goToDashboard),
+
               MorePage(
                 onBackToDashboard: _goToDashboard,
                 bundle: bundle,
@@ -134,20 +145,19 @@ class _VendorHomePageState extends State<VendorHomePage> {
   }
 }
 
-// --- ( VendorHomePageContent ) ---
-
+// --- ( VendorHomePageContent 保持不变, 我折叠了它) ---
 class VendorHomePageContent extends StatefulWidget {
+// ... (代码已折叠) ...
   final Function(int) onTabTapped;
   final VendorDataBundle bundle;
   const VendorHomePageContent(
       {super.key, required this.onTabTapped, required this.bundle});
-
   @override
   State<VendorHomePageContent> createState() => _VendorHomePageContentState();
 }
 
 class _VendorHomePageContentState extends State<VendorHomePageContent> {
-  // (所有 initState 和辅助函数 _buildStatCard, _buildActionBlock, _buildNotificationBell 保持不变)
+  // ... (代码已折叠) ...
   late OrderRepository _orderRepo;
   late Stream<Map<String, dynamic>> _statsStream;
   final _currencyFormat = NumberFormat.currency(locale: 'en_MY', symbol: 'RM');
@@ -167,7 +177,6 @@ class _VendorHomePageContentState extends State<VendorHomePageContent> {
 
   Widget _buildStatCard(
       String title, String value, IconData icon, Color color) {
-    // ... (不变)
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
@@ -204,7 +213,6 @@ class _VendorHomePageContentState extends State<VendorHomePageContent> {
 
   Widget _buildActionBlock(String actionType, String description, IconData icon,
       VoidCallback onTap) {
-    // ... (不变)
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16.0),
@@ -271,7 +279,6 @@ class _VendorHomePageContentState extends State<VendorHomePageContent> {
   }
 
   Widget _buildNotificationBell() {
-    // ... (不变)
     return StreamBuilder<int>(
       stream: _unreadCountStream,
       builder: (context, snapshot) {
@@ -334,11 +341,7 @@ class _VendorHomePageContentState extends State<VendorHomePageContent> {
       appBar: AppBar(
         backgroundColor: kAppBackgroundColor,
         elevation: 0,
-
-        // --- ( ✨ 关键修复 ✨ ) ---
-        centerTitle: false, // <-- 添加这一行
-        // --- ( ✨ 结束修复 ✨ ) ---
-
+        centerTitle: false,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -371,7 +374,6 @@ class _VendorHomePageContentState extends State<VendorHomePageContent> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              // ... (所有剩下的 body 内容, _buildProfileHeader, _buildStatCard, _buildActionBlock 等都保持不变) ...
               Container(
                 padding: const EdgeInsets.symmetric(
                     horizontal: 16.0, vertical: 12.0),

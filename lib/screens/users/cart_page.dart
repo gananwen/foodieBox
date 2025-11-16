@@ -1,18 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:foodiebox/providers/cart_provider.dart';
-import 'package:foodiebox/screens/users/checkout_page.dart';
-import 'package:foodiebox/util/styles.dart'; 
+// --- ( ✨ FIX: Removed old unused imports ✨ ) ---
+// import 'package:foodiebox/screens/users/checkout_page.dart'; 
+// import 'package:foodiebox/screens/users/pickup_payment_page.dart';
+// --- ( ✨ END FIX ✨ ) ---
+// Import the new payment page which handles the data for delivery/pickup
+import 'package:foodiebox/screens/users/qr_payment_page.dart'; 
+import 'package:foodiebox/screens/users/checkout_page.dart'; // Re-adding CheckoutPage for data flow
+import 'package:foodiebox/screens/users/pickup_payment_page.dart'; // Re-adding PickupPaymentPage for data flow
+import 'package:foodiebox/util/styles.dart';
+// Import the enum
+import 'package:foodiebox/enums/checkout_type.dart'; 
 
-class CartPage extends StatelessWidget {
+class CartPage extends StatefulWidget {
   const CartPage({super.key});
 
   @override
+  State<CartPage> createState() => _CartPageState();
+}
+
+class _CartPageState extends State<CartPage> {
+  // --- NO MORE _selectedOption state ---\
+  
+  // Helper functions to fetch the necessary data pages for navigation
+  Widget _getDeliveryCheckoutPage(CartProvider cart) {
+    return CheckoutPage(
+      subtotal: cart.subtotal,
+      items: cart.itemsList,
+    );
+  }
+
+  Widget _getPickupCheckoutPage(CartProvider cart) {
+    return PickupPaymentPage(
+      subtotal: cart.subtotal,
+      items: cart.itemsList,
+    );
+  }
+
+
+  @override
   Widget build(BuildContext context) {
-    // Listen to changes in the cart
     final cart = context.watch<CartProvider>();
     final itemsByVendor = cart.itemsByVendor;
     final vendorKeys = itemsByVendor.keys.toList();
+
+    // --- Read the selected option from the provider ---\
+    final selectedOption = cart.selectedCheckoutType;
+    // ---\
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -23,7 +58,6 @@ class CartPage extends StatelessWidget {
       ),
       body: cart.itemCount == 0
           ? Center(
-              // Show a message if the cart is empty
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -37,7 +71,6 @@ class CartPage extends StatelessWidget {
           : Column(
               children: [
                 Expanded(
-                  // List of items, grouped by vendor
                   child: ListView.builder(
                     padding: const EdgeInsets.only(top: 8, bottom: 8),
                     itemCount: vendorKeys.length,
@@ -52,14 +85,13 @@ class CartPage extends StatelessWidget {
                     },
                   ),
                 ),
-                // Bottom summary bar
-                _buildOrderSummary(context, cart),
+                // --- Pass the selected option to the summary ---\
+                _buildOrderSummary(context, cart, selectedOption),
               ],
             ),
     );
   }
 
-  // Builds a card for each vendor
   Widget _buildVendorGroup(BuildContext context, CartProvider cart,
       String vendorName, String vendorImage, List<CartItem> items) {
     return Container(
@@ -75,7 +107,6 @@ class CartPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Vendor Header
           Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
@@ -97,15 +128,18 @@ class CartPage extends StatelessWidget {
             ),
           ),
           const Divider(height: 1, indent: 12, endIndent: 12),
-          // List of items for this vendor
           ...items.map((item) => _buildCartItem(context, cart, item)),
         ],
       ),
     );
   }
 
-  // Builds a row for each item in the cart
   Widget _buildCartItem(BuildContext context, CartProvider cart, CartItem item) {
+    // --- ( ✨ NEW: Get stock info ✨ ) ---\
+    // item.product.quantity is the total stock available from Firebase
+    final int availableStock = item.product.quantity; 
+    // --- ( ✨ END NEW ✨ ) ---\
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
@@ -131,17 +165,22 @@ class CartPage extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text('RM${item.product.discountedPrice.toStringAsFixed(2)}',
                     style: kHintTextStyle),
+                // --- ( ✨ NEW: Show stock error in cart item ✨ ) ---\
+                if (item.quantity > availableStock)
+                  Text(
+                    'Only $availableStock in stock',
+                    style: kHintTextStyle.copyWith(color: Colors.red, fontSize: 12),
+                  )
+                // --- ( ✨ END NEW ✨ ) ---\
               ],
             ),
           ),
-          // Quantity Controls
           Row(
             children: [
               IconButton(
                 icon:
                     const Icon(Icons.remove_circle_outline, color: Colors.red),
                 onPressed: () {
-                  // Decrease quantity or remove item
                   cart.updateQuantity(item.product.id!, item.quantity - 1);
                 },
               ),
@@ -149,10 +188,23 @@ class CartPage extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.add_circle_outline,
                     color: kPrimaryActionColor),
+                // --- ( ✨ MODIFICATION: Check stock ✨ ) ---\
                 onPressed: () {
-                  // Increase quantity
-                  cart.updateQuantity(item.product.id!, item.quantity + 1);
+                  // Check if adding one more exceeds the total stock
+                  if (item.quantity + 1 > availableStock) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                            'No more stock available for ${item.product.title}'),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  } else {
+                    cart.updateQuantity(item.product.id!, item.quantity + 1);
+                  }
                 },
+                // --- ( ✨ END MODIFICATION ✨ ) ---\
               ),
             ],
           ),
@@ -161,11 +213,13 @@ class CartPage extends StatelessWidget {
     );
   }
 
-  // Builds the bottom summary bar with total and checkout button
-  Widget _buildOrderSummary(BuildContext context, CartProvider cart) {
+  // --- _buildToggleButton REMOVED ---\
+  // We no longer need this widget here as it's redundant.
+
+  Widget _buildOrderSummary(BuildContext context, CartProvider cart,
+      CheckoutType selectedOption) {
     return Container(
-      padding: const EdgeInsets.all(16).copyWith(
-          bottom: 30), // Extra padding for safe area (bottom navigation)
+      padding: const EdgeInsets.all(16).copyWith(bottom: 30),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -175,7 +229,74 @@ class CartPage extends StatelessWidget {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          
+          // --- NEW: Display-only widget for order mode ---\
+          const Text('Your Order Details', style: kLabelTextStyle),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: kCardColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      selectedOption == CheckoutType.delivery
+                          ? Icons.delivery_dining
+                          : Icons.store,
+                      color: kPrimaryActionColor,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Order Mode: ',
+                      style: kLabelTextStyle.copyWith(fontSize: 16),
+                    ),
+                    Text(
+                      selectedOption == CheckoutType.delivery
+                          ? 'Delivery'
+                          : 'Pickup',
+                      style: kLabelTextStyle.copyWith(
+                          fontSize: 16, color: kPrimaryActionColor),
+                    ),
+                  ],
+                ),
+                // If it's pickup, also show the time
+                if (selectedOption == CheckoutType.pickup &&
+                    cart.selectedPickupDay != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10.0),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.access_time, color: kPrimaryActionColor),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Pickup Time: ',
+                          style: kLabelTextStyle.copyWith(fontSize: 16),
+                        ),
+                        Expanded(
+                          child: Text(
+                            '${cart.selectedPickupDay}, ${cart.selectedPickupTime}',
+                            style: kLabelTextStyle.copyWith(
+                                fontSize: 16, color: kPrimaryActionColor),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // --- END NEW ---\
+
+          const Divider(height: 24),
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -184,7 +305,6 @@ class CartPage extends StatelessWidget {
                   style: kLabelTextStyle),
             ],
           ),
-          // You can add other fees like delivery, discounts here
           const Divider(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -199,16 +319,51 @@ class CartPage extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                // Navigate to Checkout, passing the cart's subtotal and item list
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CheckoutPage(
-                      subtotal: cart.subtotal,
-                      items: cart.itemsList, 
+                // --- ( ✨ NEW: Final Stock Check before Checkout ✨ ) ---\
+                String? stockError = cart.validateStock();
+                if (stockError != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(stockError),
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 4),
                     ),
-                  ),
-                );
+                  );
+                  return; // Stop processing
+                }
+                // --- ( ✨ END NEW ✨ ) ---\
+
+                // --- ( ✨✨✨ MODIFIED NAVIGATION TO NEW FLOW ✨✨✨ ) ---
+                if (selectedOption == CheckoutType.delivery) {
+                  // Navigate to the Delivery Checkout Page to collect address data
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => _getDeliveryCheckoutPage(cart),
+                    ),
+                  );
+                } else {
+                  // Check pickup time sanity (required for pickup)
+                  if (cart.selectedPickupDay == null ||
+                      cart.selectedPickupTime == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please select a pickup time from the store page first.'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+                  
+                  // Navigate to the Pickup Payment Page to collect pickup details
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => _getPickupCheckoutPage(cart),
+                    ),
+                  );
+                }
+                // --- ( ✨✨✨ END MODIFIED NAVIGATION ✨✨✨ ) ---
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimaryActionColor,
@@ -217,8 +372,13 @@ class CartPage extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
-              child:
-                  const Text('Proceed to Checkout', style: TextStyle(fontSize: 16)),
+              child: Text(
+                // This text also updates correctly based on the provider
+                selectedOption == CheckoutType.delivery
+                    ? 'Proceed to Checkout'
+                    : 'Proceed to Pickup Payment',
+                style: const TextStyle(fontSize: 16),
+              ),
             ),
           ),
         ],

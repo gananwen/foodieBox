@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:foodiebox/models/voucher_model.dart';
 import 'package:foodiebox/screens/users/order_confirmation_page.dart';
 import 'package:foodiebox/screens/users/order_failure_page.dart';
 import 'package:provider/provider.dart';
 import 'package:foodiebox/providers/cart_provider.dart';
-import '../users/subpages/delivery_address_page.dart';
+import 'package:foodiebox/screens/users/subpages/delivery_address_page.dart';
 import 'package:foodiebox/util/styles.dart';
+import 'package:foodiebox/repositories/voucher_repository.dart';
+import 'package:foodiebox/models/promotion.dart';
+import 'package:foodiebox/enums/checkout_type.dart';
+import 'qr_payment_page.dart'; // Ensure this is imported for the next step
 
 class CheckoutPage extends StatefulWidget {
   final double subtotal;
@@ -20,92 +25,186 @@ class CheckoutPage extends StatefulWidget {
   });
 
   @override
-  State<CheckoutPage> createState() => _CheckoutPageState();
+  State<CheckoutPage> createState() => _CheckoutPage();
 }
 
-class _CheckoutPageState extends State<CheckoutPage> {
+class _CheckoutPage extends State<CheckoutPage> {
+  final List<Map<String, dynamic>> _deliveryOptions = [
+    {'label': 'Express', 'time': '20 min', 'price': 4.99},
+    {'label': 'Standard', 'time': '40 min', 'price': 2.99},
+    {'label': 'Saver', 'time': '60 min', 'price': 0.99},
+  ];
   String selectedDelivery = 'Standard';
-  bool agreedToTerms = true;
-  String selectedPayment = 'Credit/Debit Card';
 
-  // --- MODIFIED: Address State ---
-  // We will store the selected address details here
-  // They are nullable because no address is selected initially
+  bool agreedToTerms = true;
   String? _selectedAddressString;
   LatLng? _selectedAddressLatLng;
   String? _selectedContactName;
   String? _selectedContactPhone;
   String? _selectedAddressLabel;
 
-  // We need the current user to fetch addresses
   User? _user;
-  // --- END MODIFICATION ---
 
   late double subtotal;
-  double discount = 0.0;
-  double deliveryFee = 5.00;
-  double deliveryDiscount = 3.00;
-  String promoCode = '';
-  String promoLabel = '';
-  String promoError = '';
+  late double deliveryFee;
+  bool _isLoading = false;
 
-  final List<Map<String, dynamic>> availablePromos = [
-    // ... your promo list remains unchanged ...
-        {
-      'title': '14% Additional Groceries Discount',
-      'code': 'VLZKOW7',
-      'minSpend': 45.00,
-      'discountAmount': 10.00,
-    },
-    {
-      'title': '30% OFF for your first pick up order',
-      'code': 'NEWPICKUP',
-      'minSpend': 25.00,
-      'discountAmount': 7.50,
-    },
-    {
-      'title': 'Enjoy RM10 off with RM 25 min. food delivery order',
-      'code': 'SYOK10',
-      'minSpend': 25.00,
-      'discountAmount': 10.00,
-    },
-  ];
+  final VoucherRepository _voucherRepo = VoucherRepository();
+
+  PromotionModel? automaticPromo;
+  double promoDiscount = 0.0;
+  bool _isLoadingPromo = true;
+
+  String voucherCode = '';
+  String voucherLabel = '';
+  String voucherError = '';
+  VoucherModel? selectedVoucher;
+  List<VoucherEligibility> voucherList = [];
+  bool _isLoadingVouchers = true;
+  double voucherDiscount = 0.0;
 
   @override
   void initState() {
     super.initState();
     subtotal = widget.subtotal;
-    // --- NEW: Get user and load their default address ---
     _user = FirebaseAuth.instance.currentUser;
+    deliveryFee = _deliveryOptions
+        .firstWhere((opt) => opt['label'] == selectedDelivery)['price'];
     _loadDefaultAddress();
-    // --- END NEW ---
+    _fetchData();
   }
 
-  // --- NEW METHOD: Load the user's most recent address ---
+  Future<void> _fetchData() async {
+    await _fetchAutomaticPromo();
+    await _fetchVouchers(subtotal - promoDiscount);
+  }
+
+  Future<void> _fetchAutomaticPromo() {
+    if (widget.items.isEmpty) {
+      setState(() => _isLoadingPromo = false);
+      return Future.value();
+    }
+    final String vendorId = widget.items.first.vendorId;
+    final String productType =
+        widget.items.first.product.productType == 'Blindbox'
+            ? 'Blindbox'
+            : 'Grocery';
+
+    try {
+      final now = DateTime.now();
+
+      FirebaseFirestore.instance
+          .collection('vendors')
+          .doc(vendorId)
+          .collection('promotions')
+          .where('endDate', isGreaterThanOrEqualTo: now)
+          .get()
+          .then((snapshot) {
+        final promos = snapshot.docs
+            .map((doc) => PromotionModel.fromMap(doc.data(), doc.id))
+            .where((promo) =>
+                promo.startDate.isBefore(now) &&
+                (promo.totalRedemptions == 0 ||
+                    promo.claimedRedemptions < promo.totalRedemptions))
+            .toList();
+
+        final validPromos = promos
+            .where((promo) =>
+                promo.productType == productType &&
+                promo.startDate.isBefore(now) &&
+                (promo.totalRedemptions == 0 ||
+                    promo.claimedRedemptions < promo.totalRedemptions) &&
+                subtotal >= promo.minSpend)
+            .toList();
+
+        if (mounted && validPromos.isNotEmpty) {
+          validPromos.sort((a, b) {
+            int minSpendComp = b.minSpend.compareTo(a.minSpend);
+            if (minSpendComp != 0) return minSpendComp;
+            return b.discountPercentage.compareTo(a.discountPercentage);
+          });
+
+          setState(() {
+            automaticPromo = validPromos.first;
+            promoDiscount =
+                subtotal * (automaticPromo!.discountPercentage / 100.0);
+            _isLoadingPromo = false;
+          });
+        } else if (mounted) {
+          setState(() => _isLoadingPromo = false);
+        }
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingPromo = false);
+      print("Error fetching automatic promo: $e");
+    }
+    return Future.value();
+  }
+
+  Future<void> _fetchVouchers(double currentSubtotal) async {
+    if (_user == null) {
+      setState(() => _isLoadingVouchers = false);
+      return;
+    }
+    setState(() => _isLoadingVouchers = true);
+
+    final vouchers = await _voucherRepo.fetchAllActiveVouchers();
+
+    // --- NEW: Get all vendor types from cart ---
+    // Note: 'Blind Box' (with space) comes from product.dart
+    final cartVendorTypes = widget.items
+        .map((item) =>
+            item.product.productType == 'Blind Box' ? 'BlindBox' : 'Grocery')
+        .toSet()
+        .toList();
+
+    List<VoucherEligibility> processedList = [];
+    for (var voucher in vouchers) {
+      final message = await _voucherRepo.getEligibilityStatus(
+        voucher: voucher,
+        subtotal: currentSubtotal,
+        currentOrderType: 'delivery',
+        cartVendorTypes: cartVendorTypes,
+      );
+      processedList.add(VoucherEligibility(
+        voucher: voucher,
+        eligibilityMessage: message,
+        isEligible: message == "Eligible",
+      ));
+    }
+
+    processedList.sort((a, b) {
+      if (a.isEligible && !b.isEligible) return -1;
+      if (!a.isEligible && b.isEligible) return 1;
+      return b.voucher.minSpend.compareTo(a.voucher.minSpend);
+    });
+
+    if (mounted) {
+      setState(() {
+        voucherList = processedList;
+        _isLoadingVouchers = false;
+      });
+    }
+  }
+
   Future<void> _loadDefaultAddress() async {
     if (_user == null) return;
-
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(_user!.uid)
           .collection('addresses')
-          .orderBy('timestamp', descending: true) // Get the latest one
+          .orderBy('timestamp', descending: true)
           .limit(1)
           .get();
-
       if (snapshot.docs.isNotEmpty) {
-        final defaultAddress = snapshot.docs.first.data();
-        // Use our new helper to set the state
-        _updateSelectedAddress(defaultAddress);
+        _updateSelectedAddress(snapshot.docs.first.data());
       }
     } catch (e) {
-      // Handle error, e.g., show a snackbar
       print("Error loading default address: $e");
     }
   }
 
-  // --- NEW HELPER METHOD: Update state with selected address ---
   void _updateSelectedAddress(Map<String, dynamic> addressData) {
     setState(() {
       _selectedAddressString = addressData['address'];
@@ -113,320 +212,213 @@ class _CheckoutPageState extends State<CheckoutPage> {
       _selectedContactPhone = addressData['contactPhone'];
       _selectedAddressLabel = addressData['label'] ?? 'Address';
       if (addressData['lat'] != null && addressData['lng'] != null) {
-        _selectedAddressLatLng =
-            LatLng(addressData['lat'], addressData['lng']);
+        _selectedAddressLatLng = LatLng(addressData['lat'], addressData['lng']);
       }
     });
   }
 
-  // --- NEW METHOD: Navigate to address selection page ---
   Future<void> _selectAddress() async {
-    // Navigate to the DeliveryAddressPage
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const DeliveryAddressPage()),
     );
-
-    // This page will pop back with the selected address data
     if (result != null && result is Map<String, dynamic>) {
-      // Update the checkout page's state with the selected address
       _updateSelectedAddress(result);
     }
   }
 
-  // --- (buildOrderSummary, _loadLastPromo, _selectPaymentMethod, _showPromoSelector, buildDeliveryOption methods remain unchanged) ---
-  Widget buildOrderSummary() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.grey.shade200, blurRadius: 4)],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Subtotal: RM${subtotal.toStringAsFixed(2)}'),
-          Text('Total discount: -RM${discount.toStringAsFixed(2)}'),
-          Text('Delivery fee: RM${deliveryFee.toStringAsFixed(2)}'),
-          Text(
-            'Delivery fee discount: -RM${deliveryDiscount.toStringAsFixed(2)}',
-          ),
-          if (promoCode.isNotEmpty)
-            Text(
-              discount > 0
-                  ? "Promo Applied: $promoLabel"
-                  : "Promo '$promoCode' cannot be used (min RM${_getPromoMinSpend(promoCode).toStringAsFixed(2)})",
-              style: TextStyle(color: discount > 0 ? Colors.green : Colors.red),
-            ),
-          const Divider(),
-          Text(
-            'Total: RM${getTotal().toStringAsFixed(2)}',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ],
-      ),
-    );
-  }
-
   double getTotal() {
-    return subtotal - discount + deliveryFee - deliveryDiscount;
-  }
+    final subtotalAfterPromo = subtotal - promoDiscount;
+    final voucherDiscountOnSubtotal =
+        selectedVoucher?.calculateDiscount(subtotalAfterPromo) ?? 0.0;
 
-  double _getPromoMinSpend(String code) {
-    final promo = availablePromos.firstWhere(
-      (p) => p['code'] == code,
-      orElse: () => {},
-    );
-    return promo['minSpend'] ?? 0.0;
-  }
+    final finalDeliveryFee =
+        (selectedVoucher?.freeDelivery ?? false) ? 0.0 : deliveryFee;
 
-  // --- _loadLastPromo ---
-  Future<void> _loadLastPromo() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-    final data = doc.data();
-    if (data != null && data['lastPromo'] != null) {
-      final promo = data['lastPromo'];
-      final code = promo['code'];
-      final label = promo['label'];
-      final savedDiscount = promo['discount'];
-
-      final promoDetails = availablePromos.firstWhere(
-        (p) => p['code'] == code,
-        orElse: () => {},
-      );
-      final meetsMinSpend = subtotal >= (promoDetails['minSpend'] ?? 0.0);
-
-      setState(() {
-        promoCode = code;
-        promoLabel = label;
-        discount = meetsMinSpend ? savedDiscount : 0.0;
-        promoError = meetsMinSpend
-            ? ''
-            : 'Promo requires RM${promoDetails['minSpend']} minimum spend';
+    // Corrected: Update state variable here (must be done in a post frame callback if outside setState)
+    if (voucherDiscountOnSubtotal != voucherDiscount) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted)
+          setState(() => voucherDiscount = voucherDiscountOnSubtotal);
       });
     }
+    return subtotalAfterPromo - voucherDiscountOnSubtotal + finalDeliveryFee;
   }
 
-  // --- _selectPaymentMethod ---
-  void _selectPaymentMethod() {
+  // --- VOUCHER MODAL - STYLED TO MATCH IMAGE & SORTED ---
+  void _showVoucherSelector() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      backgroundColor: Colors.grey[100],
       builder: (context) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.credit_card),
-              title: const Text('Credit/Debit Card'),
-              onTap: () {
-                setState(() => selectedPayment = 'Credit/Debit Card');
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.money),
-              title: const Text('Cash on Delivery'),
-              onTap: () {
-                setState(() => selectedPayment = 'Cash on Delivery');
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.account_balance_wallet),
-              title: const Text('E-Wallet'),
-              onTap: () {
-                setState(() => selectedPayment = 'E-Wallet');
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
+        if (_isLoadingVouchers) {
+          return const SizedBox(
+              height: 200, child: Center(child: CircularProgressIndicator()));
+        }
+        if (voucherList.isEmpty) {
+          return const SizedBox(
+              height: 200,
+              child: Center(
+                  child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: Text("No vouchers available right now."),
+              )));
+        }
 
-  // --- _showPromoSelector ---
-  void _showPromoSelector() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Container(
-          color: Colors.white,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Choose a Promo Code',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: ListView.separated(
-                  itemCount: availablePromos.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final promo = availablePromos[index];
-                    final meetsMinSpend = subtotal >= promo['minSpend'];
-                    final isSelected = promoCode == promo['code'];
+        final subtotalAfterPromo = subtotal - promoDiscount;
 
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          promoCode = promo['code'];
-                          promoLabel = promo['title'];
-                          if (meetsMinSpend) {
-                            discount = promo['discountAmount'];
-                            promoError = '';
-                          } else {
-                            discount = 0.0;
-                            promoError =
-                                'Promo requires RM${promo['minSpend']} minimum spend';
-                          }
-                        });
-                        Navigator.pop(context);
-                      },
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween<double>(
-                          begin: 1.0,
-                          end: isSelected ? 1.03 : 1.0,
-                        ),
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                        builder: (context, scale, child) {
-                          return Transform.scale(
-                            scale: scale,
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                gradient: isSelected
-                                    ? LinearGradient(
-                                        colors: [
-                                          Colors.amber.shade100,
-                                          Colors.white,
-                                        ],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      )
-                                    : null,
-                                color: isSelected ? null : Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? Colors.amber
-                                      : Colors.grey.shade300,
-                                  width: 1.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: isSelected
-                                        ? Colors.amber.withOpacity(0.4)
-                                        : Colors.grey.shade100,
-                                    blurRadius: isSelected ? 12 : 6,
-                                    spreadRadius: isSelected ? 2 : 1,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.7),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Text(
+                    'Choose a Promo Code',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // --- List of Vouchers ---
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: voucherList.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final item = voucherList[index];
+                      final voucher = item.voucher;
+                      final isSelected = voucherCode == voucher.code;
+                      final isEligible = item.isEligible;
+                      final eligibilityMessage = item.eligibilityMessage;
+
+                      return GestureDetector(
+                        onTap: () {
+                          if (!isEligible) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(eligibilityMessage),
+                                backgroundColor: Colors.red,
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          promo['title'],
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                      Tooltip(
-                                        message:
-                                            'Min spend RM${promo['minSpend']}\nCode: ${promo['code']}',
-                                        child: const Icon(
-                                          Icons.info_outline,
-                                          size: 18,
-                                          color: Colors.grey,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Text(
-                                            'Code: ${promo['code']}',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey.shade700,
-                                            ),
-                                          ),
-                                          if (meetsMinSpend)
-                                            const Padding(
-                                              padding: EdgeInsets.only(left: 6),
-                                              child: Icon(
-                                                Icons.local_offer,
-                                                color: Colors.green,
-                                                size: 18,
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                      Text(
-                                        meetsMinSpend
-                                            ? 'Eligible'
-                                            : 'Min RM${promo['minSpend']}',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: meetsMinSpend
-                                              ? Colors.green
-                                              : Colors.red,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                            );
+                            return;
+                          }
+                          setState(() {
+                            voucherCode = voucher.code;
+                            voucherLabel = voucher.title;
+                            selectedVoucher = voucher;
+                            voucherDiscount =
+                                voucher.calculateDiscount(subtotalAfterPromo);
+                            voucherError = '';
+                          });
+                          Navigator.pop(context);
+                        },
+                        child: Opacity(
+                          opacity: isEligible ? 1.0 : 0.6,
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected
+                                    ? kPrimaryActionColor
+                                    : Colors.grey.shade300,
+                                width: isSelected ? 2.0 : 1.0,
                               ),
                             ),
-                          );
-                        },
-                      ),
-                    );
-                  },
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        voucher.title,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    Icon(Icons.info_outline,
+                                        color: Colors.grey[400]),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.label,
+                                            color: Colors.green[600], size: 16),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Code: ${voucher.code}',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey[700],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Text(
+                                      eligibilityMessage,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: isEligible
+                                            ? Colors.green[700]
+                                            : Colors.red[700],
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  // --- buildDeliveryOption ---
-  Widget buildDeliveryOption(String label, String time, double price) {
+  Widget _buildDeliveryOptionWidget(Map<String, dynamic> option) {
+    final String label = option['label'];
+    final String time = option['time'];
+    final double price = option['price'];
     final isSelected = selectedDelivery == label;
+
     return GestureDetector(
-      onTap: () => setState(() => selectedDelivery = label),
+      onTap: () {
+        setState(() {
+          selectedDelivery = label;
+          deliveryFee = price;
+        });
+      },
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 6),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -460,18 +452,16 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  // --- NEW WIDGET: Replaces the old hardcoded address section ---
   Widget _buildAddressSection() {
-    // Case 1: No address has been selected or loaded yet
     if (_selectedAddressString == null) {
       return InkWell(
         onTap: _selectAddress,
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: kYellowLight, // Use your style
+            color: kYellowLight,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: kPrimaryActionColor, width: 1.5), // Use your style
+            border: Border.all(color: kPrimaryActionColor, width: 1.5),
           ),
           child: const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -481,39 +471,32 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: kTextColor), // Use your style
+                    color: kTextColor),
               ),
-              Icon(Icons.arrow_forward_ios, size: 16, color: kTextColor), // Use your style
+              Icon(Icons.arrow_forward_ios, size: 16, color: kTextColor),
             ],
           ),
         ),
       );
     }
-
-    // Case 2: An address is selected
     IconData iconData = Icons.location_on;
-    if (_selectedAddressLabel == 'Home') {
+    if (_selectedAddressLabel == 'Home')
       iconData = Icons.home;
-    } else if (_selectedAddressLabel == 'Office') {
-      iconData = Icons.work;
-    }
+    else if (_selectedAddressLabel == 'Office') iconData = Icons.work;
 
     return InkWell(
-      onTap: _selectAddress, // Tap to change address
+      onTap: _selectAddress,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(color: Colors.grey.shade200, blurRadius: 4)
-          ],
-          border: Border.all(color: Colors.grey.shade300)
-        ),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [BoxShadow(color: Colors.grey.shade200, blurRadius: 4)],
+            border: Border.all(color: Colors.grey.shade300)),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(iconData, color: kPrimaryActionColor, size: 28), // Use your style
+            Icon(iconData, color: kPrimaryActionColor, size: 28),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -521,14 +504,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 children: [
                   Text(
                     '$_selectedAddressLabel - $_selectedContactName',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     _selectedAddressString ?? 'No address',
                     style: const TextStyle(fontSize: 14, color: Colors.black54),
                   ),
-                   const SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     _selectedContactPhone ?? 'No phone',
                     style: const TextStyle(fontSize: 14, color: Colors.black54),
@@ -536,7 +520,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 ],
               ),
             ),
-            const Icon(Icons.edit_location_alt_outlined, size: 20, color: Colors.grey),
+            const Icon(Icons.edit_location_alt_outlined,
+                size: 20, color: Colors.grey),
           ],
         ),
       ),
@@ -562,166 +547,181 @@ class _CheckoutPageState extends State<CheckoutPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- MODIFIED: Delivery Address ---
             const Text('Delivery Address',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            // Use our new dynamic widget
             _buildAddressSection(),
             const SizedBox(height: 20),
-            // --- END MODIFICATION ---
-
-            // --- Delivery Option ---
             const Text('Delivery Option',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            buildDeliveryOption('Express', '20 min', 4.99),
-            buildDeliveryOption('Standard', '40 min', 2.99),
-            buildDeliveryOption('Saver', '60 min', 0.99),
+            ..._deliveryOptions.map(_buildDeliveryOptionWidget).toList(),
             const SizedBox(height: 20),
 
-            // --- Payment Method ---
-            const Text('Payment Method',
+            // Note: The Payment Method section was removed to force QR payment.
+
+            const Text('Voucher Code',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            GestureDetector(
-              onTap: _selectPaymentMethod,
-              child: Container(
+            ElevatedButton.icon(
+              onPressed: _showVoucherSelector,
+              icon: const Icon(Icons.local_offer, size: 18),
+              label: Text(
+                voucherCode.isEmpty
+                    ? 'Select Voucher'
+                    : 'Voucher: $voucherCode',
+                style: const TextStyle(fontSize: 14),
+              ),
+              style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
                   vertical: 14,
+                  horizontal: 16,
                 ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(color: Colors.grey.shade200, blurRadius: 4),
-                  ],
-                   border: Border.all(color: Colors.grey.shade300)
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(selectedPayment, style: const TextStyle(fontSize: 16)),
-                    const Icon(Icons.arrow_forward_ios, size: 16),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // --- Promo Code ---
-            const Text('Promo Code',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            TweenAnimationBuilder<double>(
-              tween: Tween<double>(
-                begin: 1.0,
-                end: promoCode.isEmpty ? 1.05 : 1.0,
-              ),
-              duration: const Duration(milliseconds: 600),
-              curve: Curves.easeInOut,
-              builder: (context, scale, child) {
-                return Transform.scale(
-                  scale: scale,
-                  child: ElevatedButton.icon(
-                    onPressed: _showPromoSelector,
-                    icon: const Icon(Icons.local_offer, size: 18),
-                    label: Text(
-                      promoCode.isEmpty ? 'Select Promo' : 'Promo: $promoCode',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 14,
-                        horizontal: 16,
-                      ),
-                      backgroundColor: promoCode.isEmpty
-                          ? Colors.white
-                          : Colors.amber.shade100,
-                      foregroundColor: Colors.black,
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        side: BorderSide(
-                          color: promoCode.isEmpty
-                              ? Colors.grey.shade300
-                              : Colors.amber,
-                          width: 1.5,
-                        ),
-                      ),
-                    ),
+                backgroundColor:
+                    voucherCode.isEmpty ? Colors.white : Colors.amber.shade100,
+                foregroundColor: Colors.black,
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(
+                    color: voucherCode.isEmpty
+                        ? Colors.grey.shade300
+                        : Colors.amber,
+                    width: 1.5,
                   ),
-                );
-              },
-            ),
-            if (promoCode.isNotEmpty && promoError.isEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  'Suggested from last order',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ),
-            if (promoCode.isNotEmpty)
+            ),
+            if (voucherCode.isNotEmpty)
               TextButton.icon(
                 onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Clear Promo'),
-                      content: const Text(
-                        'Are you sure you want to remove the applied promo code?',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              promoCode = '';
-                              promoLabel = '';
-                              discount = 0.0;
-                              promoError = '';
-                            });
-                            Navigator.pop(context);
-                          },
-                          child: const Text(
-                            'Clear',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
+                  setState(() {
+                    voucherCode = '';
+                    voucherLabel = '';
+                    selectedVoucher = null;
+                    voucherDiscount = 0.0;
+                    voucherError = '';
+                  });
                 },
                 icon: const Icon(Icons.close, size: 16, color: Colors.red),
                 label: const Text(
-                  'Clear Promo',
+                  'Clear Voucher',
                   style: TextStyle(color: Colors.red),
                 ),
               ),
-            if (promoError.isNotEmpty)
+            if (voucherError.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  promoError,
+                  voucherError,
                   style: const TextStyle(color: Colors.red),
                 ),
               ),
             const SizedBox(height: 20),
-
-            // --- Order Summary ---
             const Text('Order Summary',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            // Use the reusable buildOrderSummary method
-            buildOrderSummary(),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(color: Colors.grey.shade200, blurRadius: 4)
+                ],
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Subtotal', style: kLabelTextStyle),
+                      Text('RM${subtotal.toStringAsFixed(2)}',
+                          style: kLabelTextStyle),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (_isLoadingPromo)
+                    const Text('Checking for promotions...',
+                        style: kHintTextStyle),
+                  if (promoDiscount > 0)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(automaticPromo?.title ?? 'Promotion',
+                            style:
+                                kHintTextStyle.copyWith(color: Colors.green)),
+                        Text('-RM${promoDiscount.toStringAsFixed(2)}',
+                            style:
+                                kHintTextStyle.copyWith(color: Colors.green)),
+                      ],
+                    ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Delivery fee', style: kHintTextStyle),
+                      Text('RM${deliveryFee.toStringAsFixed(2)}',
+                          style: (selectedVoucher?.freeDelivery ?? false)
+                              ? kHintTextStyle.copyWith(
+                                  decoration: TextDecoration.lineThrough)
+                              : kHintTextStyle),
+                    ],
+                  ),
+                  if (voucherDiscount > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(voucherLabel,
+                              style:
+                                  kHintTextStyle.copyWith(color: Colors.green)),
+                          Text('-RM${voucherDiscount.toStringAsFixed(2)}',
+                              style:
+                                  kHintTextStyle.copyWith(color: Colors.green)),
+                        ],
+                      ),
+                    ),
+                  if (selectedVoucher?.freeDelivery ?? false)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(voucherLabel,
+                              style:
+                                  kHintTextStyle.copyWith(color: Colors.green)),
+                          Text('Free Delivery',
+                              style:
+                                  kHintTextStyle.copyWith(color: Colors.green)),
+                        ],
+                      ),
+                    ),
+                  if (voucherError.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        voucherError,
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    ),
+                  const Divider(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Total', style: kLabelTextStyle),
+                      Text(
+                        'RM${getTotal().toStringAsFixed(2)}',
+                        style: kLabelTextStyle.copyWith(
+                            fontSize: 18, color: kPrimaryActionColor),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 20),
-
-            // --- Terms and Conditions ---
             Row(
               children: [
                 Checkbox(
@@ -746,24 +746,34 @@ class _CheckoutPageState extends State<CheckoutPage> {
               ],
             ),
             const SizedBox(height: 20),
-
-            // --- Place Order Button ---
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: agreedToTerms ? _placeOrder : null,
+                // --- MODIFIED: Call _proceedToPayment ---
+                onPressed:
+                    agreedToTerms && !_isLoading ? _proceedToPayment : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimaryActionColor, // Use your style
-                  foregroundColor: kTextColor, // Use your style
+                  backgroundColor: kPrimaryActionColor,
+                  foregroundColor: kTextColor,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'Place Order',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: kTextColor,
+                          strokeWidth: 3,
+                        ),
+                      )
+                    : const Text(
+                        'Proceed to Payment', // --- MODIFIED: Changed text ---
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
               ),
             ),
           ],
@@ -772,65 +782,50 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  Future<void> _placeOrder() async {
-    // --- MODIFIED: Check for address first ---
+  // --- MODIFIED: _proceedToPayment function (Packages data and navigates to QR Page) ---
+  Future<void> _proceedToPayment() async {
     if (_selectedAddressString == null || _selectedAddressLatLng == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a delivery address.')),
       );
       return;
     }
-    // --- END MODIFICATION ---
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
+    if (widget.items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please log in to place an order.')),
+        const SnackBar(content: Text('Your cart is empty.')),
       );
       return;
     }
 
-    // ... (Promo validation logic remains unchanged) ...
-    if (promoCode.isNotEmpty && discount == 0.0) {
-      final minSpend = _getPromoMinSpend(promoCode).toStringAsFixed(2);
+    setState(() => _isLoading = true);
 
-      final shouldClear = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Promo Not Applicable'),
-          content: Text(
-            'The promo code "$promoCode" requires a minimum spend of RM$minSpend. Please clear the promo to continue with your order.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () =>
-                  Navigator.pop(context, false), // Cancel order attempt
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context, true); // Signal to clear promo
-              },
-              child: const Text(
-                'Clear Promo',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        ),
+    // --- Validate Vouchers (Voucher validation logic remains here) ---
+    final cartVendorTypes = widget.items
+        .map((item) =>
+            item.product.productType == 'Blind Box' ? 'BlindBox' : 'Grocery')
+        .toSet()
+        .toList();
+
+    if (selectedVoucher != null) {
+      final subtotalAfterPromo = subtotal - promoDiscount;
+      final eligibilityMessage = await _voucherRepo.getEligibilityStatus(
+        voucher: selectedVoucher!,
+        subtotal: subtotalAfterPromo,
+        currentOrderType: 'delivery',
+        cartVendorTypes: cartVendorTypes,
       );
-
-      if (shouldClear == true) {
-        setState(() {
-          promoCode = '';
-          promoLabel = '';
-          promoError = '';
-        });
-        return _placeOrder();
+      if (eligibilityMessage != "Eligible") {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('The selected voucher is no longer eligible.'),
+              backgroundColor: Colors.red),
+        );
+        setState(() => _isLoading = false);
+        return;
       }
-      return;
     }
 
+    // --- Prepare Order Data ---
     final itemsData = widget.items.map((item) {
       return {
         'name': item.product.title,
@@ -842,90 +837,73 @@ class _CheckoutPageState extends State<CheckoutPage> {
       };
     }).toList();
 
-    // --- MODIFIED: Use dynamic address data in the order ---
-    final orderData = {
-      'userId': user.uid,
-      'address': _selectedAddressString, // Use state variable
-      'lat': _selectedAddressLatLng!.latitude, // Use state variable
-      'lng': _selectedAddressLatLng!.longitude, // Use state variable
-      'contactName': _selectedContactName, // Add contact name
-      'contactPhone': _selectedContactPhone, // Add contact phone
-      'deliveryOption': selectedDelivery,
-      'paymentMethod': selectedPayment,
-      'subtotal': subtotal,
-      'discount': discount,
-      'deliveryFee': deliveryFee,
-      'deliveryDiscount': deliveryDiscount,
-      'total': getTotal(),
-      'promoCode': promoCode,
-      'promoLabel': promoLabel,
-      'status': 'received',
-      'items': itemsData,
-      'timestamp': FieldValue.serverTimestamp(),
-    };
-    // --- END MODIFICATION ---
+    final allVendorIds =
+        widget.items.map((item) => item.vendorId).toSet().toList();
 
-    try {
-      final docRef =
-          await FirebaseFirestore.instance.collection('orders').add(orderData);
-      final orderId = docRef.id;
+    String vendorName = 'Multiple Stores';
+    String vendorType = 'Mixed';
 
-      if (promoCode.isNotEmpty) {
-        // ... (Promo usage update logic remains unchanged) ...
-        final promoRef = FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('promoUsage')
-            .doc(promoCode);
-
-        await promoRef.set({
-          'label': promoLabel,
-          'lastUsed': FieldValue.serverTimestamp(),
-          'count': FieldValue.increment(1),
-        }, SetOptions(merge: true));
-
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'lastPromo': {
-            'code': promoCode,
-            'label': promoLabel,
-            'discount': discount,
-          },
-        }, SetOptions(merge: true));
-      }
-
-      if (mounted) {
-        context.read<CartProvider>().clearCart();
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Order placed successfully!')),
-      );
-
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => OrderConfirmationPage(
-              address: _selectedAddressString!, // Pass the selected address
-              location: _selectedAddressLatLng!, // Pass the selected lat/lng
-              total: getTotal(),
-              promoLabel: promoLabel,
-              orderId: orderId,
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to place order: $e')));
-
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const OrderFailurePage()),
-        );
+    if (allVendorIds.length == 1) {
+      try {
+        final vendorDoc = await FirebaseFirestore.instance
+            .collection('vendors')
+            .doc(allVendorIds.first)
+            .get();
+        if (vendorDoc.exists) {
+          vendorName = vendorDoc.data()?['storeName'] ?? 'Unknown Store';
+          vendorType = vendorDoc.data()?['vendorType'] ?? 'Grocery';
+        }
+      } catch (e) {
+        print("Error fetching vendor data: $e");
       }
     }
+
+    final finalTotal = getTotal();
+    final finalDeliveryFee =
+        (selectedVoucher?.freeDelivery ?? false) ? 0.0 : deliveryFee;
+    final totalDiscount = promoDiscount + voucherDiscount;
+
+    final orderData = {
+      'userId': _user!.uid,
+      'orderType': 'Delivery',
+      'address': _selectedAddressString,
+      'lat': _selectedAddressLatLng!.latitude,
+      'lng': _selectedAddressLatLng!.longitude,
+      'contactName': _selectedContactName,
+      'contactPhone': _selectedContactPhone,
+      'deliveryOption': selectedDelivery,
+      'paymentMethod': 'QR Pay', // Set payment method here
+      'subtotal': subtotal,
+      'discount': totalDiscount,
+      'deliveryFee': finalDeliveryFee,
+      'total': finalTotal,
+      'promoCode':
+          null, // FIX: Use null here as automaticPromo does not have a code field
+      'promoLabel': automaticPromo?.title,
+      'voucherCode': selectedVoucher?.code,
+      'voucherLabel': selectedVoucher?.title,
+      'vendorIds': allVendorIds,
+      'status': 'Awaiting Payment Proof', // Pre-order status
+      'items': itemsData,
+      'timestamp': FieldValue.serverTimestamp(),
+      'vendorName': vendorName,
+      'vendorType': vendorType,
+      'hasBeenReviewed': false,
+    };
+
+    // --- Navigate to QR Payment Page ---
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => QrPaymentPage(
+            orderData: orderData,
+            orderType: CheckoutType.delivery,
+          ),
+        ),
+      );
+    }
+
+    setState(() => _isLoading = false);
   }
 }

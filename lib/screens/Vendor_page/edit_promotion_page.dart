@@ -1,7 +1,7 @@
 // 路径: lib/pages/vendor_home/edit_promotion_page.dart
-import 'dart:io'; // <-- ( ✨ 新增 ✨ )
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // <-- ( ✨ 新增 ✨ )
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../util/styles.dart';
 import '../../models/promotion.dart';
@@ -20,10 +20,9 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
   final _repo = PromotionRepository();
   bool _isLoading = false;
 
-  // --- ( ✨ 新增状态 ✨ ) ---
   File? _imageFile;
   final ImagePicker _picker = ImagePicker();
-  late String _existingBannerUrl; // 用于跟踪旧 URL
+  late String _existingBannerUrl;
 
   late String _dealTitle;
   late String _selectedProductType;
@@ -48,11 +47,11 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
     super.initState();
     final promo = widget.promotion;
 
-    // ( ✨ 新增 ✨ )
     _existingBannerUrl = promo.bannerUrl;
-
     _dealTitle = promo.title;
+    // --- ( ✨ THIS LINE IS CORRECT AND ALREADY WORKS ✨ ) ---
     _selectedProductType = promo.productType;
+    // ---
     _startDate = promo.startDate;
     _endDate = promo.endDate;
     _startTime = TimeOfDay.fromDateTime(promo.startDate);
@@ -60,7 +59,6 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
     _discountPercentage = promo.discountPercentage;
     _totalRedemptions = promo.totalRedemptions;
 
-    // ... (不变) 填充 controllers ...
     _titleController = TextEditingController(text: _dealTitle);
     _startDateController.text = DateFormat('dd MMM yyyy').format(_startDate);
     _endDateController.text = DateFormat('dd MMM yyyy').format(_endDate);
@@ -79,19 +77,55 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
 
   @override
   void dispose() {
-    // ... (不变)
+    _discountPercController.dispose();
+    _totalRedemptionsController.dispose();
+    _titleController.dispose();
+    _startDateController.dispose();
+    _endDateController.dispose();
+    _startTimeController.dispose();
+    _endTimeController.dispose();
     super.dispose();
   }
 
-  // ... (日期/时间选择函数 _selectDate, _selectTime 保持不变) ...
+  // ... ( _selectDate, _selectTime, _pickImage are all correct ) ...
   Future<void> _selectDate(BuildContext context, bool isStartDate) async {
-    // ... (不变)
-  }
-  Future<void> _selectTime(BuildContext context, bool isStartTime) async {
-    // ... (不变)
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: isStartDate ? _startDate : _endDate,
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStartDate) {
+          _startDate = picked;
+          _startDateController.text = DateFormat('dd MMM yyyy').format(picked);
+        } else {
+          _endDate = picked;
+          _endDateController.text = DateFormat('dd MMM yyyy').format(picked);
+        }
+      });
+    }
   }
 
-  // --- ( ✨ 新增函数：选择图片 ✨ ) ---
+  Future<void> _selectTime(BuildContext context, bool isStartTime) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: isStartTime ? _startTime : _endTime,
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStartTime) {
+          _startTime = picked;
+          _startTimeController.text = picked.format(context);
+        } else {
+          _endTime = picked;
+          _endTimeController.text = picked.format(context);
+        }
+      });
+    }
+  }
+
   Future<void> _pickImage() async {
     try {
       final XFile? pickedFile =
@@ -110,23 +144,20 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
     }
   }
 
-  // --- ( ✨ 重大修改：_updatePromotion 函数 ✨ ) ---
+  // ... ( _updatePromotion function is correct, no changes needed ) ...
   Future<void> _updatePromotion() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
       setState(() => _isLoading = true);
 
       try {
-        String finalBannerUrl = _existingBannerUrl; // 默认为旧 URL
+        String finalBannerUrl = _existingBannerUrl;
 
-        // 步骤 1: ( ✨ 新增 ✨ ) 检查是否有新图片
         if (_imageFile != null) {
-          // 如果有，上传它 (这将覆盖旧图片，因为 promo ID 相同)
           finalBannerUrl =
               await _repo.uploadBannerImage(_imageFile!, widget.promotion.id!);
         }
 
-        // 步骤 2: 组合日期和时间 (不变)
         final DateTime startDateTime = DateTime(
           _startDate.year,
           _startDate.month,
@@ -142,18 +173,16 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
           _endTime.minute,
         );
 
-        // 步骤 3: 使用 copyWith 创建更新后的模型
         final updatedPromotion = widget.promotion.copyWith(
           title: _dealTitle,
-          productType: _selectedProductType,
+          productType: _selectedProductType, // (This is correct)
           startDate: startDateTime,
           endDate: endDateTime,
           discountPercentage: _discountPercentage,
           totalRedemptions: _totalRedemptions,
-          bannerUrl: finalBannerUrl, // ( ✨ 使用最终 URL ✨ )
+          bannerUrl: finalBannerUrl,
         );
 
-        // 步骤 4: 调用仓库进行更新
         await _repo.updatePromotion(updatedPromotion);
 
         if (mounted) {
@@ -182,17 +211,15 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
     }
   }
 
-  // ... (_buildTextField, _buildDateTimePicker, _buildProductTypeRadio 保持不变) ...
-  Widget _buildTextField({
-    required String label,
-    required Function(String?) onSaved,
-    String? Function(String?)? validator,
-    TextInputType inputType = TextInputType.text,
-    TextEditingController? controller,
-    bool readOnly = false,
-    VoidCallback? onTap,
-  }) {
-    // ... (不变)
+  // ... ( _buildTextField, _buildDateTimePicker are unchanged ) ...
+  Widget _buildTextField(
+      {required String label,
+      required Function(String?) onSaved,
+      String? Function(String?)? validator,
+      TextInputType inputType = TextInputType.text,
+      TextEditingController? controller,
+      bool readOnly = false,
+      VoidCallback? onTap}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -254,12 +281,10 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
     );
   }
 
-  Widget _buildDateTimePicker({
-    required String label,
-    required TextEditingController controller,
-    required VoidCallback onTap,
-  }) {
-    // ... (不变)
+  Widget _buildDateTimePicker(
+      {required String label,
+      required TextEditingController controller,
+      required VoidCallback onTap}) {
     return _buildTextField(
       label: label,
       onSaved: (value) {},
@@ -275,16 +300,14 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
     );
   }
 
+  // ( ✨ THIS FUNCTION IS NO LONGER USED, but we leave it here )
   Widget _buildProductTypeRadio(String title) {
-    // ... (不变)
     return RadioListTile<String>(
       title: Text(title, style: const TextStyle(color: kTextColor)),
       value: title,
       groupValue: _selectedProductType,
       onChanged: (String? value) {
-        setState(() {
-          _selectedProductType = value!;
-        });
+        // (Even if we kept this, it shouldn't do anything)
       },
       activeColor: kPrimaryActionColor,
       contentPadding: EdgeInsets.zero,
@@ -310,9 +333,9 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- 1. ( ✨ 已修改 ✨ ) 上传横幅图片 ---
+              // --- (Image picker is unchanged) ---
               GestureDetector(
-                onTap: _pickImage, // <-- ( ✨ 绑定函数 ✨ )
+                onTap: _pickImage,
                 child: Container(
                   height: 150,
                   width: double.infinity,
@@ -322,26 +345,126 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
                     border:
                         Border.all(color: kTextColor.withAlpha(51), width: 1.5),
                   ),
-                  child: _buildImageWidget(), // <-- ( ✨ 使用辅助函数 ✨ )
+                  child: _buildImageWidget(),
                 ),
               ),
               const SizedBox(height: 24),
 
-              // ... (所有其他表单字段保持不变) ...
               _buildTextField(
                 label: 'Deal Title',
                 controller: _titleController,
                 onSaved: (value) => _dealTitle = value!,
               ),
+
+              // --- ( ✨ REMOVE THE RADIO BUTTONS ✨ ) ---
+              // (We replace them with a "locked" display field)
               const Padding(
                 padding: EdgeInsets.only(left: 12.0, bottom: 4.0),
-                child: Text('Choose Products',
+                child: Text('Product Type (Locked)',
                     style: TextStyle(fontSize: 12, color: kTextColor)),
               ),
-              _buildProductTypeRadio('Blindbox'),
-              _buildProductTypeRadio('Grocery'),
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                decoration: BoxDecoration(
+                  color: kCardColor.withOpacity(0.5), // (Slightly grayed out)
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: kTextColor.withAlpha(51)),
+                ),
+                child: Text(
+                  _selectedProductType, // (This was set in initState)
+                  style: const TextStyle(
+                      color: kTextColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold),
+                ),
+              ),
               const SizedBox(height: 16),
-              // ... (所有其他表单字段保持不变) ...
+              // --- ( ✨ END OF REPLACEMENT ✨ ) ---
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDateTimePicker(
+                      label: 'Start Time',
+                      controller: _startTimeController,
+                      onTap: () => _selectTime(context, true),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildDateTimePicker(
+                      label: 'End Time',
+                      controller: _endTimeController,
+                      onTap: () => _selectTime(context, false),
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDateTimePicker(
+                      label: 'Start Date',
+                      controller: _startDateController,
+                      onTap: () => _selectDate(context, true),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildDateTimePicker(
+                      label: 'End Date',
+                      controller: _endDateController,
+                      onTap: () => _selectDate(context, false),
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTextField(
+                      label: 'Discount Percentage (e.g., 20)',
+                      controller: _discountPercController,
+                      onSaved: (value) =>
+                          _discountPercentage = int.tryParse(value!)!,
+                      inputType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        final perc = int.tryParse(value);
+                        if (perc == null || perc <= 0 || perc > 100) {
+                          return '1-100';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildTextField(
+                      label: 'Total Redemptions (e.g., 100)',
+                      controller: _totalRedemptionsController,
+                      onSaved: (value) =>
+                          _totalRedemptions = int.tryParse(value!)!,
+                      inputType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        if (int.tryParse(value) == null ||
+                            int.tryParse(value)! <= 0) {
+                          return 'Must be > 0';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -368,9 +491,8 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
     );
   }
 
-  // --- ( ✨ 新增：辅助函数 ✨ ) ---
+  // (This helper function is correct, no changes needed)
   Widget _buildImageWidget() {
-    // 1. 如果选择了新图片，显示新图片
     if (_imageFile != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(10),
@@ -380,14 +502,12 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
         ),
       );
     }
-    // 2. 如果有旧图片 URL，显示旧图片
     if (_existingBannerUrl.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(10),
         child: Image.network(
           _existingBannerUrl,
           fit: BoxFit.cover,
-          // (可选) 添加加载和错误处理
           loadingBuilder: (context, child, loadingProgress) {
             if (loadingProgress == null) return child;
             return const Center(
@@ -400,7 +520,6 @@ class _EditPromotionPageState extends State<EditPromotionPage> {
         ),
       );
     }
-    // 3. 否则，显示占位符
     return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

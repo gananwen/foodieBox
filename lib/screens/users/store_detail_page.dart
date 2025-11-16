@@ -1,27 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:foodiebox/models/vendor.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:foodiebox/models/vendor.dart';
+// import 'package:foodiebox/models/vendor.dart'; // Duplicate import, removed one
 import 'package:foodiebox/models/product.dart';
 import 'package:foodiebox/util/styles.dart';
 import 'category_product_page.dart';
-import 'product_detail_page.dart'; // NEW: Import product detail page
-
-// --- NEW IMPORTS ---
+import 'product_detail_page.dart';
 import 'package:provider/provider.dart';
 import 'package:foodiebox/providers/cart_provider.dart';
-import 'package:foodiebox/screens/users/cart_page.dart'; // <-- ADDED THIS IMPORT
-// --- END NEW IMPORTS ---
+import 'package:foodiebox/screens/users/cart_page.dart';
+// --- FIX: Import the new enum file ---
+import 'package:foodiebox/enums/checkout_type.dart';
 
-// --- Category model (unchanged) ---
 class GroceryCategory {
   final String name;
   final String imagePath;
   GroceryCategory({required this.name, required this.imagePath});
 }
-
-// --- Enum (unchanged) ---
-enum DeliveryOption { delivery, pickup }
 
 class StoreDetailPage extends StatefulWidget {
   final VendorModel vendor;
@@ -33,8 +28,7 @@ class StoreDetailPage extends StatefulWidget {
 }
 
 class _StoreDetailPageState extends State<StoreDetailPage> {
-  DeliveryOption _selectedOption = DeliveryOption.delivery;
-
+  // Local state for time modal
   String _selectedDay = 'Today';
   String _selectedTime = 'No slots available';
 
@@ -43,7 +37,6 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
 
   final List<int> _allPickupHours = [10, 11, 12, 13, 14, 15, 16];
 
-  // --- Keep your category list and images as-is ---
   final List<GroceryCategory> _groceryCategories = [
     GroceryCategory(name: 'Frozen', imagePath: 'assets/images/frozen.png'),
     GroceryCategory(name: 'Baked Goods', imagePath: 'assets/images/bakery.png'),
@@ -63,6 +56,18 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
   void initState() {
     super.initState();
     _generateTimeSlots();
+    
+    final cart = context.read<CartProvider>();
+    _selectedDay = cart.selectedPickupDay ?? 'Today';
+    _selectedTime = cart.selectedPickupTime ?? 
+                    (_availableTodaySlots.isNotEmpty 
+                        ? _availableTodaySlots.first 
+                        : 'No slots available');
+    if (_selectedDay == 'Today' && !_availableTodaySlots.contains(_selectedTime)) {
+      _selectedTime = _availableTodaySlots.isNotEmpty 
+                      ? _availableTodaySlots.first 
+                      : 'No slots available';
+    }
   }
 
   void _generateTimeSlots() {
@@ -77,14 +82,17 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
     _availableTomorrowSlots =
         _allPickupHours.map((hour) => _formatHour(hour)).toList();
 
-    if (_availableTodaySlots.isEmpty) {
-      _selectedDay = 'Tomorrow';
-      _selectedTime = _availableTomorrowSlots.isNotEmpty
-          ? _availableTomorrowSlots.first
-          : 'No slots available';
-    } else {
-      _selectedDay = 'Today';
-      _selectedTime = _availableTodaySlots.first;
+    final cart = context.read<CartProvider>();
+    if (cart.selectedPickupTime == null || cart.selectedPickupTime == 'No slots available') {
+       if (_availableTodaySlots.isEmpty) {
+        _selectedDay = 'Tomorrow';
+        _selectedTime = _availableTomorrowSlots.isNotEmpty
+            ? _availableTomorrowSlots.first
+            : 'No slots available';
+      } else {
+        _selectedDay = 'Today';
+        _selectedTime = _availableTodaySlots.first;
+      }
     }
   }
 
@@ -101,57 +109,50 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cart = context.watch<CartProvider>();
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: CustomScrollView(
         slivers: [
           _buildSliverAppBar(context),
-          _buildStoreHeader(),
+          _buildStoreHeader(cart),
           if (widget.vendor.vendorType == 'Grocery')
             _buildCategoryGrid()
           else
             _buildSectionTitle('All Products'),
-          _buildSectionTitle('All Products'),
           _buildProductList(),
         ],
       ),
-      // --- NEW FLOATING CART BUTTON ---
       floatingActionButton: _buildFloatingCartButton(context),
-      // --- END NEW BUTTON ---
     );
   }
 
-  // --- NEW WIDGET FOR THE FLOATING CART BUTTON ---
   Widget _buildFloatingCartButton(BuildContext context) {
-    // Watch the cart provider for real-time changes
     final cart = context.watch<CartProvider>();
     final itemCount = cart.itemCount;
 
-    // Use AnimatedOpacity for a smooth show/hide transition
     return AnimatedOpacity(
-      opacity: itemCount > 0 ? 1.0 : 0.0, // Show only if items > 0
+      opacity: itemCount > 0 ? 1.0 : 0.0,
       duration: const Duration(milliseconds: 300),
       child: itemCount > 0
           ? FloatingActionButton(
               onPressed: () {
-                // Navigate to the CartPage
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const CartPage()),
                 );
               },
               backgroundColor:
-                  kPrimaryActionColor, // Use your app's theme color
+                  kPrimaryActionColor,
               child: Badge(
-                // Show the item count
                 label: Text(itemCount.toString()),
                 child: const Icon(Icons.shopping_cart, color: kTextColor),
               ),
             )
-          : null, // Render nothing if cart is empty
+          : null,
     );
   }
-  // --- END NEW WIDGET ---
 
   Widget _buildSliverAppBar(BuildContext context) {
     return SliverAppBar(
@@ -187,7 +188,11 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
     );
   }
 
-  Widget _buildStoreHeader() {
+  Widget _buildStoreHeader(CartProvider cart) {
+    final selectedOption = cart.selectedCheckoutType;
+    final bool canPickup = cart.itemCount == 0 ||
+        (cart.items.isNotEmpty && cart.itemsList.first.vendorId == widget.vendor.uid);
+
     return SliverList(
       delegate: SliverChildListDelegate(
         [
@@ -223,7 +228,9 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                     Text(widget.vendor.rating.toStringAsFixed(1),
                         style: kLabelTextStyle.copyWith(fontSize: 15)),
                     const SizedBox(width: 4),
-                    const Text("(100+)", style: kHintTextStyle),
+                    // --- ( ✨ FIXED: Replaced placeholder with real reviewCount ✨ ) ---
+                    Text("(${widget.vendor.reviewCount})", style: kHintTextStyle),
+                    // --- ( ✨ END FIX ✨ ) ---
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -233,9 +240,10 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                       child: _buildToggleButton(
                         'Delivery',
                         Icons.delivery_dining,
-                        _selectedOption == DeliveryOption.delivery,
-                        () => setState(
-                            () => _selectedOption = DeliveryOption.delivery),
+                        selectedOption == CheckoutType.delivery,
+                        () => context
+                            .read<CartProvider>()
+                            .setCheckoutOption(CheckoutType.delivery),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -243,14 +251,29 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                       child: _buildToggleButton(
                         'Pickup',
                         Icons.store,
-                        _selectedOption == DeliveryOption.pickup,
-                        () => setState(
-                            () => _selectedOption = DeliveryOption.pickup),
+                        selectedOption == CheckoutType.pickup,
+                        canPickup
+                            ? () => context.read<CartProvider>().setCheckoutOption(
+                                  CheckoutType.pickup,
+                                  day: _selectedDay,
+                                  time: _selectedTime,
+                                )
+                            : null,
                       ),
                     ),
                   ],
                 ),
-                if (_selectedOption == DeliveryOption.pickup)
+                if (!canPickup && cart.itemCount > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      'Pickup is only available for one store at a time. Your cart contains items from another store.',
+                      textAlign: TextAlign.center,
+                      style: kHintTextStyle.copyWith(color: Colors.red, fontSize: 12),
+                    ),
+                  ),
+                
+                if (selectedOption == CheckoutType.pickup)
                   _buildPickupTimeSelector(),
               ],
             ),
@@ -392,13 +415,15 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
   }
 
   Widget _buildToggleButton(
-      String text, IconData icon, bool isSelected, VoidCallback onTap) {
+      String text, IconData icon, bool isSelected, VoidCallback? onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? kYellowMedium : kCardColor,
+          color: isSelected
+              ? kYellowMedium
+              : (onTap == null ? Colors.grey.shade200 : kCardColor),
           borderRadius: BorderRadius.circular(10),
           border: isSelected ? null : Border.all(color: Colors.grey.shade300),
           boxShadow: isSelected
@@ -413,13 +438,22 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: isSelected ? kTextColor : Colors.grey.shade600),
+            Icon(icon,
+                color: isSelected
+                    ? kTextColor
+                    : (onTap == null
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600)),
             const SizedBox(width: 8),
             Text(
               text,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: isSelected ? kTextColor : Colors.grey.shade600,
+                color: isSelected
+                    ? kTextColor
+                    : (onTap == null
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600),
               ),
             ),
           ],
@@ -475,7 +509,11 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
               final doc = snapshot.data!.docs[index];
               final product =
                   Product.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-              return _buildProductCard(product);
+              
+              // --- ( ✨ MODIFICATION ✨ ) ---
+              // We pass context to read the cart provider
+              return _buildProductCard(context, product);
+              // --- ( ✨ END MODIFICATION ✨ ) ---
             },
             childCount: snapshot.data!.docs.length,
           ),
@@ -484,122 +522,216 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
     );
   }
 
-  Widget _buildProductCard(Product product) {
-    return InkWell(
-      // --- NEW: Wrap in InkWell to go to detail page ---
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProductDetailPage(
-              product: product,
-              vendor: widget.vendor, // Pass the vendor
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: kCardColor,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black12,
-                blurRadius: 3,
-                offset: const Offset(0, 1))
-          ],
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                product.imageUrl,
-                width: 70,
-                height: 70,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  width: 70,
-                  height: 70,
-                  color: Colors.grey.shade200,
-                  child:
-                      const Icon(Icons.image_not_supported, color: Colors.grey),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(product.title,
-                      style: kLabelTextStyle.copyWith(fontSize: 16)),
-                  const SizedBox(height: 4),
-                  Text(product.description,
-                      style: kHintTextStyle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text(
-                        'RM${product.discountedPrice.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: kPrimaryActionColor),
-                      ),
-                      const SizedBox(width: 8),
-                      if (product.originalPrice > product.discountedPrice)
-                        Text(
-                          'RM${product.originalPrice.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey,
-                            decoration: TextDecoration.lineThrough,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            // --- MODIFIED: Add to Cart Button ---
-            IconButton(
-              icon: const Icon(Icons.add_circle_outline,
-                  color: kPrimaryActionColor, size: 30),
-              onPressed: () {
-                // Get the cart provider (don't listen, just read)
-                final cart = context.read<CartProvider>();
-                // Add 1 of this product
-                cart.addItem(product, widget.vendor, 1);
+  // --- ( ✨ MODIFICATION: Added context and cart checks ✨ ) ---
+  Widget _buildProductCard(BuildContext context, Product product) {
+    // Get the cart provider to check item quantities
+    final cart = context.watch<CartProvider>();
 
-                // Show a confirmation snackbar
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${product.title} added to cart!'),
-                    backgroundColor: kPrimaryActionColor,
-                    duration: const Duration(seconds: 2),
+    // Check stock levels
+    final bool isOutOfStock = product.quantity <= 0;
+    final int cartQuantity = cart.getQuantityInCart(product.id!);
+    final bool canAddMore = (cartQuantity + 1) <= product.quantity;
+
+    return Opacity(
+      opacity: isOutOfStock ? 0.5 : 1.0, // Make item transparent if out of stock
+      child: InkWell(
+        onTap: isOutOfStock
+            ? null // Disable tap if out of stock
+            : () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ProductDetailPage(
+                      product: product,
+                      vendor: widget.vendor,
+                    ),
                   ),
                 );
               },
-            ),
-            // --- END MODIFICATION ---
-          ],
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: kCardColor,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 3,
+                  offset: const Offset(0, 1))
+            ],
+          ),
+          child: Stack(
+            children: [
+              Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      product.imageUrl,
+                      width: 70,
+                      height: 70,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: 70,
+                        height: 70,
+                        color: Colors.grey.shade200,
+                        child:
+                            const Icon(Icons.image_not_supported, color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(product.title,
+                            style: kLabelTextStyle.copyWith(fontSize: 16)),
+                        const SizedBox(height: 4),
+                        Text(product.description,
+                            style: kHintTextStyle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Text(
+                              'RM${product.discountedPrice.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: kPrimaryActionColor),
+                            ),
+                            const SizedBox(width: 8),
+                            if (product.originalPrice > product.discountedPrice)
+                              Text(
+                                'RM${product.originalPrice.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                          ],
+                        ),
+                        // --- ( ✨ NEW: Show Stock ✨ ) ---
+                        const SizedBox(height: 4),
+                        Text(
+                          isOutOfStock
+                              ? 'Out of Stock'
+                              : 'Stock: ${product.quantity}',
+                          style: kHintTextStyle.copyWith(
+                            fontSize: 13,
+                            color: product.quantity < 5 && !isOutOfStock
+                                ? Colors.red
+                                : Colors.grey,
+                            fontWeight: isOutOfStock ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        // --- ( ✨ END NEW ✨ ) ---
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.add_circle_outline,
+                        color: isOutOfStock ? Colors.grey : kPrimaryActionColor, // Disable color
+                        size: 30),
+                    onPressed: isOutOfStock
+                        ? null // Disable button if out of stock
+                        : () {
+                            // Read cart provider for action
+                            final cart = context.read<CartProvider>();
+                            
+                            // 1. Check if user is mixing stores
+                            final bool canAdd = cart.itemCount == 0 ||
+                                (cart.items.isNotEmpty && cart.itemsList.first.vendorId == widget.vendor.uid);
+                            
+                            if (!canAdd) {
+                               ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text('You can only order from one store at a time.'),
+                                  backgroundColor: Colors.red,
+                                  duration: const Duration(seconds: 3),
+                                ),
+                              );
+                              return;
+                            }
+
+                            // 2. Check if stock is available
+                            if (!canAddMore) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                      'No more stock available for ${product.title}. You have $cartQuantity in cart.'),
+                                  backgroundColor: Colors.red,
+                                  duration: const Duration(seconds: 3),
+                                ),
+                              );
+                              return;
+                            }
+
+                            // 3. Add item
+                            cart.addItem(product, widget.vendor, 1);
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('${product.title} added to cart!'),
+                                backgroundColor: kPrimaryActionColor,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                  ),
+                ],
+              ),
+              // --- ( ✨ NEW: Out of Stock Overlay ✨ ) ---
+              if (isOutOfStock)
+                Positioned.fill(
+                  child: Container(
+                    alignment: Alignment.centerLeft,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.white.withOpacity(0.5), // Semi-transparent overlay
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade700,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      margin: const EdgeInsets.only(left: 80), // Align with text
+                      child: const Text(
+                        'OUT OF STOCK',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              // --- ( ✨ END NEW ✨ ) ---
+            ],
+          ),
         ),
       ),
     );
   }
+  // --- ( ✨ END MODIFICATION ✨ ) ---
 
   void _showTimeSlotModal(BuildContext context) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) {
-        String localDay = _selectedDay;
-        String localTime = _selectedTime;
+      builder: (modalContext) {
+        final cart = modalContext.read<CartProvider>();
+        
+        String localDay = cart.selectedPickupDay ?? _selectedDay;
+        String localTime = cart.selectedPickupTime ?? _selectedTime;
+        
         List<String> currentSlots = (localDay == 'Today')
             ? _availableTodaySlots
             : _availableTomorrowSlots;
@@ -706,6 +838,11 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                                 _selectedDay = localDay;
                                 _selectedTime = localTime;
                               });
+                              cart.setCheckoutOption(
+                                CheckoutType.pickup,
+                                day: localDay,
+                                time: localTime,
+                              );
                               Navigator.pop(context);
                             },
                       style: ElevatedButton.styleFrom(

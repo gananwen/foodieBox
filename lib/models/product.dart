@@ -7,8 +7,6 @@ class Product {
   final String productType;
   final String category;
   final String subCategory;
-  // --- END NEW FIELDS ---
-
   final String expiryDate;
   final double originalPrice;
   final double discountedPrice;
@@ -66,7 +64,7 @@ class Product {
       originalPrice: (map['originalPrice'] ?? 0.0).toDouble(),
       discountedPrice: (map['discountedPrice'] ?? 0.0).toDouble(),
       imageUrl: map['imageUrl'] ?? '',
-      quantity: map['quantity'] ?? 1,
+      quantity: map['quantity'] ?? 0, // Default to 0 if null
       isHalal: map['isHalal'] ?? false,
       isVegan: map['isVegan'] ?? false,
       isNoPork: map['isNoPork'] ?? false,

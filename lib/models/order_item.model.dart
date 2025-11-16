@@ -1,3 +1,4 @@
+// 路径: lib/models/order_item.model.dart
 class OrderItem {
   final String name;
   final double price;

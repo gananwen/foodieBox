@@ -7,10 +7,17 @@ import 'analytics_page.dart';
 import '../../models/promotion.dart';
 import '../../repositories/promotion_repository.dart';
 import 'edit_promotion_page.dart';
+import '../../repositories/vendor_data_repository.dart';
 
 class MarketingPage extends StatefulWidget {
   final VoidCallback onBackToDashboard;
-  const MarketingPage({super.key, required this.onBackToDashboard});
+  final VendorDataBundle bundle;
+  const MarketingPage({
+    super.key,
+    required this.onBackToDashboard,
+    required this.bundle, // <-- ( ✨ 2. ADD THIS )
+  });
+
   @override
   State<MarketingPage> createState() => _MarketingPageState();
 }
@@ -329,7 +336,10 @@ class _MarketingPageState extends State<MarketingPage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const AddPromotionPage(),
+              builder: (context) => AddPromotionPage(
+                vendorType:
+                    widget.bundle.vendor.vendorType, // <-- ( ✨ 3. ADD THIS )
+              ),
             ),
           );
         },

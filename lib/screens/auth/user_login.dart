@@ -69,6 +69,7 @@ class _LoginPageState extends State<LoginPage>
             code: 'user-not-found', message: "No user found");
       }
 
+      if (!mounted) return; // Check if the widget is still in the tree
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text("Login successful")));
 
@@ -89,7 +90,9 @@ class _LoginPageState extends State<LoginPage>
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) { // Check if the widget is still in the tree
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -97,6 +100,7 @@ class _LoginPageState extends State<LoginPage>
     setState(() => _isLoading = true);
     try {
       final user = await _authRepo.signInWithGoogle();
+      if (!mounted) return; // Check if the widget is still in the tree
       if (user != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Google Sign-In successful")),
@@ -111,11 +115,15 @@ class _LoginPageState extends State<LoginPage>
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Google Sign-In failed: $e")),
-      );
+      if (mounted) { // Check if the widget is still in the tree
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Google Sign-In failed: $e")),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) { // Check if the widget is still in the tree
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -193,24 +201,53 @@ class _LoginPageState extends State<LoginPage>
               const SizedBox(height: 20),
               const Divider(color: kTextColor),
               const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  GestureDetector(
-                    onTap: _signInWithGoogle,
-                    child: const _SocialIcon(
-                      icon: Icons.g_mobiledata_outlined,
-                      label: 'G',
-                      size: 30,
-                    ),
+              
+              // --- ( ✨ START OF GOOGLE BUTTON FIX ✨ ) ---
+              // Replaced ElevatedButton.icon with a normal ElevatedButton
+              // and a manual 'Row' to prevent overflow.
+              ElevatedButton(
+                onPressed: _isLoading ? null : _signInWithGoogle,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black87,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                    side: BorderSide(color: Colors.grey.shade300),
                   ),
-                  const SizedBox(width: 40),
-                  const _SocialIcon(icon: Icons.facebook, label: 'f', size: 24),
-                ],
+                  elevation: 2,
+                  shadowColor: Colors.grey.withOpacity(0.2),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset(
+                      'assets/images/google_logo.png', // <-- This still needs the pubspec.yaml fix
+                      height: 22.0, // Slightly smaller to be safe
+                      width: 22.0,
+                    ),
+                    const SizedBox(width: 12), // Add spacing
+                    // Use Flexible to prevent the text from overflowing
+                    Flexible(
+                      child: Text(
+                        'Sign in with Google',
+                        style: TextStyle(
+                          color: Colors.black87, 
+                          fontSize: 15, // Slightly smaller font
+                        ),
+                        overflow: TextOverflow.ellipsis, // Add overflow protection
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              // --- ( ✨ END OF GOOGLE BUTTON FIX ✨ ) ---
+              
               const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              // --- ( This is the 'Wrap' fix you already have, which is correct ) ---
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: <Widget>[
                   const Text("Don't have an account? ",
                       style: TextStyle(color: kTextColor)),
@@ -226,6 +263,7 @@ class _LoginPageState extends State<LoginPage>
                   ),
                 ],
               ),
+              // --- ( END OF FIX ) ---
               const SizedBox(height: 40),
             ],
           ),
@@ -295,38 +333,4 @@ class _CustomInputField extends StatelessWidget {
   }
 }
 
-class _SocialIcon extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final double size;
-
-  const _SocialIcon({
-    required this.icon,
-    required this.label,
-    required this.size,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 50,
-      height: 50,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: kTextColor, width: 1.5),
-      ),
-      child: Center(
-        child: label == 'G'
-            ? Text(
-                label,
-                style: TextStyle(
-                  fontSize: size,
-                  fontWeight: FontWeight.bold,
-                  color: kTextColor,
-                ),
-              )
-            : Icon(icon, size: size, color: kTextColor),
-      ),
-    );
-  }
-}
+// --- ( ✨ _SocialIcon class removed as it's no longer used ✨ ) ---

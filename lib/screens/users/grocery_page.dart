@@ -4,111 +4,164 @@ import 'package:foodiebox/models/vendor.dart';
 import 'package:foodiebox/util/styles.dart';
 import '../../widgets/base_page.dart';
 import 'store_detail_page.dart';
+// --- IMPORT ADDED ---
+import 'package:foodiebox/models/promotion.dart';
 
 class GroceryPage extends StatelessWidget {
   const GroceryPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    
+    // --- NEW: Promotions Stream ---
+    final allPromotionsStream = FirebaseFirestore.instance
+        .collectionGroup('promotions')
+        .where('endDate', isGreaterThan: Timestamp.now())
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => 
+            PromotionModel.fromMap(doc.data() as Map<String, dynamic>, doc.id)
+          ).toList()
+        );
+    // --- END NEW ---
+    
     return BasePage(
       currentIndex: 2, // Grocery tab index
-      child: Column(
-        children: [
-          const SizedBox(height: 50), // Added padding for the top
-          // --- Top Section (No changes) ---
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'Grocery Stores Near You',
-              style: TextStyle(
-                  fontSize: 22, fontWeight: FontWeight.bold, color: kTextColor),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search stores or categories',
-                      hintStyle: kHintTextStyle,
-                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                      filled: true,
-                      fillColor: kCardColor, // Use style color
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
+      // --- NEW: Wrap with StreamBuilder for promotions ---
+      child: StreamBuilder<List<PromotionModel>>(
+        stream: allPromotionsStream,
+        builder: (context, promotionSnapshot) {
+
+          // Handle loading/error for promotions
+          if (promotionSnapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: kPrimaryActionColor));
+          }
+          if (promotionSnapshot.hasError) {
+              print("Error loading promotions: ${promotionSnapshot.error}");
+               // --- ( ✨ NEW: Show error if index is needed ✨ ) ---
+              String errorMsg = "Error loading promotions";
+              if (promotionSnapshot.error.toString().contains('FAILED_PRECONDITION')) {
+                errorMsg = "Firebase index required. Please check logs.";
+              }
+              return Center(child: Text(errorMsg));
+          }
+          
+          final allPromotions = promotionSnapshot.data ?? [];
+
+          return Column(
+            children: [
+              const SizedBox(height: 50), // Added padding for the top
+              // --- Top Section (No changes) ---
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  'Grocery Stores Near You',
+                  style: TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.bold, color: kTextColor),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Search stores or categories',
+                          hintStyle: kHintTextStyle,
+                          prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                          filled: true,
+                          fillColor: kCardColor, // Use style color
+                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        // TODO: Add filter logic
+                      },
+                      icon: const Icon(Icons.filter_alt_outlined, size: 20),
+                      label: const Text('Expiry'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red[100],
+                        foregroundColor: Colors.red[800],
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12), // Adjusted padding
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    // TODO: Add filter logic
+              ),
+              const SizedBox(height: 20),
+
+              // --- Store Cards from Firebase ---
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('vendors')
+                      .where('vendorType', isEqualTo: 'Grocery')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                          child: CircularProgressIndicator(
+                              color: kPrimaryActionColor));
+                    }
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    }
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return const Center(
+                          child: Text('No grocery stores found.',
+                              style: kHintTextStyle));
+                    }
+
+                    return ListView(
+                      padding: const EdgeInsets.only(bottom: 80),
+                      children: snapshot.data!.docs.map((doc) {
+                        VendorModel vendor =
+                            VendorModel.fromMap(doc.data() as Map<String, dynamic>);
+
+                        // --- PASS PROMOTIONS TO CARD ---
+                        return _buildStoreCard(context, vendor, allPromotions);
+                      }).toList(),
+                    );
                   },
-                  icon: const Icon(Icons.filter_alt_outlined, size: 20),
-                  label: const Text('Expiry'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red[100],
-                    foregroundColor: Colors.red[800],
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 12), // Adjusted padding
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    elevation: 0,
-                  ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // --- Store Cards from Firebase ---
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('vendors')
-                  .where('vendorType', isEqualTo: 'Grocery')
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                      child: CircularProgressIndicator(
-                          color: kPrimaryActionColor));
-                }
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(
-                      child: Text('No grocery stores found.',
-                          style: kHintTextStyle));
-                }
-
-                return ListView(
-                  padding: const EdgeInsets.only(bottom: 80),
-                  children: snapshot.data!.docs.map((doc) {
-                    VendorModel vendor =
-                        VendorModel.fromMap(doc.data() as Map<String, dynamic>);
-
-                    // Use your new card UI
-                    return _buildStoreCard(context, vendor);
-                  }).toList(),
-                );
-              },
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        }
       ),
     );
   }
 
-  // --- MODIFIED WIDGET: This card now has the BIG BANNER IMAGE at the top ---
-  Widget _buildStoreCard(BuildContext context, VendorModel vendor) {
+  // --- MODIFIED WIDGET: Now accepts promotions list ---
+  Widget _buildStoreCard(
+    BuildContext context, 
+    VendorModel vendor,
+    List<PromotionModel> allPromotions, // <-- NEW PARAMETER
+  ) {
+
+    // --- NEW: Find best discount ---
+    int? bestDiscount;
+    final vendorPromotions = allPromotions.where((p) => p.vendorId == vendor.uid).toList();
+    if (vendorPromotions.isNotEmpty) {
+      bestDiscount = vendorPromotions.fold(0, (max, promo) => 
+        promo.discountPercentage > max! ? promo.discountPercentage : max
+      );
+      if (bestDiscount == 0) bestDiscount = null;
+    }
+    // --- END NEW ---
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -175,6 +228,8 @@ class GroceryPage extends StatelessWidget {
                   Text(
                     vendor.storeAddress, // From Firebase
                     style: kHintTextStyle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -185,6 +240,13 @@ class GroceryPage extends StatelessWidget {
                         vendor.rating.toStringAsFixed(1),
                         style: kLabelTextStyle.copyWith(fontSize: 14),
                       ), // From Firebase
+                      const SizedBox(width: 4),
+                       // --- ( ✨ FIXED: Replaced placeholder with real reviewCount ✨ ) ---
+                       Text(
+                        '(${vendor.reviewCount})',
+                        style: kHintTextStyle.copyWith(fontSize: 14),
+                      ),
+                      // --- ( ✨ END FIX ✨ ) ---
                       const SizedBox(width: 12),
                       Text(
                         vendor.vendorType, // From Firebase
@@ -194,12 +256,34 @@ class GroceryPage extends StatelessWidget {
                       const Icon(Icons.location_on,
                           size: 18, color: Colors.grey),
                       const SizedBox(width: 4),
-                      const Text('5.0 km',
-                          style: kHintTextStyle), // Placeholder for distance
+                       // --- ( ✨ FIXED: Removed placeholder distance ✨ ) ---
+                      // const Text('5.0 km',
+                      //     style: kHintTextStyle), 
+                      // --- ( ✨ END FIX ✨ ) ---
                     ],
                   ),
 
-                  // --- Expiry Deals Tag ---
+                  // --- NEW: Promotion Tag ---
+                  if (bestDiscount != null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade100,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '$bestDiscount% OFF', // <-- REAL DATA
+                        style: TextStyle(
+                            color: Colors.green.shade800,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14),
+                      ),
+                    ),
+                  ],
+
+                  // --- Expiry Deals Tag (Kept this as well) ---
                   if (vendor.hasExpiryDeals) ...[
                     const SizedBox(height: 8),
                     Container(

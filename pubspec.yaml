@@ -28,9 +28,9 @@ dependencies:
   
 
   # --- Location, Maps, and Geocoding ---
-  google_maps_flutter: ^2.5.0
+  google_maps_flutter: ^2.14.0
   geocoding: ^4.0.0
-  geolocator: ^10.1.0
+  geolocator: ^14.0.2
   google_places_flutter: ^2.0.6
 
   # --- Predictive Search UI ---
@@ -41,7 +41,7 @@ dependencies:
   firebase_auth: ^5.7.0
   cloud_firestore: ^5.6.12
   firebase_storage: ^12.4.10
-  google_sign_in: ^6.2.1
+  google_sign_in: ^6.3.0
   provider: ^6.1.2
   flutter_animate: ^4.5.2
   shared_preferences: ^2.5.3
@@ -49,17 +49,19 @@ dependencies:
   google_place: ^0.4.7
   confetti: ^0.8.0
   flutter_rating_bar: ^4.0.1
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true
 
   assets:
     - assets/images/
+    
 
 
 # --- App Icon Configuration ---

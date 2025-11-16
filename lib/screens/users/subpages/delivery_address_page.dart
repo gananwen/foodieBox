@@ -5,6 +5,10 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../users/map_page.dart';
 import 'package:foodiebox/util/styles.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../../../api/api_config.dart';
+
 
 class DeliveryAddressPage extends StatefulWidget {
   const DeliveryAddressPage({super.key});
@@ -28,16 +32,17 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
 
   GoogleMapController? _mapController;
 
-  // State for conceptual autocomplete results (would be filled by an API)
-  List<String> _autocompleteSuggestions = [];
+  // State for autocomplete results from Google API
+  List<dynamic> _autocompleteSuggestions = []; // Will be List<dynamic> from Google
 
-  // Default camera position
-  static const LatLng _initialCameraPosition = LatLng(3.1390, 101.6869);
+  // --- ( ✨ UPDATED: Default camera position to New York ✨ ) ---
+  static const LatLng _initialCameraPosition = LatLng(40.7128, -74.0060); // New York City
+  // --- ( ✨ END UPDATE ✨ ) ---
 
   @override
   void initState() {
     super.initState();
-    // Listen to changes for potential autocomplete trigger
+    // Listen to changes for autocomplete trigger
     _addressController.addListener(_onAddressChanged);
   }
 
@@ -48,42 +53,80 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     _nameController.dispose();
     _phoneController.dispose();
     _detailsController.dispose();
+    _mapController?.dispose();
     super.dispose();
   }
 
-  // --- Autocomplete/Suggestion Stub ---
-  void _onAddressChanged() {
-    // ... (this logic remains the same) ...
-    final input = _addressController.text;
-    if (input.length > 2) {
-      setState(() {
-        _autocompleteSuggestions = [
-          '${input}th Street, New York',
-          '${input}0 Jalan Raja, Kuala Lumpur',
-          '${input} A venue, Singapore',
-        ]
-            .where((s) => s.toLowerCase().startsWith(input.toLowerCase()))
-            .toList();
-      });
-    } else {
-      setState(() {
-        _autocompleteSuggestions = [];
-      });
+
+  void _onAddressChanged() async {
+    final input = _addressController.text.trim();
+
+    if (input.isEmpty) {
+    // --- ( ✨ END OF FIX ✨ ) ---
+      setState(() => _autocompleteSuggestions = []);
+      return;
+    }
+
+    final url =
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$input&key=${ApiConfig.googleMapsApiKey}&components=country:us';
+    
+    try {
+      final response = await http.get(Uri.parse(url));
+      final data = json.decode(response.body);
+
+      if (data['status'] == 'OK') {
+        setState(() => _autocompleteSuggestions = data['predictions']);
+      } else {
+        setState(() => _autocompleteSuggestions = []);
+      }
+    } catch (e) {
+      print("Error fetching autocomplete: $e");
+      setState(() => _autocompleteSuggestions = []);
     }
   }
 
-  void _selectSuggestion(String suggestion) {
-    // ... (this logic remains the same) ...
-    _addressController.text = suggestion;
+  // --- ( ✨ UPDATED: Fetch Place Details on suggestion tap ✨ ) ---
+  void _selectSuggestion(String placeId, String description) async {
+    // Set text immediately and hide suggestions
+    _addressController.text = description;
     setState(() {
       _autocompleteSuggestions = []; // Hide suggestions
     });
-    _geocodeAddress();
+
+    // Call Google Places Details API to get coordinates
+    final url =
+        'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=${ApiConfig.googleMapsApiKey}';
+    
+    try {
+      final response = await http.get(Uri.parse(url));
+      final data = json.decode(response.body);
+
+      if (data['status'] == 'OK' && data['result'] != null) {
+        final loc = data['result']['geometry']['location'];
+        final newLat = (loc['lat'] as num?)?.toDouble();
+        final newLng = (loc['lng'] as num?)?.toDouble();
+
+        if (newLat != null && newLng != null) {
+          setState(() {
+            lat = newLat;
+            lng = newLng;
+          });
+
+          // Animate map to the new location
+          _mapController?.animateCamera(
+            CameraUpdate.newLatLngZoom(LatLng(newLat, newLng), 16),
+          );
+        }
+      }
+    } catch (e) {
+      print("Error fetching place details: $e");
+    }
   }
+  // --- ( ✨ END UPDATES ✨ ) ---
+
 
   // --- Geocoding (Manual Input) ---
   Future<void> _geocodeAddress() async {
-    // ... (this logic remains the same) ...
         final address = _addressController.text.trim();
     if (address.isEmpty) return;
 
@@ -132,10 +175,9 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
 
   // --- Map Picker (Visual Selection) ---
   Future<void> _openMapPicker() async {
-    // ... (this logic remains the same) ...
         final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const MapPage()),
+      MaterialPageRoute(builder: (context) => const MapPage()), // MapPage now defaults to US
     );
 
     if (result != null && result is Map<String, dynamic>) {
@@ -159,10 +201,16 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     }
   }
 
-  // --- Save/Edit/Delete/Reset methods (Unchanged from previous revision) ---
+  // --- Save/Edit/Delete/Reset methods (Unchanged) ---
   Future<void> _saveAddress() async {
-    // ... (this logic remains the same) ...
-        final userId = FirebaseAuth.instance.currentUser!.uid;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+       ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: Not logged in.')),
+      );
+      return;
+    }
+    final userId = user.uid;
     final address = _addressController.text.trim();
     final name = _nameController.text.trim();
     final phone = _phoneController.text.trim();
@@ -223,7 +271,6 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   }
 
   void _startEditing(String docId, Map<String, dynamic> data) {
-    // ... (this logic remains the same) ...
         setState(() {
       editingId = docId;
       _addressController.text = data['address'] ?? '';
@@ -244,7 +291,6 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   }
 
   void _resetForm() {
-    // ... (this logic remains the same) ...
         setState(() {
       editingId = null;
       _addressController.clear();
@@ -262,8 +308,9 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   }
 
   Future<void> _deleteAddress(String docId) async {
-    // ... (this logic remains the same) ...
-        final userId = FirebaseAuth.instance.currentUser!.uid;
+    final user = FirebaseAuth.instance.currentUser;
+     if (user == null) return;
+    final userId = user.uid;
     await FirebaseFirestore.instance
         .collection('users')
         .doc(userId)
@@ -274,15 +321,10 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         .showSnackBar(const SnackBar(content: Text('Address deleted')));
   }
 
-  // --- REMOVED ---
-  // void _goToCheckout() { ... }
-  // --- END REMOVED ---
-
   // --- UI Helper Functions ---
 
   InputDecoration _inputDecoration(String labelText,
       {String? hintText, Widget? suffixIcon}) {
-    // ... (this logic remains the same) ...
     return InputDecoration(
       labelText: labelText,
       hintText: hintText,
@@ -335,7 +377,6 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
             style: TextStyle(color: Colors.black)),
         centerTitle: true,
       ),
-      // --- REMOVED FloatingActionButton ---
       body: Column(
         children: [
           // --- Map Preview (Always showing) ---
@@ -358,7 +399,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                   onMapCreated: (controller) => _mapController = controller,
                   zoomControlsEnabled: false,
                   myLocationButtonEnabled: false,
-                  liteModeEnabled: false,
+                  liteModeEnabled: false, // Must be false for map to be interactive
                 ),
               ),
             ),
@@ -399,7 +440,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                       onSubmitted: (_) => _geocodeAddress(),
                       decoration: _inputDecoration(
                         'Type your address',
-                        hintText: 'e.g. 16 Jalan Merah, Taman XYZ',
+                        hintText: 'e.g. 1600 Amphitheatre Pkwy, Mountain View', // ( ✨ US Example ✨ )
                         suffixIcon: IconButton(
                           icon: const Icon(Icons.search, color: Colors.amber),
                           onPressed: _geocodeAddress,
@@ -455,7 +496,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
                       decoration: _inputDecoration('Phone Number',
-                          hintText: 'e.g. 0123456789'),
+                          hintText: 'e.g. (555) 123-4567'), // ( ✨ US Example ✨ )
                     ),
                     const SizedBox(height: 10),
 
@@ -463,7 +504,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                     TextField(
                       controller: _detailsController,
                       decoration: _inputDecoration('Address Details (Optional)',
-                          hintText: 'e.g. Level 3, Unit B-12'),
+                          hintText: 'e.g. Apt 3B, Floor 12'), // ( ✨ US Example ✨ )
                       maxLines: 2,
                     ),
                     const SizedBox(height: 20),
@@ -508,12 +549,14 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                           .orderBy('timestamp', descending: true)
                           .snapshots(),
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting)
+                        if (snapshot.connectionState == ConnectionState.waiting) {
                           return const Center(
                               child: CircularProgressIndicator());
-                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+                        }
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                           return const Center(
                               child: Text('No addresses saved yet.'));
+                        }
 
                         final docs = snapshot.data!.docs;
                         return Column(
@@ -572,39 +615,50 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                         );
                       },
                     ),
+                    const SizedBox(height: 20), // Added padding at the bottom
                   ],
                 ),
 
                 // --- Autocomplete Suggestions Overlay ---
                 if (_autocompleteSuggestions.isNotEmpty)
                   Positioned(
-                    top: 130, // Adjust position based on your layout
-                    left: 20,
-                    right: 20,
-                    child: Material(
-                      elevation: 4,
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        // ... (autocomplete UI remains the same) ...
-                         decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.amber.shade100)),
-                        constraints: const BoxConstraints(maxHeight: 200),
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          padding: EdgeInsets.zero,
-                          itemCount: _autocompleteSuggestions.length,
-                          itemBuilder: (context, index) {
-                            final suggestion = _autocompleteSuggestions[index];
-                            return ListTile(
-                              leading: const Icon(Icons.location_on,
-                                  color: Colors.grey, size: 20),
-                              title: Text(suggestion,
-                                  style: const TextStyle(fontSize: 14)),
-                              onTap: () => _selectSuggestion(suggestion),
-                            );
-                          },
+                    // --- ( ✨ POSITIONING FIX: Align with the TextField ✨ ) ---
+                    // This positions the suggestions right below the text field.
+                    top: 130, 
+                    left: 0,
+                    right: 0,
+                    // --- ( ✨ END FIX ✨ ) ---
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0), // Match ListView padding
+                      child: Material(
+                        elevation: 4,
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                           decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.amber.shade100)),
+                          constraints: const BoxConstraints(maxHeight: 200),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            padding: EdgeInsets.zero,
+                            itemCount: _autocompleteSuggestions.length,
+                            itemBuilder: (context, index) {
+                              // --- ( ✨ UPDATED: Use Google API response ✨ ) ---
+                              final suggestion = _autocompleteSuggestions[index];
+                              return ListTile(
+                                leading: const Icon(Icons.location_on,
+                                    color: Colors.grey, size: 20),
+                                title: Text(suggestion['description'], // Use 'description'
+                                    style: const TextStyle(fontSize: 14)),
+                                onTap: () => _selectSuggestion(
+                                    suggestion['place_id'], // Pass 'place_id'
+                                    suggestion['description']
+                                ),
+                              );
+                              // --- ( ✨ END UPDATE ✨ ) ---
+                            },
+                          ),
                         ),
                       ),
                     ),

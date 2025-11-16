@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
-// --- MODIFIED IMPORT ---
-// We will import the CartPage instead of the CheckoutPage
 import 'package:foodiebox/screens/users/cart_page.dart';
-import 'package:foodiebox/screens/users/main_page.dart'; // To go back home
-// --- END MODIFIED IMPORT ---
+import 'package:foodiebox/screens/users/main_page.dart';
+import 'package:foodiebox/util/styles.dart';
 
 class OrderFailurePage extends StatelessWidget {
-  const OrderFailurePage({super.key});
+  final String? rejectionReason;
+
+  const OrderFailurePage({super.key, this.rejectionReason});
 
   @override
   Widget build(BuildContext context) {
+    // Determine the title and subtitle based on whether a reason is provided
+    final String title = rejectionReason != null 
+        ? 'Payment Rejected' 
+        : 'Oops! Order Failed';
+    
+    final String subtitle = rejectionReason ?? 'Something went terribly wrong.';
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -19,7 +26,7 @@ class OrderFailurePage extends StatelessWidget {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Order Failed', style: TextStyle(color: Colors.black)),
+        title: Text(title, style: const TextStyle(color: Colors.black)),
         centerTitle: true,
       ),
       body: Padding(
@@ -29,15 +36,15 @@ class OrderFailurePage extends StatelessWidget {
           children: [
             const Icon(Icons.cancel, color: Colors.red, size: 80),
             const SizedBox(height: 10),
-            const Text(
-              'Oops! Order Failed',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Text(
+              title,
+              style: kLabelTextStyle.copyWith(fontSize: 18),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Something went terribly wrong.',
+            Text(
+              subtitle,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14),
+              style: kHintTextStyle.copyWith(fontSize: 14),
             ),
             const SizedBox(height: 40),
             Row(
@@ -45,18 +52,16 @@ class OrderFailurePage extends StatelessWidget {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
-                      // --- MODIFIED NAVIGATION ---
                       // Go back to the Cart Page to try again
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
                             builder: (context) => const CartPage()),
                       );
-                      // --- END MODIFIED NAVIGATION ---
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber,
-                      foregroundColor: Colors.black,
+                      backgroundColor: kYellowMedium,
+                      foregroundColor: kTextColor,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -79,7 +84,7 @@ class OrderFailurePage extends StatelessWidget {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey.shade300,
-                      foregroundColor: Colors.black,
+                      foregroundColor: kTextColor,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
