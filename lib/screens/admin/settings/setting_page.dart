@@ -379,38 +379,6 @@ class _SettingsAppState extends State<SettingsApp> {
               ),
 
               const SizedBox(height: 24),
-              // --- Logout Button ---
-              SizedBox(
-                width: double.infinity,
-                child: TextButton.icon(
-                  onPressed: () async {
-                    await _auth.signOut();
-                    if (!context.mounted) return;
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) =>
-                              const AdminHomePage()), // Navigate to home or login after logout
-                      (route) => false,
-                    );
-                  },
-                  icon: const Icon(Icons.logout, color: Colors.red),
-                  label: const Text('Log Out',
-                      style: TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16)),
-                  style: TextButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.grey.shade300)),
-                    elevation: 1,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 40),
             ],
           ),
         ),

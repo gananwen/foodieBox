@@ -54,22 +54,23 @@ class _ReportPageState extends State<ReportPage> {
   // ------------------------------------------------------------
   Future<void> _fetchAnalytics() async {
     try {
-      DateTime now = DateTime.now();
-      // Ensure calculation for start of week is correct (Monday is 1, Sunday is 7)
-      DateTime startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-      DateTime endOfWeek = startOfWeek
-          .add(const Duration(days: 6))
-          .copyWith(hour: 23, minute: 59, second: 59); // End of Sunday
+      // --------------------------
+      // 1️⃣ Users Collection
+      // --------------------------
+      final usersSnapshot =
+          await FirebaseFirestore.instance.collection('users').get();
+      _totalUsers = usersSnapshot.docs.length;
 
-      // Fetch orders for this week
-      final ordersSnapshot = await FirebaseFirestore.instance
-          .collection('orders')
-          .where('timestamp',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
-          .where('timestamp',
-              isLessThanOrEqualTo: Timestamp.fromDate(endOfWeek))
-          .get();
+      // --------------------------
+      // 2️⃣ Orders Collection
+      // --------------------------
+      final ordersSnapshot =
+          await FirebaseFirestore.instance.collection('orders').get();
 
+      int totalOrderCount = ordersSnapshot.docs.length;
+      double totalRevenue = 0;
+
+      // Daily breakdown (optional, if you still want charts)
       Map<String, double> dailyRevenue = {
         "Mon": 0,
         "Tue": 0,
@@ -79,7 +80,6 @@ class _ReportPageState extends State<ReportPage> {
         "Sat": 0,
         "Sun": 0,
       };
-
       Map<String, int> dailyOrders = {
         "Mon": 0,
         "Tue": 0,
@@ -90,47 +90,43 @@ class _ReportPageState extends State<ReportPage> {
         "Sun": 0,
       };
 
-      Set<String> userIds = {};
-
       for (var doc in ordersSnapshot.docs) {
         final data = doc.data();
-        if (data['userId'] != null) userIds.add(data['userId']);
+        double total =
+            (data['total'] is num) ? (data['total'] as num).toDouble() : 0;
+        totalRevenue += total;
 
+        // Daily breakdown by timestamp if exists
         final ts = data['timestamp'];
         if (ts is Timestamp) {
           final date = ts.toDate();
           String day = _getDayOfWeek(date.weekday);
-          final double total =
-              (data['total'] is num) ? (data['total'] as num).toDouble() : 0;
-
           dailyRevenue[day] = dailyRevenue[day]! + total;
           dailyOrders[day] = dailyOrders[day]! + 1;
         }
       }
 
+      // Build chart data
       revenueData =
           dailyRevenue.entries.map((e) => _ChartData(e.key, e.value)).toList();
       orderData = dailyOrders.entries
           .map((e) => _ChartData(e.key, e.value.toDouble()))
           .toList();
-      _totalUsers = userIds.length;
 
       // --------------------------
-      // VENDORS COLLECTION
+      // 3️⃣ Vendors Collection
       // --------------------------
       final vendorSnapshot =
           await FirebaseFirestore.instance.collection('vendors').get();
-
       _totalVendors = vendorSnapshot.docs.length;
       _approvedVendors =
-          vendorSnapshot.docs.where((v) => v['isApproved'] == true).length;
+          vendorSnapshot.docs.where((v) => v['isApproved'] ?? false).length;
       _lockedVendors =
-          vendorSnapshot.docs.where((v) => v['isLocked'] == true).length;
+          vendorSnapshot.docs.where((v) => v['isLocked'] ?? false).length;
 
       double vendorRatingSum = 0;
       int vendorRatingCount = 0;
       for (var v in vendorSnapshot.docs) {
-        // Ensure 'rating' field exists and is a number type
         if (v.data().containsKey('rating') && v['rating'] is num) {
           vendorRatingSum += (v['rating'] as num).toDouble();
           vendorRatingCount++;
@@ -140,7 +136,7 @@ class _ReportPageState extends State<ReportPage> {
           vendorRatingCount > 0 ? vendorRatingSum / vendorRatingCount : 0.0;
 
       // --------------------------
-      // REVIEWS COLLECTION
+      // 4️⃣ Reviews Collection
       // --------------------------
       final reviewSnapshot =
           await FirebaseFirestore.instance.collection('reviews').get();
@@ -148,7 +144,6 @@ class _ReportPageState extends State<ReportPage> {
 
       double sumReviews = 0;
       for (var r in reviewSnapshot.docs) {
-        // Ensure 'rating' field exists and is a number type
         if (r.data().containsKey('rating') && r['rating'] is num) {
           sumReviews += (r['rating'] as num).toDouble();
         }
@@ -157,7 +152,7 @@ class _ReportPageState extends State<ReportPage> {
           _totalReviews > 0 ? sumReviews / _totalReviews : 0.0;
 
       // --------------------------
-      // VOUCHERS COLLECTION
+      // 5️⃣ Vouchers Collection
       // --------------------------
       final voucherSnapshot = await FirebaseFirestore.instance
           .collection('vouchers')
@@ -167,7 +162,6 @@ class _ReportPageState extends State<ReportPage> {
 
       setState(() => _isLoading = false);
     } catch (e) {
-      // In a production app, you would log this error properly
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error fetching analytics: ${e.toString()}')),
@@ -319,13 +313,13 @@ class _ReportPageState extends State<ReportPage> {
 
           // Using GridView for a more modern, dashboard-like look for key stats
           GridView.count(
-            physics:
-                const NeverScrollableScrollPhysics(), // Important for nested scrolling
+            physics: const NeverScrollableScrollPhysics(),
             shrinkWrap: true,
-            crossAxisCount: 2, // Two columns
+            crossAxisCount: MediaQuery.of(context).size.width < 400 ? 1 : 2,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: 1.5, // Make cards rectangular
+            childAspectRatio:
+                MediaQuery.of(context).size.width < 400 ? 2.5 : 1.5,
             children: [
               _metricCard("Total Users", _totalUsers.toString(),
                   Icons.people_alt, Colors.teal),
@@ -382,36 +376,34 @@ class _ReportPageState extends State<ReportPage> {
 
   // Modern Stat Card (for GridView)
   Widget _metricCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(height: 4),
-          Text(title,
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12), // smaller padding
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 28), // smaller icon
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 16, // smaller font
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              textAlign: TextAlign.center,
               style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey.shade600)),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade900)),
-        ],
+                fontSize: 12, // smaller font
+                color: Colors.grey.shade700,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
