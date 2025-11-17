@@ -1,34 +1,20 @@
+import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:pdf/pdf.dart';
-import '../../util/styles.dart';
-import 'admin_home_page.dart';
+import 'package:path_provider/path_provider.dart';
 
-// ===================== Chart & Status Colors =====================
-const Color kPrimaryColor = kPrimaryActionColor;
-const Color kAccentColor = Color(0xFF6C757D);
-const Color kSuccessColor = Color(0xFF4CAF50);
-const Color kWarningColor = Color(0xFFFFC107);
-const Color kErrorColor = Color(0xFFF44336);
+// ================= Theme & Status Colors =================
+// Using a slightly more vibrant blue and gray for modern look
+const Color kPrimaryColor = Color(0xFF1E88E5); // Blue 600
+const Color kAccentColor = Color(0xFF607D8B); // Blue Grey 500
+const Color kBackgroundColor =
+    Color(0xFFF4F6F9); // Light gray background for contrast
 
-// ===================== Report Model =====================
-class Report {
-  final String title;
-  final String category;
-  final DateTime createdAt;
-  final String description;
-
-  Report({
-    required this.title,
-    required this.category,
-    required this.createdAt,
-    required this.description,
-  });
-}
-
-// ===================== Report Page =====================
+// ================= Report Page =================
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
 
@@ -36,274 +22,355 @@ class ReportPage extends StatefulWidget {
   State<ReportPage> createState() => _ReportPageState();
 }
 
-class _ReportPageState extends State<ReportPage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  bool _isFilterVisible = false;
+class _ReportPageState extends State<ReportPage> {
+  bool _isLoading = true;
 
-  // Filter state
-  final List<String> _categories = [
-    'All',
-    'Sales',
-    'Orders',
-    'Vendors',
-    'Customers'
-  ];
-  String _selectedCategory = 'All';
-  String? _selectedDateRange;
+  // WEEKLY CHARTS DATA
+  List<_ChartData> revenueData = [];
+  List<_ChartData> orderData = [];
 
-  // Sample reports
-  final List<Report> _allReports = List.generate(
-    15,
-    (i) {
-      final categories = ['Sales', 'Orders', 'Vendors', 'Customers'];
-      final category = categories[i % categories.length];
-      return Report(
-        title: "$category Report #${i + 1}",
-        category: category,
-        createdAt: DateTime.now().subtract(Duration(days: i * 2)),
-        description: "Detailed information about $category report #${i + 1}.",
-      );
-    },
-  );
+  // Additional Analytics
+  int _totalUsers = 0;
+  int _totalVendors = 0;
+  int _approvedVendors = 0;
+  int _lockedVendors = 0;
+  double _averageVendorRating = 0.0;
 
-  List<Report> get _filteredReports {
-    return _allReports.where((report) {
-      final matchCategory =
-          _selectedCategory == 'All' || report.category == _selectedCategory;
-      return matchCategory;
-    }).toList();
-  }
+  int _totalReviews = 0;
+  double _averageReviewRating = 0.0;
 
-  void _applyFilters() => setState(() {});
-
-  Future<void> _selectDateRange() async {
-    DateTimeRange? picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2023),
-      lastDate: DateTime.now(),
-      initialDateRange: DateTimeRange(
-        start: DateTime.now().subtract(const Duration(days: 7)),
-        end: DateTime.now(),
-      ),
-    );
-
-    if (picked != null) {
-      setState(() {
-        _selectedDateRange =
-            "${picked.start.day}/${picked.start.month}/${picked.start.year} - ${picked.end.day}/${picked.end.month}/${picked.end.year}";
-        _applyFilters();
-      });
-    }
-  }
+  int _activePromotions =
+      0; // Kept in for future expansion if needed, but not fetched
+  int _activeVouchers = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _fetchAnalytics();
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  // ------------------------------------------------------------
+  // 🔥 MAIN FETCH METHOD (Logic remains identical)
+  // ------------------------------------------------------------
+  Future<void> _fetchAnalytics() async {
+    try {
+      DateTime now = DateTime.now();
+      // Ensure calculation for start of week is correct (Monday is 1, Sunday is 7)
+      DateTime startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+      DateTime endOfWeek = startOfWeek
+          .add(const Duration(days: 6))
+          .copyWith(hour: 23, minute: 59, second: 59); // End of Sunday
+
+      // Fetch orders for this week
+      final ordersSnapshot = await FirebaseFirestore.instance
+          .collection('orders')
+          .where('timestamp',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
+          .where('timestamp',
+              isLessThanOrEqualTo: Timestamp.fromDate(endOfWeek))
+          .get();
+
+      Map<String, double> dailyRevenue = {
+        "Mon": 0,
+        "Tue": 0,
+        "Wed": 0,
+        "Thu": 0,
+        "Fri": 0,
+        "Sat": 0,
+        "Sun": 0,
+      };
+
+      Map<String, int> dailyOrders = {
+        "Mon": 0,
+        "Tue": 0,
+        "Wed": 0,
+        "Thu": 0,
+        "Fri": 0,
+        "Sat": 0,
+        "Sun": 0,
+      };
+
+      Set<String> userIds = {};
+
+      for (var doc in ordersSnapshot.docs) {
+        final data = doc.data();
+        if (data['userId'] != null) userIds.add(data['userId']);
+
+        final ts = data['timestamp'];
+        if (ts is Timestamp) {
+          final date = ts.toDate();
+          String day = _getDayOfWeek(date.weekday);
+          final double total =
+              (data['total'] is num) ? (data['total'] as num).toDouble() : 0;
+
+          dailyRevenue[day] = dailyRevenue[day]! + total;
+          dailyOrders[day] = dailyOrders[day]! + 1;
+        }
+      }
+
+      revenueData =
+          dailyRevenue.entries.map((e) => _ChartData(e.key, e.value)).toList();
+      orderData = dailyOrders.entries
+          .map((e) => _ChartData(e.key, e.value.toDouble()))
+          .toList();
+      _totalUsers = userIds.length;
+
+      // --------------------------
+      // VENDORS COLLECTION
+      // --------------------------
+      final vendorSnapshot =
+          await FirebaseFirestore.instance.collection('vendors').get();
+
+      _totalVendors = vendorSnapshot.docs.length;
+      _approvedVendors =
+          vendorSnapshot.docs.where((v) => v['isApproved'] == true).length;
+      _lockedVendors =
+          vendorSnapshot.docs.where((v) => v['isLocked'] == true).length;
+
+      double vendorRatingSum = 0;
+      int vendorRatingCount = 0;
+      for (var v in vendorSnapshot.docs) {
+        // Ensure 'rating' field exists and is a number type
+        if (v.data().containsKey('rating') && v['rating'] is num) {
+          vendorRatingSum += (v['rating'] as num).toDouble();
+          vendorRatingCount++;
+        }
+      }
+      _averageVendorRating =
+          vendorRatingCount > 0 ? vendorRatingSum / vendorRatingCount : 0.0;
+
+      // --------------------------
+      // REVIEWS COLLECTION
+      // --------------------------
+      final reviewSnapshot =
+          await FirebaseFirestore.instance.collection('reviews').get();
+      _totalReviews = reviewSnapshot.docs.length;
+
+      double sumReviews = 0;
+      for (var r in reviewSnapshot.docs) {
+        // Ensure 'rating' field exists and is a number type
+        if (r.data().containsKey('rating') && r['rating'] is num) {
+          sumReviews += (r['rating'] as num).toDouble();
+        }
+      }
+      _averageReviewRating =
+          _totalReviews > 0 ? sumReviews / _totalReviews : 0.0;
+
+      // --------------------------
+      // VOUCHERS COLLECTION
+      // --------------------------
+      final voucherSnapshot = await FirebaseFirestore.instance
+          .collection('vouchers')
+          .where('active', isEqualTo: true)
+          .get();
+      _activeVouchers = voucherSnapshot.docs.length;
+
+      setState(() => _isLoading = false);
+    } catch (e) {
+      // In a production app, you would log this error properly
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching analytics: ${e.toString()}')),
+        );
+      }
+      setState(() => _isLoading = false);
+    }
   }
 
-  // 🔹 Chart Card Container
-  Widget _chartCard({
-    required String title,
-    required Widget chart,
-    VoidCallback? onDownload,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  String _getDayOfWeek(int weekday) {
+    switch (weekday) {
+      case 1:
+        return "Mon";
+      case 2:
+        return "Tue";
+      case 3:
+        return "Wed";
+      case 4:
+        return "Thu";
+      case 5:
+        return "Fri";
+      case 6:
+        return "Sat";
+      case 7:
+      default:
+        return "Sun";
+    }
+  }
+
+  // ------------------------------------------------------------
+  // PDF GENERATION (Logic remains identical)
+  // ------------------------------------------------------------
+  Future<void> _downloadPdf() async {
+    final pdf = pw.Document();
+
+    pdf.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      build: (context) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            Text(title,
-                style:
-                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-            IconButton(
-              icon: const Icon(Icons.download_rounded,
-                  color: Colors.grey, size: 20),
-              onPressed: onDownload ?? () {},
+            pw.Text("Analytics Report",
+                style: pw.TextStyle(
+                    fontSize: 24,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColor.fromInt(kPrimaryColor.value))),
+            pw.SizedBox(height: 16),
+
+            // Users & Vendors
+            pw.Container(
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.grey300)),
+              child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text("Users & Vendors Metrics",
+                        style: pw.TextStyle(
+                            fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                    pw.Divider(),
+                    pw.Bullet(text: "Total Users: $_totalUsers"),
+                    pw.Bullet(text: "Total Vendors: $_totalVendors"),
+                    pw.Bullet(text: "Approved Vendors: $_approvedVendors"),
+                    pw.Bullet(text: "Locked Vendors: $_lockedVendors"),
+                    pw.Bullet(
+                        text:
+                            "Average Vendor Rating: ${_averageVendorRating.toStringAsFixed(1)}"),
+                  ]),
+            ),
+
+            pw.SizedBox(height: 20),
+
+            // Reviews & Vouchers
+            pw.Container(
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.grey300)),
+              child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text("Engagement Metrics",
+                        style: pw.TextStyle(
+                            fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                    pw.Divider(),
+                    pw.Bullet(text: "Total Reviews: $_totalReviews"),
+                    pw.Bullet(
+                        text:
+                            "Average Review Rating: ${_averageReviewRating.toStringAsFixed(1)}"),
+                    pw.Bullet(text: "Active Vouchers: $_activeVouchers"),
+                  ]),
             ),
           ],
-        ),
-        Container(
-          width: double.infinity,
-          height: 200,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: chart,
-        ),
-      ],
+        );
+      },
+    ));
+
+    // Save file locally and share
+    final bytes = await pdf.save();
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/analytics_report.pdf');
+      await file.writeAsBytes(bytes);
+    } catch (e) {
+      // In case path_provider fails on web/certain environments, continue to share.
+    }
+
+    // Show system print/share dialog
+    await Printing.sharePdf(bytes: bytes, filename: 'analytics_report.pdf');
+  }
+
+  // ------------------------------------------------------------
+  // UI
+  // ------------------------------------------------------------
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: kBackgroundColor,
+      appBar: AppBar(
+        title: const Text("Reports & Analytics 📊"),
+        backgroundColor: Colors.white,
+        elevation: 1,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.download_rounded, color: kPrimaryColor),
+            onPressed: _isLoading ? null : _downloadPdf,
+            tooltip: 'Download Report PDF',
+          )
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: kPrimaryColor))
+          : _buildAnalyticsContent(),
     );
   }
 
-  // 🔹 Analytics Tab Content (kept charts from your previous code)
   Widget _buildAnalyticsContent() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Sales & Order Reports",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 16),
+          // --- Section 1: Key Metrics (Grid Layout) ---
+          const Text("Key Metrics",
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1F2937))),
+          const SizedBox(height: 12),
 
-          // Sales Trend
-          _chartCard(
-            title: "Sales Trend",
-            chart: LineChart(LineChartData(
-              gridData: FlGridData(show: false),
-              borderData: FlBorderData(show: false),
-              titlesData: FlTitlesData(
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        const months = [
-                          'Jan',
-                          'Feb',
-                          'Mar',
-                          'Apr',
-                          'May',
-                          'Jun'
-                        ];
-                        return Text(
-                          months[value.toInt() % months.length],
-                          style: const TextStyle(fontSize: 10),
-                        );
-                      }),
-                ),
-                leftTitles:
-                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles:
-                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                topTitles:
-                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              ),
-              lineBarsData: [
-                LineChartBarData(
-                  spots: const [
-                    FlSpot(0, 1.5),
-                    FlSpot(1, 1.85),
-                    FlSpot(2, 2.1),
-                    FlSpot(3, 1.95),
-                    FlSpot(4, 2.4),
-                    FlSpot(5, 2.8),
-                  ],
-                  isCurved: true,
-                  color: kPrimaryColor,
-                  barWidth: 2,
-                  belowBarData: BarAreaData(
-                    show: true,
-                    color: kPrimaryColor.withOpacity(0.15),
-                  ),
-                  dotData: FlDotData(show: false),
-                ),
-              ],
-            )),
+          // Using GridView for a more modern, dashboard-like look for key stats
+          GridView.count(
+            physics:
+                const NeverScrollableScrollPhysics(), // Important for nested scrolling
+            shrinkWrap: true,
+            crossAxisCount: 2, // Two columns
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.5, // Make cards rectangular
+            children: [
+              _metricCard("Total Users", _totalUsers.toString(),
+                  Icons.people_alt, Colors.teal),
+              _metricCard("Total Vendors", _totalVendors.toString(),
+                  Icons.store, Colors.indigo),
+              _metricCard("Approved Vendors", _approvedVendors.toString(),
+                  Icons.verified, Colors.green),
+              _metricCard("Locked Vendors", _lockedVendors.toString(),
+                  Icons.lock, Colors.red),
+              _metricCard(
+                  "Avg Vendor Rating",
+                  _averageVendorRating.toStringAsFixed(1),
+                  Icons.star_half,
+                  Colors.orange),
+              _metricCard("Total Reviews", _totalReviews.toString(),
+                  Icons.comment, Colors.purple),
+              _metricCard(
+                  "Avg Review Rating",
+                  _averageReviewRating.toStringAsFixed(1),
+                  Icons.star,
+                  kPrimaryColor),
+              _metricCard("Active Vouchers", _activeVouchers.toString(),
+                  Icons.discount, Colors.pink),
+            ],
           ),
 
-          const SizedBox(height: 28),
+          const SizedBox(height: 30),
 
-          // Order Volume
+          // --- Section 2: Weekly Revenue Chart ---
+          _chartTitle("Weekly Revenue (USD) 💰", kPrimaryColor),
           _chartCard(
-            title: "Order Volume",
-            chart: BarChart(BarChartData(
-              borderData: FlBorderData(show: false),
-              gridData: FlGridData(show: false),
-              titlesData: FlTitlesData(
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        const days = [
-                          'Mon',
-                          'Tue',
-                          'Wed',
-                          'Thu',
-                          'Fri',
-                          'Sat',
-                          'Sun'
-                        ];
-                        return Text(
-                          days[value.toInt() % days.length],
-                          style: const TextStyle(fontSize: 10),
-                        );
-                      }),
-                ),
-                leftTitles:
-                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles:
-                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                topTitles:
-                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              ),
-              barGroups: List.generate(7, (i) {
-                final data = [45, 62, 78, 55, 90, 110, 85];
-                return BarChartGroupData(x: i, barRods: [
-                  BarChartRodData(
-                    toY: data[i].toDouble(),
-                    color: kAccentColor,
-                    width: 14,
-                    borderRadius: BorderRadius.circular(4),
-                  )
-                ]);
-              }),
-            )),
+            SizedBox(
+              height: 280,
+              child: _buildBarChart(revenueData, kPrimaryColor, 'Revenue'),
+            ),
           ),
 
-          const SizedBox(height: 28),
+          const SizedBox(height: 30),
 
-          // Vendor Performance
+          // --- Section 3: Weekly Order Count Chart ---
+          _chartTitle("Weekly Order Count 📦", kAccentColor),
           _chartCard(
-            title: "Vendor Performance",
-            chart: PieChart(
-              PieChartData(
-                sectionsSpace: 2,
-                centerSpaceRadius: 40,
-                sections: [
-                  PieChartSectionData(
-                    value: 45,
-                    color: kSuccessColor,
-                    title: '45%',
-                    radius: 50,
-                    titleStyle:
-                        const TextStyle(fontSize: 10, color: Colors.white),
-                  ),
-                  PieChartSectionData(
-                    value: 30,
-                    color: kWarningColor,
-                    title: '30%',
-                    radius: 50,
-                    titleStyle:
-                        const TextStyle(fontSize: 10, color: Colors.white),
-                  ),
-                  PieChartSectionData(
-                    value: 25,
-                    color: kErrorColor,
-                    title: '25%',
-                    radius: 50,
-                    titleStyle:
-                        const TextStyle(fontSize: 10, color: Colors.white),
-                  ),
-                ],
-              ),
+            SizedBox(
+              height: 280,
+              child: _buildBarChart(orderData, kAccentColor, 'Orders'),
             ),
           ),
         ],
@@ -311,367 +378,202 @@ class _ReportPageState extends State<ReportPage>
     );
   }
 
-  // 🔹 Reports Tab Content
-  Widget _reportCard(Report report) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ReportDetailPage(report: report),
+  // --- WIDGET HELPER FUNCTIONS ---
+
+  // Modern Stat Card (for GridView)
+  Widget _metricCard(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey.shade300),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.description, size: 28, color: kPrimaryColor),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(report.title,
-                      style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 4),
-                  Text(report.category,
-                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              ),
-            ),
-            Text(
-              "${report.createdAt.day}/${report.createdAt.month}/${report.createdAt.year}",
-              style: const TextStyle(fontSize: 11, color: Colors.black54),
-            ),
-            const SizedBox(width: 6),
-            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-          ],
-        ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Icon(icon, color: color, size: 28),
+          const SizedBox(height: 4),
+          Text(title,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey.shade600)),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade900)),
+        ],
       ),
     );
   }
 
-  Widget _buildReportsContent() {
-    if (_filteredReports.isEmpty) {
-      return const Center(
-        child: Text("No reports found for selected filters.",
-            style: TextStyle(fontSize: 14, color: Colors.black54)),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      itemCount: _filteredReports.length,
-      itemBuilder: (context, index) {
-        return _reportCard(_filteredReports[index]);
-      },
+  // Title with Accent Bar
+  Widget _chartTitle(String title, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 20,
+          color: color,
+          margin: const EdgeInsets.only(right: 8),
+        ),
+        Text(title,
+            style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1F2937))),
+      ],
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kAppBackgroundColor,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        elevation: 0,
-        backgroundColor: Colors.white,
-        centerTitle: true,
-        title: const Text(
-          "Analytics & Reports",
-          style: TextStyle(
-            color: kTextColor,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
+  // Wrapper for Charts
+  Widget _chartCard(Widget child) {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding:
+          const EdgeInsets.fromLTRB(16, 16, 16, 0), // Adjust padding for chart
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  // Bar Chart Builder (Minimalist Tooltip Fix)
+  Widget _buildBarChart(List<_ChartData> data, Color color, String type) {
+    // Determine the max Y value for better scaling
+    double maxY = data.isNotEmpty
+        ? data.map((d) => d.value).reduce((a, b) => a > b ? a : b)
+        : 10;
+    // Add a buffer to the max Y value
+    maxY = (maxY * 1.2).ceilToDouble();
+    if (maxY == 0) maxY = 10;
+
+    return BarChart(
+      BarChartData(
+        alignment: BarChartAlignment.spaceAround,
+        maxY: maxY,
+        barTouchData: BarTouchData(
+          enabled: true,
+          touchTooltipData: BarTouchTooltipData(
+            // **REMOVED:** The conflicting property (tooltipBgColor/tooltipColor/tooltipStyle)
+            // The chart will now use the package's default tooltip background color.
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              return BarTooltipItem(
+                '${data[group.x.toInt()].day}\n',
+                // NOTE: The text color may need adjustment if the default background is light.
+                const TextStyle(
+                  color: Colors
+                      .white, // Keep white for now, may need to change to Colors.black if default background is light.
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+                children: <TextSpan>[
+                  TextSpan(
+                    text: type == 'Revenue'
+                        ? '\$${rod.toY.toStringAsFixed(2)}'
+                        : rod.toY.toInt().toString(),
+                    style: const TextStyle(
+                      color: Colors.white, // Keep white for now
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: kTextColor),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminHomePage()),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          getDrawingHorizontalLine: (value) {
+            return FlLine(
+              color: Colors.grey.shade200,
+              strokeWidth: 1,
             );
           },
         ),
-        actions: [
-          IconButton(
-            onPressed: () {
-              setState(() {
-                _isFilterVisible = !_isFilterVisible;
-              });
-            },
-            icon: Icon(
-              Icons.tune,
-              color: _isFilterVisible ? kPrimaryColor : kTextColor,
+        titlesData: FlTitlesData(
+          show: true,
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 30,
+              getTitlesWidget: (value, meta) {
+                return SideTitleWidget(
+                  axisSide: meta.axisSide,
+                  space: 8,
+                  child: Text(data[value.toInt() % 7].day,
+                      style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12)),
+                );
+              },
             ),
           ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: kPrimaryColor,
-          labelColor: kPrimaryColor,
-          unselectedLabelColor: Colors.grey,
-          labelStyle:
-              const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-          tabs: const [
-            Tab(text: 'Analytics'),
-            Tab(text: 'Reports'),
-          ],
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 40,
+              interval: maxY / 4 < 1 ? 1 : (maxY / 4).ceilToDouble(),
+              getTitlesWidget: (value, meta) {
+                String text = type == 'Revenue'
+                    ? '\$${value.toInt()}'
+                    : value.toInt().toString();
+                return Text(text,
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
+                    textAlign: TextAlign.left);
+              },
+            ),
+          ),
         ),
-      ),
-      body: Column(
-        children: [
-          // Animated filter bar
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            height: _isFilterVisible ? 70 : 0,
-            curve: Curves.easeInOut,
-            child: _isFilterVisible
-                ? Container(
-                    color: kAppBackgroundColor,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey.shade300),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: _selectedCategory,
-                                icon: const Icon(Icons.keyboard_arrow_down),
-                                items: _categories
-                                    .map((cat) => DropdownMenuItem(
-                                          value: cat,
-                                          child: Text(cat,
-                                              style: const TextStyle(
-                                                  fontSize: 13)),
-                                        ))
-                                    .toList(),
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedCategory = value!;
-                                    _applyFilters();
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          flex: 2,
-                          child: GestureDetector(
-                            onTap: _selectDateRange,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.grey.shade300),
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      _selectedDateRange ?? 'Select Date Range',
-                                      style: const TextStyle(
-                                          fontSize: 13, color: Colors.black54),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  const Icon(Icons.calendar_today,
-                                      size: 16, color: Colors.black54),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildAnalyticsContent(),
-                _buildReportsContent(),
-              ],
-            ),
-          ),
-        ],
+        borderData: FlBorderData(show: false),
+        barGroups: data
+            .asMap()
+            .entries
+            .map((e) => BarChartGroupData(x: e.key, barRods: [
+                  BarChartRodData(
+                      toY: e.value.value,
+                      color: color,
+                      width: 14,
+                      borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(4),
+                          topRight: Radius.circular(4))),
+                ]))
+            .toList(),
       ),
     );
   }
 }
 
-// ===================== Report Detail Page with PDF =====================
-class ReportDetailPage extends StatelessWidget {
-  final Report report;
-
-  const ReportDetailPage({super.key, required this.report});
-
-  // Generate PDF
-  Future<void> _generatePdf() async {
-    final pdf = pw.Document();
-
-    pdf.addPage(
-      pw.Page(
-        build: (context) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(report.title,
-                style:
-                    pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
-            pw.SizedBox(height: 12),
-            pw.Row(
-              children: [
-                pw.Text("Category: ",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                pw.Text(report.category),
-                pw.SizedBox(width: 20),
-                pw.Text("Date: ",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                pw.Text(
-                    "${report.createdAt.day}/${report.createdAt.month}/${report.createdAt.year}"),
-              ],
-            ),
-            pw.Divider(height: 20, thickness: 1),
-            pw.Text("Description:",
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-            pw.SizedBox(height: 6),
-            pw.Text(report.description),
-            pw.SizedBox(height: 20),
-            pw.Text("Generated by Admin Dashboard",
-                style: pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
-          ],
-        ),
-      ),
-    );
-
-    // Open PDF preview or share
-    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(report.title),
-        backgroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.download),
-            onPressed: _generatePdf,
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Report Info Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 6,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    report.title,
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      const Icon(Icons.category, size: 16, color: Colors.grey),
-                      const SizedBox(width: 4),
-                      Text(report.category,
-                          style: const TextStyle(
-                              fontSize: 13, color: Colors.grey)),
-                      const SizedBox(width: 16),
-                      const Icon(Icons.calendar_today,
-                          size: 16, color: Colors.grey),
-                      const SizedBox(width: 4),
-                      Text(
-                        "${report.createdAt.day}/${report.createdAt.month}/${report.createdAt.year}",
-                        style:
-                            const TextStyle(fontSize: 13, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                  const Divider(height: 24, thickness: 1),
-                  const Text(
-                    "Description:",
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    report.description,
-                    style: const TextStyle(fontSize: 13, color: Colors.black87),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-            const Text(
-              "Generated by Admin Dashboard",
-              style: TextStyle(fontSize: 11, color: Colors.black54),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------- For Standalone Testing ----------------
-void main() {
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: ReportPage(),
-  ));
+// ----------------------------
+// DATA MODEL FOR CHARTS (No change needed)
+// ----------------------------
+class _ChartData {
+  final String day;
+  final double value;
+  _ChartData(this.day, this.value);
 }
