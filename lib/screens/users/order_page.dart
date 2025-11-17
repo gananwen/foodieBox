@@ -42,7 +42,7 @@ class _OrdersPageState extends State<OrdersPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Padding(
-            padding: EdgeInsets.fromLTRB(20, 50, 20, 10),
+            padding: EdgeInsets.fromLTRB(20, 30, 20, 10),
             child: Text(
               'My Orders',
               style: TextStyle(
@@ -75,10 +75,11 @@ class _OrdersPageState extends State<OrdersPage>
 
   Widget _buildOrderList(BuildContext context,
       {required bool isOngoing, String? userId}) {
-    // --- ( ✨ UPDATED STATUSES - CASE INSENSITIVE FIX ✨ ) ---
-    // We now check for both lowercase and uppercase versions
+    // --- ( ✨ FINAL ONGOING STATUSES ✨ ) ---
+    // Note: These must match the status strings saved in Firestore!
     final ongoingStatuses = [
-      'received', 'Received',
+      'Awaiting Payment Proof', // Blue (Pending Admin Action)
+      'Received', 'received', // Order Accepted
       'Preparing', 'preparing',
       'Prepared', 'prepared',
       'Ready for Pickup', 'ready for pickup',
@@ -87,12 +88,14 @@ class _OrdersPageState extends State<OrdersPage>
     ];
     
     final historyStatuses = [
+      'Rejected', // Red (Declined Payment)
+      'rejected',
       'completed', 'Completed',
-      'cancelled', 'Cancelled', // <-- This is the important fix
+      'cancelled', 'Cancelled', 
       'Delivered', 'delivered',
       'Picked Up', 'picked up'
     ];
-    // --- ( ✨ END UPDATED STATUSES ✨ ) ---
+    // --- ( ✨ END FINAL ONGOING STATUSES ✨ ) ---
 
     if (userId == null) {
       return const Center(
@@ -168,12 +171,15 @@ class _OrdersPageState extends State<OrdersPage>
 
     final TextStyle statusStyle = _getStatusStyle(order.status);
     final String formattedDateTime = _formatDateTime(order.timestamp.toDate());
+    
+    // --- Determine if navigation should be to OrderTracking or PickupConfirmation ---
+    final bool isDelivery = order.orderType == 'Delivery';
+    final bool isPickup = order.orderType == 'Pickup';
 
     return GestureDetector(
-      // --- ( ✨ UPDATED NAVIGATION LOGIC ✨ ) ---
       onTap: () {
         if (isOngoing) {
-          if (order.orderType == 'Delivery') {
+          if (isDelivery) {
             // Ongoing Delivery -> Track Page
             Navigator.push(
               context,
@@ -181,8 +187,8 @@ class _OrdersPageState extends State<OrdersPage>
                 builder: (_) => OrderTrackingPage(orderId: order.id),
               ),
             );
-          } else if (order.orderType == 'Pickup') {
-            // Ongoing Pickup -> QR Code Page
+          } else if (isPickup) {
+            // Ongoing Pickup -> QR Code Page (Pickup Confirmation)
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -206,7 +212,6 @@ class _OrdersPageState extends State<OrdersPage>
           );
         }
       },
-      // --- ( ✨ END UPDATED NAVIGATION LOGIC ✨ ) ---
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(12),
@@ -279,7 +284,7 @@ class _OrdersPageState extends State<OrdersPage>
                     style: kLabelTextStyle.copyWith(fontSize: 15)),
                 
                 // --- FIX: Show correct icon for delivery or pickup ---
-                if (order.orderType == 'Delivery' && order.driverId != null && isOngoing)
+                if (order.orderType == 'Delivery' && isOngoing)
                   const Icon(Icons.local_shipping,
                       color: kPrimaryActionColor, size: 20),
 
@@ -298,14 +303,15 @@ class _OrdersPageState extends State<OrdersPage>
 
   TextStyle _getStatusStyle(String status) {
     Color color;
-    // --- ( ✨ UPDATED STATUS STYLES ✨ ) ---
-    // This switch already uses .toLowerCase(), so it's safe!
+    // --- ( ✨ FINALIZED STATUS STYLES FOR USER VIEW ✨ ) ---
+    // The key is catching 'rejected' specifically.
     switch (status.toLowerCase()) {
       case 'completed':
       case 'delivered':
       case 'picked up':
         color = Colors.green;
         break;
+      case 'rejected': // This handles the Admin decline
       case 'cancelled':
         color = Colors.red;
         break;
@@ -316,17 +322,17 @@ class _OrdersPageState extends State<OrdersPage>
       case 'prepared':
         color = Colors.amber;
         break;
-      case 'ready for pickup':
-      case 'paid_pending_pickup':
+      case 'awaiting payment proof': // Payment uploaded, waiting for Admin
+      case 'paid pending pickup':
         color = Colors.blue;
         break;
-      case 'Received':
-      case 'pending':
+      case 'received': // Order accepted by Vendor/Admin
+      case 'ready for pickup':
       default:
-        color = kPrimaryActionColor;
+        color = kPrimaryActionColor; // Amber/Yellow
         break;
     }
-    // --- ( ✨ END UPDATED STATUS STYLES ✨ ) ---
+    // --- ( ✨ END FINALIZED STATUS STYLES ✨ ) ---
     return TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: color);
   }
 

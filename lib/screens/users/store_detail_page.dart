@@ -1,21 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:foodiebox/models/vendor.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:foodiebox/models/vendor.dart'; // Duplicate import, removed one
 import 'package:foodiebox/models/product.dart';
 import 'package:foodiebox/util/styles.dart';
-import 'category_product_page.dart';
 import 'product_detail_page.dart';
 import 'package:provider/provider.dart';
 import 'package:foodiebox/providers/cart_provider.dart';
 import 'package:foodiebox/screens/users/cart_page.dart';
-// --- FIX: Import the new enum file ---
 import 'package:foodiebox/enums/checkout_type.dart';
 
 class GroceryCategory {
   final String name;
   final String imagePath;
-  GroceryCategory({required this.name, required this.imagePath});
+  // CategoryName is the value used for Firestore query.
+  final String categoryFilter; 
+  GroceryCategory({required this.name, required this.imagePath, required this.categoryFilter});
 }
 
 class StoreDetailPage extends StatefulWidget {
@@ -37,18 +36,21 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
 
   final List<int> _allPickupHours = [10, 11, 12, 13, 14, 15, 16];
 
+  // --- MODIFIED: Added categoryFilter property ---
   final List<GroceryCategory> _groceryCategories = [
-    GroceryCategory(name: 'Frozen', imagePath: 'assets/images/frozen.png'),
-    GroceryCategory(name: 'Baked Goods', imagePath: 'assets/images/bakery.png'),
+    // Display Name, Image Path, Firestore Category Field Value
+    GroceryCategory(name: 'Frozen', imagePath: 'assets/images/frozen.png', categoryFilter: 'Frozen'),
+    GroceryCategory(name: 'Baked Goods', imagePath: 'assets/images/bakery.png', categoryFilter: 'Baked Goods'),
     GroceryCategory(
-        name: 'Vegetables', imagePath: 'assets/images/vegetables.png'),
-    GroceryCategory(name: 'Spice', imagePath: 'assets/images/spice.png'),
+        name: 'Vegetables', imagePath: 'assets/images/vegetables.png', categoryFilter: 'Vegetables'),
+    GroceryCategory(name: 'Spice', imagePath: 'assets/images/spice.png', categoryFilter: 'Spices'), // Assuming Firestore category is 'Spices'
     GroceryCategory(
-        name: 'Beverages', imagePath: 'assets/images/beverages.png'),
+        name: 'Beverages', imagePath: 'assets/images/beverages.png', categoryFilter: 'Beverages'),
     GroceryCategory(
-        name: 'Non-Halal Food', imagePath: 'assets/images/non_halal.png'),
-    GroceryCategory(name: 'View All', imagePath: 'assets/images/view_all.png'),
+        name: 'Non-Halal Food', imagePath: 'assets/images/non_halal.png', categoryFilter: 'Non-Halal Food'), // Uses the exact category name
+    GroceryCategory(name: 'View All', imagePath: 'assets/images/view_all.png', categoryFilter: 'View All'),
   ];
+  // --- END MODIFIED ---
 
   String? _selectedProductCategory;
 
@@ -128,31 +130,61 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
     );
   }
 
+  // --- MODIFIED: Implemented the exact requested FloatingActionButton.extended design ---
   Widget _buildFloatingCartButton(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final itemCount = cart.itemCount;
+    // Using subtotal, as confirmed in the previous step
+    final cartTotal = cart.subtotal; 
 
     return AnimatedOpacity(
       opacity: itemCount > 0 ? 1.0 : 0.0,
       duration: const Duration(milliseconds: 300),
       child: itemCount > 0
-          ? FloatingActionButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CartPage()),
-                );
-              },
-              backgroundColor:
-                  kPrimaryActionColor,
-              child: Badge(
-                label: Text(itemCount.toString()),
-                child: const Icon(Icons.shopping_cart, color: kTextColor),
-              ),
+          ? Stack(
+              clipBehavior: Clip.none, // Essential for badge visibility
+              alignment: Alignment.topRight, 
+              children: [
+                FloatingActionButton.extended(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const CartPage()),
+                    );
+                  },
+                  backgroundColor: Colors.amber, 
+                  icon: const Icon(Icons.shopping_cart, color: Colors.white),
+                  label: Text('RM ${cartTotal.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                          color: Colors.white)),
+                ),
+                // Custom item count badge positioned as requested (right: 0, top: 0)
+                Positioned(
+                  right: 0, 
+                  top: 0,   
+                  child: Container(
+                    padding: const EdgeInsets.all(6), 
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: Text(
+                      itemCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        // Not explicitly bolded, matching the requested snippet style
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             )
           : null,
     );
   }
+  // --- END MODIFIED ---
 
   Widget _buildSliverAppBar(BuildContext context) {
     return SliverAppBar(
@@ -309,26 +341,21 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           physics: const NeverScrollableScrollPhysics(),
           itemBuilder: (context, index) {
             final category = _groceryCategories[index];
+            // Uses the categoryFilter for selection state comparison
             final bool isSelected = (_selectedProductCategory == null &&
-                    category.name == 'View All') ||
-                (_selectedProductCategory == category.name);
+                    category.categoryFilter == 'View All') ||
+                (_selectedProductCategory == category.categoryFilter);
 
             return GestureDetector(
               onTap: () {
                 setState(() {
-                  if (category.name == 'View All') {
+                  if (category.categoryFilter == 'View All') {
+                    // Selecting 'View All' clears the category filter
                     _selectedProductCategory = null;
                   } else {
-                    _selectedProductCategory = category.name;
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CategoryProductPage(
-                          vendor: widget.vendor,
-                          categoryName: category.name,
-                        ),
-                      ),
-                    );
+                    // Selecting a specific category sets the filter to its categoryFilter value
+                    _selectedProductCategory = category.categoryFilter;
+                    // Note: This category selection *only* filters the local product list
                   }
                 });
               },
@@ -352,7 +379,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      category.name,
+                      category.name, // Displays the readable name (e.g., "Non-Halal Food")
                       textAlign: TextAlign.center,
                       style: kHintTextStyle.copyWith(
                         fontSize: 12,
@@ -463,11 +490,20 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
   }
 
   Widget _buildProductList() {
-    final productQuery = FirebaseFirestore.instance
+    // 1. Start with the base query for the vendor's products
+    Query<Map<String, dynamic>> productQuery = FirebaseFirestore.instance
         .collection('vendors')
         .doc(widget.vendor.uid)
         .collection('products');
 
+    // 2. Add filtering if a category is selected
+    if (_selectedProductCategory != null) {
+      productQuery =
+          productQuery.where('category', isEqualTo: _selectedProductCategory);
+    }
+
+    // Since we can't get a Stream<Query<Product>> from the result of a where clause,
+    // we use a generic StreamBuilder and map the documents manually.
     return StreamBuilder<QuerySnapshot>(
       stream: productQuery.snapshots(),
       builder: (context, snapshot) {
@@ -492,12 +528,14 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           );
         }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const SliverToBoxAdapter(
+          final message = _selectedProductCategory == null
+              ? 'No products found for this shop.'
+              : 'No products found in the "${_selectedProductCategory!}" category.';
+          return SliverToBoxAdapter(
             child: Center(
               child: Padding(
                 padding: EdgeInsets.all(32.0),
-                child: Text('No products found for this shop.',
-                    style: kHintTextStyle),
+                child: Text(message, style: kHintTextStyle),
               ),
             ),
           );
@@ -510,10 +548,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
               final product =
                   Product.fromMap(doc.data() as Map<String, dynamic>, doc.id);
               
-              // --- ( ✨ MODIFICATION ✨ ) ---
               // We pass context to read the cart provider
               return _buildProductCard(context, product);
-              // --- ( ✨ END MODIFICATION ✨ ) ---
             },
             childCount: snapshot.data!.docs.length,
           ),

@@ -26,7 +26,9 @@ class _RateOrderPageState extends State<RateOrderPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You must be logged in to leave a review.')),
       );
-      return;
+      return;final review = ReviewModel(
+  id: '', // Will be set by Firebase
+  orderId: widget.order.id,
     }
     if (_rating == 0) {
       ScaffoldMessenger.of(context).showSnackBar(

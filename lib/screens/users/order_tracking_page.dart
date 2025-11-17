@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:foodiebox/screens/users/order_failure_page.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geocoding/geocoding.dart';
@@ -19,21 +20,22 @@ class OrderTrackingPage extends StatefulWidget {
 
 class _OrderTrackingPageState extends State<OrderTrackingPage> {
   
-  // --- ( ✨ MODIFIED: Added 'Pending Payment' ✨ ) ---
+  // --- ( ✨ MODIFIED: Simplified Steps - Payment is step 0 ✨ ) ---
+  // The Admin's approval directly jumps the status from 0 to 1 (Received).
   final List<String> _deliverySteps = [
-    'Pending Payment',
-    'Order Received',
-    'Preparing',
-    'Delivering',
-    'Delivered'
+    'Awaiting Payment Proof', // 0
+    'Order Received',         // 1
+    'Preparing',              // 2
+    'Delivering',             // 3
+    'Delivered'               // 4
   ];
 
   final List<String> _pickupSteps = [
-    'Pending Payment',
-    'Order Received',
-    'Preparing',
-    'Ready for Pickup',
-    'Completed'
+    'Awaiting Payment Proof', // 0
+    'Order Received',         // 1
+    'Preparing',              // 2
+    'Ready for Pickup',       // 3
+    'Picked Up'               // 4
   ];
   // --- ( ✨ END MODIFICATION ✨ ) ---
 
@@ -62,43 +64,23 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
     super.dispose();
   }
 
-  // --- ( ✨ MODIFIED: Function to map vendor status to step index ✨ ) ---
+  // --- ( ✨ MODIFIED: Function to map order status to step index ✨ ) ---
   int _getStepFromStatus(String status, String orderType) {
-
-    if (orderType == 'Delivery') {
-      switch (status) {
-        case 'Pending Payment':
-          return 0;
-        case 'Received':
-          return 1;
-        case 'Preparing':
-          return 2;
-        // Skip 'Ready for Pickup' for delivery UI
-        case 'Ready for Pickup':
-          return 2; // Stay at 'Preparing' step
-        case 'Delivering':
-          return 3;
-        case 'Completed': // This is 'Delivered'
-          return 4;
-        default:
-          return 0;
-      }
-    } else {
-      // Logic for 'Pickup'
-      switch (status) {
-        case 'Pending Payment':
-          return 0;
-        case 'Received':
-          return 1;
-        case 'Preparing':
-          return 2;
-        case 'Ready for Pickup':
-          return 3;
-        case 'Completed': // This is 'Picked Up'
-          return 4;
-        default:
-          return 0;
-      }
+    final lowerStatus = status.toLowerCase();
+    
+    // Handle aliases and ensure we jump past Awaiting Payment Proof (Step 0)
+    // if status is 'Received' (Step 1).
+    switch (lowerStatus) {
+        case 'awaiting payment proof': return 0;
+        case 'received': return 1;
+        case 'paid pending pickup': return 1; // Treat as 'Received' for timeline progress
+        case 'preparing': return 2;
+        case 'prepared': return 2;
+        case 'delivering': return 3;
+        case 'ready for pickup': return 3;
+        case 'delivered': return 4;
+        case 'picked up': return 4;
+        default: return 0;
     }
   }
   // --- ( ✨ END MODIFIED FUNCTION ✨ ) ---
@@ -147,7 +129,7 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
       appBar: AppBar(
         title: const Text('Track Your Order',
             style: TextStyle(color: Colors.black)),
-        backgroundColor: Colors.white,
+        backgroundColor: kAppBackgroundColor,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
       ),
@@ -186,10 +168,25 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
           final List<String> stepsToShow = 
               isDelivery ? _deliverySteps : _pickupSteps;
 
-          if ((order.status == 'Completed') && isDelivery) {
+          if ((order.status == 'Delivered' || order.status == 'Picked Up') && isDelivery) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               // Use demo driver for now, replace with 'order.driverId' when ready
               _navigateToRatingPage(fixedDriver, order.id);
+            });
+          }
+          
+          // Handle payment rejection
+          if (order.status.toLowerCase() == 'rejected' || order.status.toLowerCase() == 'cancelled') {
+             // Navigate to Order Failure Page
+             WidgetsBinding.instance.addPostFrameCallback((_) {
+                Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => OrderFailurePage(
+                            rejectionReason: order.adminRejectionReason ?? 'Order was ${order.status}.'
+                        )
+                    )
+                );
             });
           }
 
@@ -241,10 +238,10 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
                         stepsToShow[currentStep], // Show text for the current step
                         style: kLabelTextStyle.copyWith(
                           fontSize: 22,
-                          color: currentStep == 0 ? kPrimaryActionColor : kTextColor
+                          color: currentStep == 0 ? Colors.blue : kTextColor
                         ),
                       ),
-                      if(order.status == 'Pending Payment')
+                      if(order.status.toLowerCase() == 'awaiting payment proof')
                         Padding(
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Text(
@@ -261,7 +258,7 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
                       if (isDelivery && currentStep >= 3) _buildDriverInfo(fixedDriver),
                       if (isDelivery && currentStep >= 3) const Divider(height: 32),
 
-                      _buildOrderSummary(order.items, order.total),
+                      _buildOrderSummary(order), // Pass the full order model
                     ],
                   ),
                 ),
@@ -306,77 +303,79 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
   }
 
   Widget _buildTimeline(int currentStep, String orderType, List<String> stepsToShow) {
-    // --- ( ✨ MODIFIED: Dynamic icons based on order type ✨ ) ---
-    final List<IconData> icons;
-    if (orderType == 'Delivery') {
-       icons = [
-        Icons.pending_actions, // Pending Payment
-        Icons.receipt_long,    // Order Received
-        Icons.outdoor_grill,   // Preparing
-        Icons.two_wheeler,     // Delivering
-        Icons.home_filled,     // Delivered
-      ];
-    } else {
-      icons = [
-        Icons.pending_actions, // Pending Payment
-        Icons.receipt_long,    // Order Received
-        Icons.outdoor_grill,   // Preparing
-        Icons.store,           // Ready for Pickup
-        Icons.check_circle,    // Completed
-      ];
-    }
-    // --- ( ✨ END MODIFICATION ✨ ) ---
+  // Dynamic icons based on order type
+  final List<IconData> icons;
+  if (orderType == 'Delivery') {
+    icons = [
+      Icons.pending_actions, // Awaiting Payment Proof
+      Icons.receipt_long,    // Order Received
+      Icons.outdoor_grill,   // Preparing
+      Icons.two_wheeler,     // Delivering
+      Icons.home_filled,     // Delivered
+    ];
+  } else {
+    icons = [
+      Icons.pending_actions, // Awaiting Payment Proof
+      Icons.receipt_long,    // Order Received
+      Icons.outdoor_grill,   // Preparing
+      Icons.store,           // Ready for Pickup
+      Icons.check_circle,    // Picked Up
+    ];
+  }
 
-    return Column(
-      children: List.generate(stepsToShow.length, (index) {
+  return Column(
+    children: List.generate(stepsToShow.length, (index) {
+      final isActive = index <= currentStep;
+      final isCurrent = index == currentStep;
 
-        final isActive = index <= currentStep;
-        final isCurrent = index == currentStep;
+      // ✅ Force all active icons and trail colors to kYellowMedium
+      final Color activeColor = kYellowMedium;
+      final Color trailColor = isActive ? activeColor : Colors.grey.shade200;
 
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: isActive ? (index == 0 ? kPrimaryActionColor : Colors.amber) : Colors.grey.shade200,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    icons[index], // Use the correct icon
-                    color: isActive ? Colors.black : Colors.grey.shade500,
-                    size: 20,
-                  ),
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: trailColor,
+                  shape: BoxShape.circle,
                 ),
-                if (index < stepsToShow.length - 1)
-                  Container(
-                    height: 40,
-                    width: 2,
-                    color: isActive ? (index == 0 ? kPrimaryActionColor : Colors.amber) : Colors.grey.shade200,
-                  ),
-              ],
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  stepsToShow[index], // Use the correct step text
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                    color: isActive ? Colors.black : Colors.grey.shade500,
-                  ),
+                child: Icon(
+                  icons[index],
+                  color: isActive ? Colors.black : Colors.grey.shade500,
+                  size: 20,
+                ),
+              ),
+              if (index < stepsToShow.length - 1)
+                Container(
+                  height: 40,
+                  width: 2,
+                  color: trailColor,
+                ),
+            ],
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text(
+                stepsToShow[index],
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                  color: isActive ? Colors.black : Colors.grey.shade500,
                 ),
               ),
             ),
-          ],
-        );
-      }),
-    );
-  }
+          ),
+        ],
+      );
+    }),
+  );
+}
 
   Widget _buildDriverInfo(DriverModel driver) {
     return Row(
@@ -405,14 +404,22 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
     );
   }
 
-  Widget _buildOrderSummary(List<OrderItem> items, double total) {
+  // --- MODIFIED: Order Summary to show all fees and discounts ---
+  Widget _buildOrderSummary(OrderModel order) {
+    
+    // Determine which label to use (Promo or Voucher)
+    final String? discountLabel = order.promoLabel ?? order.voucherLabel;
+    final double totalDiscount = (order.discount); // Use the fixed discount field
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Order Summary',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
-        ...items.map((item) {
+        
+        // 1. Items List (Must use item price from order model, not original product price)
+        ...order.items.map((item) {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: Row(
@@ -423,16 +430,52 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
             ),
           );
         }).toList(),
+        
+        const Divider(height: 20),
+
+        // 2. Subtotal
+        _buildSummaryRow('Subtotal', order.subtotal, isDiscount: false),
+        
+        // 3. Promotion/Voucher Discount
+        if (totalDiscount > 0)
+          _buildSummaryRow(
+              discountLabel ?? 'Discount', -totalDiscount, isDiscount: true),
+
+        // 4. Delivery Fee
+        if (order.orderType == 'Delivery')
+          _buildSummaryRow(
+              'Delivery Fee', order.deliveryFee, isDiscount: order.deliveryFee == 0.0),
+
         const Divider(),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
-            Text('RM${total.toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        )
+        
+        // 5. Final Total
+        _buildSummaryRow('Total', order.total, isBold: true, valueColor: kPrimaryActionColor),
       ],
+    );
+  }
+  
+  // Helper for cleaner summary row
+  Widget _buildSummaryRow(String label, double amount,
+      {bool isBold = false, bool isDiscount = false, Color? valueColor}) {
+    final textColor = isDiscount ? Colors.green.shade700 : Colors.black;
+    final textStyle = TextStyle(
+      fontSize: isBold ? 16 : 14,
+      fontWeight: isBold ? FontWeight.bold : (isDiscount ? FontWeight.w500 : FontWeight.normal),
+      color: isBold ? kTextColor : (isDiscount ? textColor : Colors.black87),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: textStyle),
+          Text(
+            '${amount < 0 ? '-' : ''}RM${amount.abs().toStringAsFixed(2)}',
+            style: textStyle.copyWith(color: valueColor ?? textColor),
+          ),
+        ],
+      ),
     );
   }
 }

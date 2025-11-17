@@ -258,9 +258,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               const SizedBox(height: 24),
 
               // --- ( ✨ NEW: Show Stock ✨ ) ---
-              Text('Availability',
-                  style: kLabelTextStyle.copyWith(fontSize: 18)),
-              const SizedBox(height: 8),
               Text(
                 isOutOfStock
                     ? 'This item is out of stock.'
@@ -281,40 +278,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               Text(
                 widget.product.description,
                 style: kHintTextStyle.copyWith(fontSize: 15, height: 1.5),
-              ),
-              const SizedBox(height: 24),
-
-              // --- Nutritions (Placeholder) ---
-              // NOTE: This data is not in your product.dart model.
-              // You will need to add fields to your model and Firebase to populate this.
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Nutritions',
-                      style: kLabelTextStyle.copyWith(fontSize: 18)),
-                  Row(
-                    children: [
-                      Text('100gr', style: kHintTextStyle),
-                      const Icon(Icons.chevron_right, color: Colors.grey),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                    color: kCardColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade200)),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Calories: 52 kcal', style: kHintTextStyle),
-                    Text('Protein: 0.3g', style: kHintTextStyle),
-                    Text('Carbs: 14g', style: kHintTextStyle),
-                  ],
-                ),
               ),
               const SizedBox(height: 24),
 

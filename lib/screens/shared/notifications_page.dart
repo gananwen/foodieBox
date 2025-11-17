@@ -1,31 +1,31 @@
-// 路径: lib/shared/notifications_page.dart
+// 路径: lib/screens/shared/notifications_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; 
 import '../../util/styles.dart';
+// FIX: Using relative path for repository
+import '../../repositories/notification_repository.dart'; 
+// FIX: Using relative path for model
+import '../../models/notification_model.dart'; 
 
-// (模型和枚举保持不变)
-class AppNotification {
-  final String title;
-  final String body;
-  final String time;
-  final NotificationType type;
-  bool isRead;
-
-  AppNotification({
-    required this.title,
-    required this.body,
-    required this.time,
-    required this.type,
-    this.isRead = false,
-  });
+// Utility function to format Timestamp (since we removed the static 'time' field)
+String _formatTimeDifference(Timestamp timestamp) {
+  final difference = DateTime.now().difference(timestamp.toDate());
+  if (difference.inHours > 24) {
+    return '${difference.inDays}d ago';
+  } else if (difference.inHours > 0) {
+    return '${difference.inHours}h ago';
+  } else if (difference.inMinutes > 0) {
+    return '${difference.inMinutes}m ago';
+  } else {
+    return 'Just now';
+  }
 }
 
-enum NotificationType { order, offer, update, product, redeem } // ( ✨ 新增了类型 ✨ )
-
 class NotificationsPage extends StatefulWidget {
-  // --- ( ✨ 1. 新增参数 ✨ ) ---
-  final String userRole; // 接收 "User" 或 "Vendor"
+  final String userRole; 
 
+  // NOTE: Assuming this file moved to lib/screens/shared/notifications_page.dart
   const NotificationsPage({super.key, required this.userRole});
 
   @override
@@ -33,151 +33,42 @@ class NotificationsPage extends StatefulWidget {
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
-  // --- ( ✨ 2. 已修改 ✨ ) ---
-  // 列表现在是空的，将在 initState 中填充
-  List<AppNotification> _notifications = [];
+  // --- Repository and Stream ---
+  final NotificationRepository _notificationRepo = NotificationRepository();
+  late final Stream<List<AppNotification>> _notificationsStream; 
 
   @override
   void initState() {
     super.initState();
-    // --- ( ✨ 3. 新增函数 ✨ ) ---
-    // 根据传入的角色加载不同的数据
-    _loadNotificationsForRole(widget.userRole);
+    // Use the stream from the repository
+    _notificationsStream = _notificationRepo.getNotificationsStream();
   }
 
-  // --- ( ✨ 4. 新增函数：加载模拟数据 ✨ ) ---
-  void _loadNotificationsForRole(String role) {
-    if (role == 'Vendor') {
-      // --- 这是你的供应商通知列表 ---
-      setState(() {
-        _notifications = [
-          AppNotification(
-            title: 'New Order Received! 💰',
-            body:
-                'Order #20241032 has been placed for 2x Blindbox 1. Please prepare for pickup.',
-            time: 'Just now',
-            type: NotificationType.order, // (使用新类型)
-          ),
-          AppNotification(
-            title: 'Promotion Fully Redeemed',
-            body:
-                'Your "Weekend 20% Off" deal has been fully redeemed (100/100).',
-            time: '1 hour ago',
-            type: NotificationType.redeem, // (使用新类型)
-            isRead: true,
-          ),
-          AppNotification(
-            title: 'Product Updated',
-            body:
-                'Your "Fresh Apples" product details were successfully updated.',
-            time: '3 hours ago',
-            type: NotificationType.product, // (使用新类型)
-            isRead: true,
-          ),
-          AppNotification(
-            title: 'Deal Redemption',
-            body:
-                'Your "Weekend 20% Off" deal has 50/100 redemptions remaining.',
-            time: 'Yesterday',
-            type: NotificationType.redeem,
-            isRead: true,
-          ),
-          AppNotification(
-            title: 'Promotion Successfully Posted!',
-            body:
-                'Your "Weekend 20% Off" deal is now live and visible to users.',
-            time: '2 days ago',
-            type: NotificationType.offer,
-            isRead: true,
-          ),
-        ];
-      });
-    } else {
-      // --- 这是你的用户通知列表 (来自你之前的文件) ---
-      setState(() {
-        _notifications = [
-          AppNotification(
-            title: 'Order Delivered! 🎉',
-            body:
-                'Your FoodieBox order #20241031 is now complete. Enjoy your items!',
-            time: 'Just now',
-            type: NotificationType.order,
-          ),
-          AppNotification(
-            title: 'Payment Successful',
-            body: 'Your payment for order #20241031 was successful. Thank you!',
-            time: '5 minutes ago',
-            type: NotificationType.order,
-            isRead: true,
-          ),
-          AppNotification(
-            title: 'Syok Deal: RM10 OFF!',
-            body:
-                'Grab RM10 off your next BlindBox purchase. Limited time offer!',
-            time: '1 hour ago',
-            type: NotificationType.offer,
-            isRead: true,
-          ),
-          AppNotification(
-            title: 'Order Confirmed (Received)',
-            body:
-                'We\'ve received your order #20241030. Preparation is underway.',
-            time: '1 hour ago',
-            type: NotificationType.order,
-            isRead: true,
-          ),
-          AppNotification(
-            title: 'Promotion Update',
-            body:
-                'Wolo Hotel buffet has just posted a new 30% Off deal! Check it out.',
-            time: 'Yesterday',
-            type: NotificationType.offer,
-            isRead: true,
-          ),
-        ];
-      });
-    }
+  // --- Utility to map Firestore status to UI icon ---
+  IconData _getIconForType(String status) {
+    final lowerStatus = status.toLowerCase();
+    if (lowerStatus.contains('order') || lowerStatus.contains('received')) return Icons.shopping_bag_outlined;
+    if (lowerStatus.contains('offer') || lowerStatus.contains('promo')) return Icons.local_offer_outlined;
+    if (lowerStatus.contains('product')) return Icons.inventory_2_outlined;
+    if (lowerStatus.contains('redeem') || lowerStatus.contains('verified')) return Icons.check_circle_outline;
+    return Icons.notifications_none;
   }
 
-  // (函数不变)
-  void _markAllAsRead() {
-    setState(() {
-      for (var notif in _notifications) {
-        notif.isRead = true;
-      }
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('All notifications marked as read')),
-    );
-  }
-
-  // --- ( ✨ 5. 已修改：添加新图标 ✨ ) ---
-  IconData _getIconForType(NotificationType type) {
-    switch (type) {
-      case NotificationType.order:
-        return Icons.shopping_bag_outlined;
-      case NotificationType.offer:
-        return Icons.local_offer_outlined;
-      case NotificationType.product: // (新增)
-        return Icons.inventory_2_outlined;
-      case NotificationType.redeem: // (新增)
-        return Icons.check_circle_outline;
-      case NotificationType.update:
-        return Icons.info_outline;
-      default:
-        return Icons.notifications_none;
+  void _markAllAsRead(List<AppNotification> notifications) async {
+    // This call now works because the method was added to the repository
+    await _notificationRepo.markAllAsRead(notifications);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All notifications marked as read')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // (Count unread 逻辑不变)
-    final unreadCount = _notifications.where((n) => !n.isRead).length;
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        // ... (AppBar 逻辑不变) ...
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -187,46 +78,64 @@ class _NotificationsPageState extends State<NotificationsPage> {
         title: const Text('Notifications', style: TextStyle(color: kTextColor)),
         centerTitle: true,
         actions: [
-          TextButton(
-            onPressed: unreadCount > 0 ? _markAllAsRead : null,
-            child: Text(
-              'Mark all read',
-              style: TextStyle(
-                color: unreadCount > 0 ? kPrimaryActionColor : Colors.grey,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+          StreamBuilder<List<AppNotification>>(
+            stream: _notificationsStream,
+            builder: (context, snapshot) {
+              final notifications = snapshot.data ?? [];
+              final unreadCount = notifications.where((n) => !n.isRead).length;
+
+              return TextButton(
+                onPressed: unreadCount > 0 ? () => _markAllAsRead(notifications) : null,
+                child: Text(
+                  'Mark all read',
+                  style: TextStyle(
+                    color: unreadCount > 0 ? kPrimaryActionColor : Colors.grey,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(width: 8),
         ],
       ),
-      // ( ✨ 已修改 ✨ )
-      // body 现在会根据 _notifications 列表是否为空来构建
-      body: _notifications.isEmpty
-          ? Center(
-              // (空状态不变)
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.notifications_off_outlined,
-                    size: 60,
-                    color: Colors.grey,
+      body: StreamBuilder<List<AppNotification>>(
+        stream: _notificationsStream,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: kPrimaryActionColor));
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Error loading notifications: ${snapshot.error}'));
+          }
+
+          final notifications = snapshot.data ?? [];
+          
+          if (notifications.isEmpty) {
+              return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.notifications_off_outlined,
+                        size: 60,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'You\'re all caught up!',
+                        style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'You\'re all caught up!',
-                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            )
-          : ListView.builder(
-              // (列表构建逻辑不变)
+                );
+          }
+          
+          return ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              itemCount: _notifications.length,
+              itemCount: notifications.length,
               itemBuilder: (context, index) {
-                final notification = _notifications[index];
+                final notification = notifications[index];
                 final isUnread = !notification.isRead;
 
                 return Padding(
@@ -245,13 +154,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     ),
                     child: ListTile(
                       onTap: () {
-                        setState(() {
-                          notification.isRead = true;
-                        });
-                        // TODO: 导航
+                        // Mark as read when tapped
+                        if (isUnread) {
+                            _notificationRepo.markAsRead(notification.id);
+                        }
+                        // TODO: Implement navigation based on notification.orderId or status
                       },
                       leading: Icon(
-                        _getIconForType(notification.type),
+                        _getIconForType(notification.type), // Use the 'type' field from the model
                         size: 30,
                         color: isUnread ? kPrimaryActionColor : Colors.grey,
                       ),
@@ -272,35 +182,21 @@ class _NotificationsPageState extends State<NotificationsPage> {
                           fontSize: 13,
                         ),
                       ),
-                      trailing: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          if (isUnread)
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          const SizedBox(height: 4),
-                          Text(
-                            notification.time,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color:
-                                  isUnread ? kPrimaryActionColor : Colors.grey,
-                            ),
-                          ),
-                        ],
+                      trailing: Text(
+                        _formatTimeDifference(notification.timestamp), // Use helper for time
+                        style: TextStyle(
+                          fontSize: 11,
+                          color:
+                              isUnread ? kPrimaryActionColor : Colors.grey,
+                        ),
                       ),
                     ),
                   ).animate().fadeIn(duration: 400.ms),
                 );
               },
-            ),
+            );;
+        }
+      ),
     );
   }
 }

@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class VendorModel {
   final String uid;
   final String storeName;
@@ -15,6 +13,7 @@ class VendorModel {
   final bool hasExpiryDeals;
   final int reviewCount;
 
+
   VendorModel({
     required this.uid,
     required this.storeName,
@@ -27,38 +26,36 @@ class VendorModel {
     this.isApproved = false,
     this.rating = 0.0,
     this.storeHours = const [],
-    this.hasExpiryDeals = false, // Default to false
+    this.hasExpiryDeals = false,
     this.reviewCount = 0,
   });
 
-  // 从 Firestore (Map) 转换
   factory VendorModel.fromMap(Map<String, dynamic> map) {
     return VendorModel(
       uid: map['uid'] ?? '',
       storeName: map['storeName'] ?? '',
       storeAddress: map['storeAddress'] ?? '',
       storePhone: map['storePhone'] ?? '',
-      vendorType: map['vendorType'] ?? 'Grocery', // <-- (添加了默认值)
+      vendorType: map['vendorType'] ?? 'Grocery',
       businessPhotoUrl: map['businessPhotoUrl'] ??
           'https://placehold.co/600x400/FFF8E1/E6A000?text=Store',
       businessLicenseUrl: map['businessLicenseUrl'] ?? '',
       halalCertificateUrl: map['halalCertificateUrl'] ?? '',
       isApproved: map['isApproved'] ?? false,
-      rating: (map['rating'] as num?)?.toDouble() ?? 0.0, // <-- (FIXED)
+      rating: (map['rating'] as num?)?.toDouble() ?? 0.0,
       storeHours: List<String>.from(map['storeHours'] ?? []),
       hasExpiryDeals: map['hasExpiryDeals'] ?? false,
-      reviewCount: (map['reviewCount'] as num?)?.toInt() ?? 0, // <-- (FIXED)
+      reviewCount: (map['reviewCount'] as num?)?.toInt() ?? 0,
     );
   }
 
-  // 转换到 Map (用于写入 Firestore)
   Map<String, dynamic> toMap() {
     return {
       'uid': uid,
       'storeName': storeName,
       'storeAddress': storeAddress,
       'storePhone': storePhone,
-      'vendorType': vendorType, // <-- (添加)
+      'vendorType': vendorType,
       'businessPhotoUrl': businessPhotoUrl,
       'businessLicenseUrl': businessLicenseUrl,
       'halalCertificateUrl': halalCertificateUrl,
@@ -66,11 +63,10 @@ class VendorModel {
       'rating': rating,
       'storeHours': storeHours,
       'hasExpiryDeals': hasExpiryDeals,
-      'reviewCount': reviewCount, // <-- (ADDED)
+      'reviewCount': reviewCount,
     };
   }
 
-  // --- (FIX) 这就是你缺少的另一个方法 ---
   VendorModel copyWith({
     String? uid,
     String? storeName,
@@ -84,7 +80,9 @@ class VendorModel {
     double? rating,
     List<String>? storeHours,
     bool? hasExpiryDeals,
-    int? reviewCount, // <-- (FIXED)
+    int? reviewCount,
+    double? lat,
+    double? lng,
   }) {
     return VendorModel(
       uid: uid ?? this.uid,
@@ -99,7 +97,7 @@ class VendorModel {
       rating: rating ?? this.rating,
       storeHours: storeHours ?? this.storeHours,
       hasExpiryDeals: hasExpiryDeals ?? this.hasExpiryDeals,
-      reviewCount: reviewCount ?? this.reviewCount, // <-- (FIXED)
+      reviewCount: reviewCount ?? this.reviewCount,
     );
   }
 }

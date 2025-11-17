@@ -1,7 +1,6 @@
-// 路径: lib/repositories/notification_repository.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/notification_model.dart'; // 导入我们刚创建的模型
+import '../models/notification_model.dart'; 
 
 class NotificationRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -9,27 +8,80 @@ class NotificationRepository {
 
   String? get _uid => _auth.currentUser?.uid;
 
-  // --- ( ✨ 关键函数 ✨ ) ---
-  // 获取当前用户未读通知的 *数量*
+  // --- CRITICAL: Function to send notification on status change ---
+  Future<void> sendOrderStatusNotification({
+    required String userId,
+    required String orderId,
+    required String newStatus,
+    required String vendorName,
+  }) async {
+    final String title;
+    final String body;
+    final String type = 'order'; // Always 'order' type for status updates
+
+    switch (newStatus.toLowerCase()) {
+      case 'received':
+        title = 'Order Accepted! Starting Preparation';
+        body = 'The vendor $vendorName has received and accepted your order #$orderId.';
+        break;
+      case 'rejected':
+        title = 'Order Declined';
+        body = 'Your payment for order #$orderId was declined by the Admin. Check your payment proof.';
+        break;
+      case 'preparing':
+        title = 'Order Preparation Underway';
+        body = 'The vendor $vendorName is preparing your items.';
+        break;
+      case 'ready for pickup':
+        title = 'Ready for Pickup!';
+        body = 'Your BlindBox order #$orderId is ready for collection at $vendorName.';
+        break;
+      case 'delivering':
+        title = 'Out for Delivery!';
+        body = 'Your order #$orderId is now with the driver and is on its way.';
+        break;
+      default:
+        // Skip notification for minor or unknown statuses
+        return;
+    }
+
+    final newNotification = AppNotification(
+      id: '', // Firestore will assign ID
+      userId: userId,
+      title: title,
+      body: body,
+      type: type,
+      timestamp: Timestamp.now(),
+      isRead: false,
+      orderId: orderId, // <-- FIX: This line now matches the AppNotification constructor
+    );
+
+    try {
+      await _db.collection('notifications').add(newNotification.toMap());
+    } catch (e) {
+      print("Error sending status notification: $e");
+    }
+  }
+  // --- END CRITICAL FUNCTION ---
+
+  // --- FIX: Correctly defined return type for the unread count stream ---
   Stream<int> getUnreadNotificationCountStream() {
     final uid = _uid;
     if (uid == null) {
-      // 如果未登录，返回一个 0 的流
       return Stream.value(0);
     }
 
     return _db
         .collection('notifications')
         .where('userId', isEqualTo: uid)
-        .where('isRead', isEqualTo: false) // ( ✨ 关键查询 ✨ )
-        .snapshots() // 监听变化
+        .where('isRead', isEqualTo: false)
+        .snapshots() 
         .map((snapshot) {
-      // 每次变化时，只返回文档的数量
       return snapshot.docs.length;
     });
   }
 
-  // (这是我们稍后在 notifications_page.dart 中需要的函数)
+  // (This streams the list for the notifications page)
   Stream<List<AppNotification>> getNotificationsStream() {
     final uid = _uid;
     if (uid == null) {
@@ -61,5 +113,17 @@ class NotificationRepository {
       print('Error marking as read: $e');
       rethrow;
     }
+  }
+  
+  // --- FIX: Added the missing markAllAsRead method using a batch ---
+  Future<void> markAllAsRead(List<AppNotification> notifications) async {
+    final batch = _db.batch();
+    
+    // Only update those that are not already read
+    for (var notification in notifications.where((n) => !n.isRead)) {
+      final docRef = _db.collection('notifications').doc(notification.id);
+      batch.update(docRef, {'isRead': true});
+    }
+    await batch.commit();
   }
 }

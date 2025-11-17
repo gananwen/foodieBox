@@ -49,7 +49,7 @@ class GroceryPage extends StatelessWidget {
 
           return Column(
             children: [
-              const SizedBox(height: 50), // Added padding for the top
+              const SizedBox(height: 30), // Added padding for the top
               // --- Top Section (No changes) ---
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20),
@@ -59,7 +59,7 @@ class GroceryPage extends StatelessWidget {
                       fontSize: 22, fontWeight: FontWeight.bold, color: kTextColor),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(

@@ -457,6 +457,11 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
       'voucherCode': selectedVoucher?.code,
       'voucherLabel': selectedVoucher?.title, 
       'items': itemsData,
+      
+      // --- ( ✨ THIS IS THE ADDED LINE ✨ ) ---
+      'status': 'Awaiting Payment Proof', // Pre-order status
+      // --- ( ✨ END OF ADDED LINE ✨ ) ---
+
       'timestamp': FieldValue.serverTimestamp(),
       'pickupDay': cart.selectedPickupDay,
       'pickupTime': cart.selectedPickupTime,
