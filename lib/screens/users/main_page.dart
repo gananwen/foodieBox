@@ -8,17 +8,17 @@ import 'profile_page.dart';
 import 'package:provider/provider.dart';
 import 'package:foodiebox/providers/cart_provider.dart';
 import 'package:foodiebox/screens/users/cart_page.dart';
-import 'dart:async'; 
+import 'dart:async';
 import 'package:foodiebox/models/promotion.dart';
-import 'package:firebase_auth/firebase_auth.dart'; 
-import '../users/status_notification_bar.dart'; 
-import '../../repositories/notification_repository.dart'; 
-import '../shared/notifications_page.dart'; 
-import '../users/subpages/delivery_address_page.dart'; 
-
+import 'package:firebase_auth/firebase_auth.dart';
+import '../users/status_notification_bar.dart';
+import '../../repositories/notification_repository.dart';
+import '../shared/notifications_page.dart';
+import '../users/subpages/delivery_address_page.dart';
+import '../users/main_category_product_page.dart'; // <--- NEW IMPORT
 
 class MainPage extends StatefulWidget {
-  final String? pendingOrderId; 
+  final String? pendingOrderId;
   const MainPage({super.key, this.pendingOrderId});
 
   @override
@@ -27,12 +27,12 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> {
   String _currentAddress = "Select Location";
-  
+
   late final PageController _pageController;
   Timer? _timer;
   int _currentPage = 0;
-  
-  final NotificationRepository _notificationRepo = NotificationRepository(); 
+
+  final NotificationRepository _notificationRepo = NotificationRepository();
 
   // --- NEW SEARCH STATE ---
   final TextEditingController _searchController = TextEditingController();
@@ -40,18 +40,17 @@ class _MainPageState extends State<MainPage> {
   Timer? _debounce;
   // --- END NEW SEARCH STATE ---
 
-
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: 0, viewportFraction: 0.9);
     _loadSelectedAddress();
-    
+
     // --- NEW: Listen to search bar changes ---
     _searchController.addListener(_onSearchChanged);
     // --- END NEW ---
   }
-  
+
   Future<void> _loadSelectedAddress() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -61,11 +60,10 @@ class _MainPageState extends State<MainPage> {
     final data = doc.data();
     if (data != null && data['selectedAddress'] != null) {
       final addr = data['selectedAddress'];
-      setState(() =>
-          _currentAddress = addr['address'] ?? 'Select Location');
+      setState(() => _currentAddress = addr['address'] ?? 'Select Location');
     }
   }
-  
+
   // --- NEW: Debounced search function ---
   void _onSearchChanged() {
     final text = _searchController.text.trim();
@@ -76,7 +74,7 @@ class _MainPageState extends State<MainPage> {
       }
       return;
     }
-    
+
     // Debounce the call to avoid hitting Firestore too hard
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () {
@@ -89,13 +87,15 @@ class _MainPageState extends State<MainPage> {
       final snapshot = await FirebaseFirestore.instance
           .collection('vendors')
           .where('storeName', isGreaterThanOrEqualTo: query)
-          .where('storeName', isLessThan: query + '\uf7ff') // Unicode upper bound for prefix search
+          .where('storeName',
+              isLessThan:
+                  query + '\uf7ff') // Unicode upper bound for prefix search
           .limit(5) // Limit results for performance
           .get();
 
       // Only rebuild if the search results have actually changed
       final newResults = snapshot.docs
-          .map((doc) => VendorModel.fromMap(doc.data()))
+          .map((doc) => VendorModel.fromMap(doc.data() as Map<String, dynamic>))
           .toList();
 
       if (mounted) {
@@ -110,7 +110,7 @@ class _MainPageState extends State<MainPage> {
       }
     }
   }
-  
+
   void _selectVendor(VendorModel vendor) {
     // Navigate to the store detail page for the selected vendor
     Navigator.push(
@@ -124,7 +124,6 @@ class _MainPageState extends State<MainPage> {
     setState(() => _searchResults = []);
   }
   // --- END NEW SEARCH FUNCTIONS ---
-
 
   void _startAutoSlide(int totalPages) {
     if (_timer != null) {
@@ -170,18 +169,18 @@ class _MainPageState extends State<MainPage> {
       // 1. Update the user's default selected address in Firestore
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid != null) {
-          await FirebaseFirestore.instance.collection('users').doc(uid).update({
-              'selectedAddress': selectedLocation,
-          });
+        await FirebaseFirestore.instance.collection('users').doc(uid).update({
+          'selectedAddress': selectedLocation,
+        });
       }
-      
+
       // 2. Update the local state
       setState(() {
         _currentAddress = selectedLocation['address'] as String;
       });
     }
   }
-  
+
   void _navigateToNotificationsPage(BuildContext context) {
     // FIX: Ensure correct path and remove const if arguments are dynamic
     Navigator.push(
@@ -192,7 +191,6 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  // --- NEW HELPER WIDGET: Contains Search Bar and Dropdown (Now placed outside main build stack) ---
   Widget _buildSearchBarWithDropdown(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -218,7 +216,7 @@ class _MainPageState extends State<MainPage> {
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
             ),
           ),
-          
+
           // --- Autocomplete Dropdown Overlay (Embedded in Column, appears below) ---
           if (_searchResults.isNotEmpty)
             Padding(
@@ -239,13 +237,15 @@ class _MainPageState extends State<MainPage> {
                     itemBuilder: (context, index) {
                       final vendor = _searchResults[index];
                       return ListTile(
-                        leading: const Icon(Icons.storefront, color: kPrimaryActionColor),
+                        leading: const Icon(Icons.storefront,
+                            color: kPrimaryActionColor),
                         title: Text(
-                          vendor.storeName, 
+                          vendor.storeName,
                           style: kLabelTextStyle.copyWith(fontSize: 16),
                           overflow: TextOverflow.ellipsis,
                         ),
-                        subtitle: Text(vendor.vendorType, style: kHintTextStyle),
+                        subtitle:
+                            Text(vendor.vendorType, style: kHintTextStyle),
                         onTap: () => _selectVendor(vendor),
                       );
                     },
@@ -259,258 +259,269 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final currentUser = FirebaseAuth.instance.currentUser; // Get current user
 
     final allPromotionsStream = FirebaseFirestore.instance
-        .collectionGroup('promotions') 
+        .collectionGroup('promotions')
         .where('endDate', isGreaterThan: Timestamp.now())
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => 
-            PromotionModel.fromMap(doc.data() as Map<String, dynamic>, doc.id)
-          ).toList()
-        );
+        .map((snapshot) => snapshot.docs
+            .map((doc) => PromotionModel.fromMap(
+                doc.data() as Map<String, dynamic>, doc.id))
+            .toList());
 
     Widget buildMainContent(List<PromotionModel> allPromotions) {
-        return Stack(
-          children: [
-            // --- FIX 2: Corrected GestureDetector to use the named 'child' argument ---
-            GestureDetector(
-              onTap: () {
-                // Clear focus to hide keyboard and remove search results
-                FocusScope.of(context).unfocus();
-                if (_searchResults.isNotEmpty) {
-                  setState(() => _searchResults = []);
-                }
-              },
-              child: SingleChildScrollView( 
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // --- Top Bar (Remains same) ---
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 50, 20, 10),
-                      child: Row(
-                        children: [
-                          GestureDetector(
-                            onTap: _navigateToAddressSelection,
-                            child: Row(
-                              children: [
-                                const Icon(Icons.location_on, color: kTextColor),
-                                const SizedBox(width: 4),
-                                SizedBox(
-                                  width: 150,
-                                  child: Text(
-                                    _currentAddress,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: kTextColor,
-                                    ),
+      return Stack(
+        children: [
+          // --- FIX 2: Corrected GestureDetector to use the named 'child' argument ---
+          GestureDetector(
+            onTap: () {
+              // Clear focus to hide keyboard and remove search results
+              FocusScope.of(context).unfocus();
+              if (_searchResults.isNotEmpty) {
+                setState(() => _searchResults = []);
+              }
+            },
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // --- Top Bar (Gap reduced from 50 to 20) ---
+                  // REDUCED TOP PADDING TO MOVE UI UP
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 5),
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: _navigateToAddressSelection,
+                          child: Row(
+                            children: [
+                              const Icon(Icons.location_on, color: kTextColor),
+                              const SizedBox(width: 4),
+                              SizedBox(
+                                width: 150,
+                                child: Text(
+                                  _currentAddress,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: kTextColor,
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          const Spacer(),
-                          if (currentUser != null)
-                            StreamBuilder<int>(
-                              stream: _notificationRepo.getUnreadNotificationCountStream(),
+                        ),
+                        const Spacer(),
+                        if (currentUser != null)
+                          StreamBuilder<int>(
+                              stream: _notificationRepo
+                                  .getUnreadNotificationCountStream(),
                               builder: (context, snapshot) {
                                 final unreadCount = snapshot.data ?? 0;
                                 return IconButton(
                                   icon: Badge(
                                     label: Text(unreadCount.toString()),
                                     isLabelVisible: unreadCount > 0,
-                                    child: const Icon(Icons.notifications_none, color: kTextColor),
+                                    child: const Icon(Icons.notifications_none,
+                                        color: kTextColor),
                                   ),
-                                  onPressed: () => _navigateToNotificationsPage(context),
+                                  onPressed: () =>
+                                      _navigateToNotificationsPage(context),
                                 );
-                              }
-                            )
-                          else 
-                            IconButton(
-                                icon: const Icon(Icons.notifications_none, color: kTextColor),
-                                onPressed: () => _navigateToNotificationsPage(context),
-                            ),
-                          
+                              })
+                        else
                           IconButton(
-                            icon: Badge(
-                              label: Text(cart.itemCount.toString()),
-                              isLabelVisible: cart.itemCount > 0,
-                              child: const Icon(Icons.shopping_cart_outlined,
-                                  color: kTextColor),
-                            ),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => const CartPage()),
-                              );
-                            },
+                            icon: const Icon(Icons.notifications_none,
+                                color: kTextColor),
+                            onPressed: () =>
+                                _navigateToNotificationsPage(context),
                           ),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => const ProfilePage()),
-                              );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                border:
-                                    Border.all(color: kPrimaryActionColor, width: 2),
-                                shape: BoxShape.circle,
-                              ),
-                              child:
-                                  const Icon(Icons.person_outline, color: kTextColor),
-                            ),
+                        IconButton(
+                          icon: Badge(
+                            label: Text(cart.itemCount.toString()),
+                            isLabelVisible: cart.itemCount > 0,
+                            child: const Icon(Icons.shopping_cart_outlined,
+                                color: kTextColor),
                           ),
-                        ],
-                      ),
-                    ),
-
-                    // --- Search Bar and Dropdown (Now self-contained helper) ---
-                    _buildSearchBarWithDropdown(context),
-                    // --- End Search Bar ---
-                    
-                    _buildPromotionsBanner(context, allPromotions),
-
-                    // --- Horizontal Scrollable Categories (Remaining content remains the same) ---
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10), // REDUCED VERTICAL PADDING
-                      child: SizedBox(
-                        height: 120, // increased from 100 to allow label space
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: [
-                            _buildCircleCategory(
-                                'Hot Deals', 'assets/images/hot_deals.jpg'),
-                            const SizedBox(width: 16),
-                            _buildCircleCategory(
-                                'Frozen Rescue', 'assets/images/frozen_rescue.jpg'),
-                            const SizedBox(width: 16),
-                            _buildCircleCategory(
-                                'Pantry Saver', 'assets/images/pantry_saver.jpg'),
-                            const SizedBox(width: 16),
-                            _buildCircleCategory('Healthy Leftovers',
-                                'assets/images/healthy_leftovers.jpg'),
-                          ],
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => const CartPage()),
+                            );
+                          },
                         ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => const ProfilePage()),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                  color: kPrimaryActionColor, width: 2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.person_outline,
+                                color: kTextColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // --- Search Bar and Dropdown ---
+                  _buildSearchBarWithDropdown(context),
+                  // --- End Search Bar ---
+
+                  // Gap between Search Bar and Banner reduced from 10 to 5
+                  const SizedBox(height: 5),
+
+                  _buildPromotionsBanner(context, allPromotions),
+
+                  // --- Horizontal Scrollable Categories (MODIFIED) ---
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 10),
+                    child: SizedBox(
+                      height: 120, // increased from 100 to allow label space
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          // MAPPING: Hot Deals -> Hot Deals
+                          _buildCircleCategory(
+                              'Hot Deals', 'assets/images/hot_deals.jpg', 'Hot Deals'),
+                          const SizedBox(width: 16),
+                          // MAPPING: Frozen Rescue -> Frozen
+                          _buildCircleCategory('Frozen Rescue',
+                              'assets/images/frozen_rescue.jpg', 'Frozen'),
+                          const SizedBox(width: 16),
+                          // MAPPING: Pantry Saver -> Spices
+                          _buildCircleCategory(
+                              'Pantry Saver', 'assets/images/pantry_saver.jpg', 'Spices'),
+                          const SizedBox(width: 16),
+                          // MAPPING: Healthy Leftovers -> Vegetables
+                          _buildCircleCategory('Healthy Leftovers',
+                              'assets/images/healthy_leftovers.jpg', 'Vegetables'),
+                        ],
                       ),
                     ),
-                    
-                    // --- LAYOUT FIX: Reduced vertical space here ---
-                    const SizedBox(height: 10), 
-                    // --- END LAYOUT FIX ---
+                  ),
 
-                    _buildVendorListSection(
-                      title: 'Order snacks from',
-                      stream: FirebaseFirestore.instance
-                          .collection('vendors')
-                          .where('vendorType', isEqualTo: 'Blindbox')
-                          .snapshots(),
-                      allPromotions: allPromotions, 
-                    ),
-                    
-                    const SizedBox(height: 30),
-                    _buildVendorListSection(
-                      title: 'Order from Grocery',
-                      stream: FirebaseFirestore.instance
-                          .collection('vendors')
-                          .where('vendorType', isEqualTo: 'Grocery')
-                          .snapshots(),
-                      allPromotions: allPromotions, 
-                    ),
-                    
-                    const SizedBox(height: 100), // Extra space for cart bubble offset
-                  ],
-                ),
+                  // --- LAYOUT FIX: Reduced vertical space here ---
+                  const SizedBox(
+                      height: 5), // Reduced gap before vendor list start
+                  // --- END LAYOUT FIX ---
+
+                  _buildVendorListSection(
+                    title: 'Order snacks from',
+                    stream: FirebaseFirestore.instance
+                        .collection('vendors')
+                        .where('vendorType', isEqualTo: 'Blindbox')
+                        .snapshots(),
+                    allPromotions: allPromotions,
+                  ),
+
+                  const SizedBox(height: 30),
+                  _buildVendorListSection(
+                    title: 'Order from Grocery',
+                    stream: FirebaseFirestore.instance
+                        .collection('vendors')
+                        .where('vendorType', isEqualTo: 'Grocery')
+                        .snapshots(),
+                    allPromotions: allPromotions,
+                  ),
+
+                  const SizedBox(
+                      height: 100), // Extra space for cart bubble offset
+                ],
               ),
             ),
-            
-            // --- Floating Cart Bubble (Remains the same) ---
-            Positioned(
-              right: 20,
-              bottom: 12,
-              child: AnimatedOpacity(
-                opacity: cart.itemCount > 0 ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: cart.itemCount > 0
-                    ? Stack(
-                        alignment: Alignment.topRight,
-                        children: [
-                          FloatingActionButton.extended(
-                            backgroundColor: Colors.amber,
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => const CartPage()),
-                              );
-                            },
-                            icon: const Icon(Icons.shopping_cart,
-                                color: Colors.white),
-                            label: Text('RM ${cart.subtotal.toStringAsFixed(2)}',
-                                style: const TextStyle(color: Colors.white)),
-                          ),
-                          Positioned(
-                            right: 0,
-                            top: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.redAccent,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
-                              ),
-                              child: Text('${cart.itemCount}',
-                                  style: const TextStyle(
-                                      color: Colors.white, fontSize: 12)),
+          ),
+
+          // --- Floating Cart Bubble (Remains the same) ---
+          Positioned(
+            right: 20,
+            bottom: 12,
+            child: AnimatedOpacity(
+              opacity: cart.itemCount > 0 ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: cart.itemCount > 0
+                  ? Stack(
+                      alignment: Alignment.topRight,
+                      children: [
+                        FloatingActionButton.extended(
+                          backgroundColor: Colors.amber,
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => const CartPage()),
+                            );
+                          },
+                          icon: const Icon(Icons.shopping_cart,
+                              color: Colors.white),
+                          label: Text('RM ${cart.subtotal.toStringAsFixed(2)}',
+                              style: const TextStyle(color: Colors.white)),
+                        ),
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
                             ),
+                            child: Text('${cart.itemCount}',
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 12)),
                           ),
-                        ],
-                      )
-                    : null,
-              ),
+                        ),
+                      ],
+                    )
+                  : null,
             ),
-            // --- END Floating Cart ---
-          ],
-        );
+          ),
+          // --- END Floating Cart ---
+        ],
+      );
     }
-
 
     // 2. StreamBuilder around the main content
     Widget content = StreamBuilder<List<PromotionModel>>(
         stream: allPromotionsStream,
         builder: (context, promotionSnapshot) {
-          
           if (promotionSnapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: kPrimaryActionColor));
+            return const Center(
+                child: CircularProgressIndicator(color: kPrimaryActionColor));
           }
           if (promotionSnapshot.hasError) {
-             print("Error loading promotions: ${promotionSnapshot.error}");
-             // Return simplified error handling for brevity
-             return const Center(child: Text("Error loading promotions."));
+            print("Error loading promotions: ${promotionSnapshot.error}");
+            // Return simplified error handling for brevity
+            return const Center(child: Text("Error loading promotions."));
           }
 
           final allPromotions = promotionSnapshot.data ?? [];
           return buildMainContent(allPromotions);
-        }
-      );
+        });
 
     // 3. Wrap in BasePage and conditionally wrap in OrderStatusChecker
     Widget mainPageScaffold = BasePage(
       currentIndex: 0,
       child: content,
     );
-    
+
     if (widget.pendingOrderId != null) {
       // FIX: Use OrderStatusChecker widget correctly
       return OrderStatusChecker(
@@ -518,27 +529,73 @@ class _MainPageState extends State<MainPage> {
         child: mainPageScaffold,
       );
     }
-    
+
     return mainPageScaffold;
   }
-  
-  // --- START OF HELPER METHODS ---
 
-  Widget _buildPromotionsBanner(BuildContext context, List<PromotionModel> allPromotions) {
-    
+  // --- START OF HELPER METHODS ---
+  
+  // --- MODIFIED _buildCircleCategory to include categoryFilter and navigation ---
+  Widget _buildCircleCategory(
+      String label, String imagePath, String categoryFilter) {
+    return GestureDetector(
+      onTap: () {
+        // Navigate to the new CategoryProductPage
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MainCategoryProductPage( // <--- RENAMED
+              title: label,
+              categoryName: categoryFilter,
+            ),
+          ),
+        );
+      },
+      child: Column(
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              image: DecorationImage(
+                // Assuming AssetImage paths are correct
+                image: AssetImage(imagePath),
+                fit: BoxFit.cover,
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 4,
+                  offset: Offset(2, 2),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(label, style: const TextStyle(fontSize: 12, color: kTextColor)),
+        ],
+      ),
+    );
+  }
+  // --- END MODIFIED _buildCircleCategory ---
+
+  Widget _buildPromotionsBanner(
+      BuildContext context, List<PromotionModel> allPromotions) {
     final bannerPromotions = allPromotions
-        .where((promo) => promo.bannerUrl.isNotEmpty && promo.vendorId.isNotEmpty)
+        .where(
+            (promo) => promo.bannerUrl.isNotEmpty && promo.vendorId.isNotEmpty)
         .toList();
 
     if (bannerPromotions.isEmpty) {
-      return const SizedBox.shrink(); 
+      return const SizedBox.shrink();
     }
 
     _startAutoSlide(bannerPromotions.length);
 
     return Container(
-      height: 150, 
-      margin: const EdgeInsets.only(top: 10), 
+      height: 150,
+      margin: const EdgeInsets.only(top: 10),
       child: PageView.builder(
         controller: _pageController,
         itemCount: bannerPromotions.length,
@@ -562,12 +619,14 @@ class _MainPageState extends State<MainPage> {
         try {
           final doc = await FirebaseFirestore.instance
               .collection('vendors')
-              .doc(promo.vendorId) 
+              .doc(promo.vendorId)
               .get();
-              
+
           if (doc.exists) {
             // NOTE: Assuming VendorModel.fromMap exists
-            final vendor = doc.data() != null ? VendorModel.fromMap(doc.data() as Map<String, dynamic>) : null; 
+            final vendor = doc.data() != null
+                ? VendorModel.fromMap(doc.data() as Map<String, dynamic>)
+                : null;
             if (vendor != null) {
               Navigator.push(
                 context,
@@ -588,19 +647,22 @@ class _MainPageState extends State<MainPage> {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade300, width: 1.0), // Light border
+          border: Border.all(
+              color: Colors.grey.shade300, width: 1.0), // Light border
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: Image.network(
-            promo.bannerUrl, 
+            promo.bannerUrl,
             fit: BoxFit.cover,
             width: double.infinity,
             loadingBuilder: (context, child, progress) {
               if (progress == null) return child;
               return Container(
                 color: Colors.grey.shade200,
-                child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryActionColor)),
+                child: const Center(
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: kPrimaryActionColor)),
               );
             },
             errorBuilder: (context, error, stackTrace) {
@@ -615,38 +677,10 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  Widget _buildCircleCategory(String label, String imagePath) {
-    return Column(
-      children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            image: DecorationImage(
-              // Assuming AssetImage paths are correct
-              image: AssetImage(imagePath), 
-              fit: BoxFit.cover,
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 4,
-                offset: Offset(2, 2),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(label, style: const TextStyle(fontSize: 12, color: kTextColor)),
-      ],
-    );
-  }
-
   Widget _buildVendorListSection({
-    required String title, 
+    required String title,
     required Stream<QuerySnapshot> stream,
-    required List<PromotionModel> allPromotions, 
+    required List<PromotionModel> allPromotions,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -670,14 +704,13 @@ class _MainPageState extends State<MainPage> {
               return const Center(
                   child: Text('No shops found.', style: kHintTextStyle));
             }
-            
+
             return Column(
               children: snapshot.data!.docs.map((doc) {
                 VendorModel vendor =
                     VendorModel.fromMap(doc.data() as Map<String, dynamic>);
-                
-                return _buildShopCard(context, vendor, allPromotions);
 
+                return _buildShopCard(context, vendor, allPromotions);
               }).toList(),
             );
           },
@@ -686,16 +719,18 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  Widget _buildShopCard(BuildContext context, VendorModel vendor, List<PromotionModel> allPromotions) {
-    
+  Widget _buildShopCard(BuildContext context, VendorModel vendor,
+      List<PromotionModel> allPromotions) {
     int? bestDiscount;
     // NOTE: Assuming vendor.uid exists for filtering
-    final vendorPromotions = allPromotions.where((p) => p.vendorId == (vendor.uid ?? '')).toList(); 
-    
+    final vendorPromotions =
+        allPromotions.where((p) => p.vendorId == (vendor.uid ?? '')).toList();
+
     if (vendorPromotions.isNotEmpty) {
-      bestDiscount = vendorPromotions.fold(0, (max, promo) => 
-        promo.discountPercentage > max! ? promo.discountPercentage : max
-      );
+      bestDiscount = vendorPromotions.fold(
+          0,
+          (max, promo) =>
+              promo.discountPercentage > max! ? promo.discountPercentage : max);
       if (bestDiscount == 0) {
         bestDiscount = null;
       }
@@ -760,7 +795,7 @@ class _MainPageState extends State<MainPage> {
                     },
                   ),
                 ),
-                
+
                 // --- "HOT DEAL" Tag ---
                 if (vendor.hasExpiryDeals)
                   Positioned(
@@ -771,7 +806,7 @@ class _MainPageState extends State<MainPage> {
                           horizontal: 6, vertical: 3),
                       decoration: const BoxDecoration(
                         // Changed from dark red to a sharp, visible color
-                        color: Colors.redAccent, 
+                        color: Colors.redAccent,
                         borderRadius: BorderRadius.only(
                           topLeft: Radius.circular(12),
                           bottomRight: Radius.circular(12),
@@ -837,7 +872,8 @@ class _MainPageState extends State<MainPage> {
                         const SizedBox(width: 6),
                         Text(
                           '(${vendor.reviewCount})', // Shows review count
-                          style: const TextStyle(fontSize: 13, color: Colors.black54),
+                          style: const TextStyle(
+                              fontSize: 13, color: Colors.black54),
                         ),
                         const SizedBox(width: 12),
                         const Icon(Icons.delivery_dining,
@@ -849,7 +885,7 @@ class _MainPageState extends State<MainPage> {
                         ),
                       ],
                     ),
-                    
+
                     // --- VISUAL FIX: Discount Tag PLACED HERE (Bellow ratings) ---
                     if (bestDiscount != null)
                       Padding(
@@ -859,14 +895,15 @@ class _MainPageState extends State<MainPage> {
                               horizontal: 8, vertical: 4),
                           // --- MODIFIED TO GREEN VOUCHER STYLE ---
                           decoration: BoxDecoration(
-                            color: Colors.green.shade100, 
+                            color: Colors.green.shade100,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             '$bestDiscount% OFF',
                             style: TextStyle(
-                              color: Colors.green.shade800, 
-                              fontWeight: FontWeight.w500, // Use w500 to match voucher body text
+                              color: Colors.green.shade800,
+                              fontWeight: FontWeight
+                                  .w500, // Use w500 to match voucher body text
                               fontSize: 12,
                             ),
                           ),

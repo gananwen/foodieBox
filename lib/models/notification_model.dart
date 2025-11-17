@@ -1,4 +1,3 @@
-// 路径: lib/models/notification_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // (我们沿用你之前的枚举，但现在它在自己的模型文件中)
@@ -12,6 +11,7 @@ class AppNotification {
   final String type; // 'order', 'offer', 'product', 'redeem'
   final Timestamp timestamp;
   bool isRead;
+  final String? orderId; // <-- FIXED: Added missing orderId field
 
   AppNotification({
     required this.id,
@@ -21,6 +21,7 @@ class AppNotification {
     required this.type,
     required this.timestamp,
     this.isRead = false,
+    this.orderId, // <-- ADDED TO CONSTRUCTOR
   });
 
   // 从 Firestore 转换
@@ -33,6 +34,7 @@ class AppNotification {
       type: map['type'] ?? 'update',
       timestamp: map['timestamp'] ?? Timestamp.now(),
       isRead: map['isRead'] ?? false,
+      orderId: map['orderId'], // <-- MAPPED HERE
     );
   }
 
@@ -45,6 +47,7 @@ class AppNotification {
       'type': type,
       'timestamp': timestamp,
       'isRead': isRead,
+      'orderId': orderId, // <-- MAPPED HERE
     };
   }
 }

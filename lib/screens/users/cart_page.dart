@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:foodiebox/providers/cart_provider.dart';
-// --- ( ✨ FIX: Removed old unused imports ✨ ) ---
-// import 'package:foodiebox/screens/users/checkout_page.dart'; 
-// import 'package:foodiebox/screens/users/pickup_payment_page.dart';
-// --- ( ✨ END FIX ✨ ) ---
-// Import the new payment page which handles the data for delivery/pickup
-import 'package:foodiebox/screens/users/qr_payment_page.dart'; 
 import 'package:foodiebox/screens/users/checkout_page.dart'; // Re-adding CheckoutPage for data flow
 import 'package:foodiebox/screens/users/pickup_payment_page.dart'; // Re-adding PickupPaymentPage for data flow
 import 'package:foodiebox/util/styles.dart';
@@ -21,9 +15,7 @@ class CartPage extends StatefulWidget {
 }
 
 class _CartPageState extends State<CartPage> {
-  // --- NO MORE _selectedOption state ---\
-  
-  // Helper functions to fetch the necessary data pages for navigation
+
   Widget _getDeliveryCheckoutPage(CartProvider cart) {
     return CheckoutPage(
       subtotal: cart.subtotal,
@@ -273,7 +265,7 @@ class _CartPageState extends State<CartPage> {
                     padding: const EdgeInsets.only(top: 10.0),
                     child: Row(
                       children: [
-                        const Icon(Icons.access_time, color: kPrimaryActionColor),
+                        const Icon(Icons.access_time, color:  kYellowMedium),
                         const SizedBox(width: 12),
                         Text(
                           'Pickup Time: ',
@@ -283,7 +275,7 @@ class _CartPageState extends State<CartPage> {
                           child: Text(
                             '${cart.selectedPickupDay}, ${cart.selectedPickupTime}',
                             style: kLabelTextStyle.copyWith(
-                                fontSize: 16, color: kPrimaryActionColor),
+                                fontSize: 16, color:  kYellowMedium),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -366,7 +358,7 @@ class _CartPageState extends State<CartPage> {
                 // --- ( ✨✨✨ END MODIFIED NAVIGATION ✨✨✨ ) ---
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimaryActionColor,
+                backgroundColor: kYellowMedium,
                 foregroundColor: kTextColor,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(

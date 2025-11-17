@@ -3,17 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:foodiebox/providers/cart_provider.dart';
-import 'package:foodiebox/screens/users/payment_pending_page.dart';
 import 'package:foodiebox/util/styles.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+// NOTE: payment_pending_page.dart is removed from imports
 import 'package:foodiebox/enums/checkout_type.dart';
 import 'package:foodiebox/screens/users/order_failure_page.dart';
 import 'package:foodiebox/screens/users/order_confirmation_page.dart';
 import 'package:foodiebox/screens/users/pickup_confirmation_page.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart'; 
 import 'package:foodiebox/repositories/order_repository.dart';
+import 'package:foodiebox/screens/users/main_page.dart'; // Assuming this is your main navigation file
 
 class QrPaymentPage extends StatefulWidget {
   final Map<String, dynamic> orderData;
@@ -63,10 +64,6 @@ class _QrPaymentPageState extends State<QrPaymentPage> {
     }
   }
 
-  // --- REMOVED: _deductStockAndRedeem function --- 
-  // Admin will handle stock and redemption after approval.
-
-
   Future<void> _confirmPayment() async {
     if (_paymentProofImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -83,53 +80,54 @@ class _QrPaymentPageState extends State<QrPaymentPage> {
     
     try {
       // 1. Create the order document first to get an ID
-      // Status is Awaiting Payment Proof
       orderDocRef = await FirebaseFirestore.instance
           .collection('orders')
           .add({
             ...widget.orderData,
-            // Status is now 'Awaiting Payment Proof' (handled by CheckoutPage passing the status)
+            // Status is the pending state defined by CheckoutPage
             'paymentProofUrl': null, // Will be updated
           });
       
       final orderId = orderDocRef.id;
 
-      // 2. Upload the payment proof using the new Order ID (REQUIRES STORAGE PERMISSION)
+      // 2. Upload the payment proof using the new Order ID 
       final String downloadUrl = await _uploadProof(orderId, _paymentProofImage!);
 
-      // 3. Update the order with the payment proof URL (REQUIRES FIRESTORE UPDATE PERMISSION)
+      // 3. Update the order with the payment proof URL 
       await orderDocRef.update({
         'paymentProofUrl': downloadUrl,
       });
-
-      // --- REMOVED: Stock deduction and redemption logic (Now admin responsibility) ---
 
       // 4. Clear the cart
       if (mounted) {
           context.read<CartProvider>().clearCart();
       }
 
-      // 5. Navigate to PaymentPendingPage to wait for admin approval
+      // 5. Navigate back to MainPage, carrying the orderId (for notification bar)
       if (mounted) {
-        final total = widget.orderData['total'];
-        final vendorName = widget.orderData['vendorName'];
-        final vendorAddress = widget.orderData['vendorAddress'] ?? widget.orderData['address']; // Use vendorAddress for pickup
-        final pickupId = widget.orderData['pickupId'];
-
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Payment proof submitted! Check your Orders tab for status updates.'),
+            duration: Duration(seconds: 3),
+            backgroundColor: Colors.blueGrey,
+          ),
+        );
+        
+        // --- CRITICAL CHANGE: Navigate to Orders Page (index 3) ---
+        // This directs the user to see the status in the 'Ongoing' list immediately.
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
-            builder: (context) => PaymentPendingPage(
-              orderId: orderId,
-              orderType: widget.orderType,
-              pickupId: pickupId,
-              vendorName: vendorName,
-              vendorAddress: vendorAddress,
-              total: total,
-            ),
+            // We navigate to MainPage and expect the BasePage to handle the tab switch
+            builder: (context) => const MainPage(), 
           ),
           (route) => route.isFirst,
         );
+        
+        // Note: You may need to manually trigger tab 3 selection on the main page.
+        // For now, navigating to MainPage is the safest way to pop back.
+        // The user will check the Orders tab (index 3).
+        // ------------------------------------------------------------------
       }
 
     } catch (e) {
@@ -140,9 +138,8 @@ class _QrPaymentPageState extends State<QrPaymentPage> {
           backgroundColor: Colors.red,
         ),
       );
-      // Clean up the half-created order if an error occurred after order creation (REQUIRES DELETE PERMISSION)
+      // Clean up the half-created order if an error occurred after order creation 
       if (orderDocRef != null) {
-          // This line requires the fixed Firestore 'delete' rule
           orderDocRef.delete().catchError((error) => debugPrint("Error deleting order: $error"));
       }
       if (mounted) {

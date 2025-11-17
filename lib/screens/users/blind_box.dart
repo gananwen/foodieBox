@@ -15,7 +15,6 @@ import 'package:foodiebox/models/product.dart';
 import 'package:foodiebox/repositories/product_repository.dart'; 
 
 
-
 class BlindBox extends StatefulWidget {
   const BlindBox({super.key});
 
@@ -119,55 +118,57 @@ class _BlindBoxState extends State<BlindBox> {
     });
   }
 
-  // --- RESTORED CIRCULAR CATEGORY WIDGET (REDESIGNED & ALIGNED) ---
-  Widget _buildCircleCategory(String label, String imagePath) {
-    final isSelected = _selectedCategoryFilter == label;
-    
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          // Toggle filter: If tapping current filter, clear it. Otherwise, set it.
-          // Note: If 'All' is removed, selecting the already selected filter clears it.
-          _selectedCategoryFilter = isSelected ? null : label;
-        });
-      },
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center, // <-- FIX: Align contents to center
-        children: [
-          Container(
-            width: 65, // Reduced size
-            height: 65, // Reduced size
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white, // White background
-              border: Border.all(
-                color: isSelected ? kPrimaryActionColor : Colors.grey.shade300, // Light border
-                width: isSelected ? 2.5 : 1.0,
-              ),
-              boxShadow: [
-                // Subtle shadow for depth
-                BoxShadow(
-                    color: Colors.black.withOpacity(0.1), 
-                    blurRadius: 4, 
-                    offset: const Offset(0, 2))
-              ],
-              image: DecorationImage(
-                  // Use AssetImage to load placeholder images
-                  image: AssetImage(imagePath), 
-                  fit: BoxFit.cover),
+// --- MODIFIED CIRCULAR CATEGORY WIDGET (TO MATCH CALL SIGNATURE) ---
+Widget _buildCircleCategory(String label, String imagePath, String categoryValue) {
+  // Use the third parameter (categoryValue) for the actual filtering logic.
+  final isSelected = _selectedCategoryFilter == categoryValue;
+  
+  return GestureDetector(
+    onTap: () {
+      setState(() {
+        // Toggle filter: If tapping current filter, clear it. Otherwise, set it.
+        // The filter value is now categoryValue, not label.
+        _selectedCategoryFilter = isSelected ? null : categoryValue;
+      });
+    },
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center, // Align contents to center
+      children: [
+        Container(
+          width: 80, // Category size increased from 65
+          height: 80, // Category size increased from 65
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white, // White background
+            border: Border.all(
+              // Assuming kPrimaryActionColor and kTextColor are defined elsewhere
+              color: isSelected ? kPrimaryActionColor : Colors.grey.shade300, // Light border
+              width: isSelected ? 2.5 : 1.0,
             ),
+            boxShadow: [
+              // Subtle shadow for depth
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.1), 
+                  blurRadius: 4, 
+                  offset: const Offset(0, 2))
+            ],
+            image: DecorationImage(
+                // Use AssetImage to load placeholder images
+                image: AssetImage(imagePath), 
+                fit: BoxFit.cover),
           ),
-          const SizedBox(height: 6),
-          Text(label, style: TextStyle(
-            fontSize: 12, 
-            color: isSelected ? kPrimaryActionColor : kTextColor,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal
-          )),
-        ],
-      ),
-    );
-  }
-  // --- END RESTORED CIRCULAR CATEGORY WIDGET ---
+        ),
+        const SizedBox(height: 6),
+        Text(label, style: TextStyle(
+          fontSize: 12, 
+          color: isSelected ? kPrimaryActionColor : kTextColor,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal
+        )),
+      ],
+    ),
+  );
+}
+// --- END MODIFIED WIDGET ---
   
   // --- RESTORED: Helper to fetch one product for preview ---
   Future<Product?> _fetchProductPreview(String vendorId) async {
@@ -518,8 +519,8 @@ class _BlindBoxState extends State<BlindBox> {
             borderRadius: BorderRadius.circular(12),
           ),
           padding: const EdgeInsets.all(16),
-           child: const Center(
-             child: Text(
+            child: const Center(
+              child: Text(
               'No promotions available', 
               style: TextStyle(color: Colors.black54)
             ),
@@ -766,7 +767,7 @@ class _BlindBoxState extends State<BlindBox> {
                                   ..._categoryImages.entries.map((entry) => 
                                     Padding(
                                       padding: const EdgeInsets.only(right: 16),
-                                      child: _buildCircleCategory(entry.key, entry.value),
+                                      child: _buildCircleCategory(entry.key, entry.value, entry.key),
                                     ),
                                   ).toList(),
                                   // --- END RESTORED ---

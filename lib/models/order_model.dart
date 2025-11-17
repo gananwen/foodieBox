@@ -10,6 +10,7 @@ class OrderModel {
   final String paymentMethod;
   final double subtotal;
   final double total;
+  final double discount; // <-- ADDED MISSING DISCOUNT FIELD
   final String status;
   final List<OrderItem> items;
   final Timestamp timestamp;
@@ -56,6 +57,7 @@ class OrderModel {
     required this.paymentMethod,
     required this.subtotal,
     required this.total,
+    required this.discount, // <-- ADDED TO CONSTRUCTOR
     required this.status,
     required this.items,
     required this.timestamp,
@@ -103,6 +105,7 @@ class OrderModel {
       paymentMethod: map['paymentMethod'] ?? '',
       subtotal: (map['subtotal'] as num?)?.toDouble() ?? 0.0,
       total: (map['total'] as num?)?.toDouble() ?? 0.0,
+      discount: (map['discount'] as num?)?.toDouble() ?? 0.0, // <-- MAPPED HERE
       status: map['status'] ?? 'received',
       items: parsedItems,
       timestamp: map['timestamp'] ?? Timestamp.now(),

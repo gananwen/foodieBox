@@ -11,7 +11,6 @@ import 'subpages/my_details_page.dart';
 import 'subpages/delivery_address_page.dart';
 import '../shared/notifications_page.dart';
 import 'subpages/promo_card_page.dart';
-import 'subpages/orders_history_page.dart';
 import '../vendor_page/vendor_regieteration_page.dart'; //
 
 class ProfilePage extends StatelessWidget {
@@ -22,6 +21,7 @@ class ProfilePage extends StatelessWidget {
     final userId = FirebaseAuth.instance.currentUser!.uid;
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       backgroundColor: kAppBackgroundColor,
       appBar: AppBar(
         // ... (不变) ...
@@ -41,7 +41,7 @@ class ProfilePage extends StatelessWidget {
                 ClipPath(
                   clipper: _HeaderClipper(),
                   child: Container(
-                    height: 200,
+                    height: 250,
                     width: double.infinity,
                     decoration: const BoxDecoration(
                       gradient: kProfileHeaderGradient,
@@ -116,7 +116,7 @@ class ProfilePage extends StatelessWidget {
               ],
             ),
 
-            const SizedBox(height: 30),
+            const SizedBox(height: 20),
 
             // --- Menu Items ---
             Container(
@@ -127,13 +127,6 @@ class ProfilePage extends StatelessWidget {
               ),
               child: const Column(
                 children: [
-                  // ... (所有其他 ProfileItem 不变) ...
-                  _ProfileItem(
-                    icon: Icons.receipt_long,
-                    label: 'Order History',
-                    targetPage: OrderHistoryPage(),
-                  ),
-                  Divider(height: 1, thickness: 1),
                   _ProfileItem(
                       icon: Icons.person_outline,
                       label: 'My Details',
@@ -148,11 +141,6 @@ class ProfilePage extends StatelessWidget {
                       icon: Icons.card_giftcard,
                       label: 'Promo Card',
                       targetPage: PromoCardPage()),
-                  Divider(height: 1, thickness: 1),
-                  _ProfileItem(
-                      icon: Icons.notifications_none,
-                      label: 'Notifications',
-                      targetPage: NotificationsPage(userRole: 'User')),
                   Divider(height: 1, thickness: 1),
                   _ProfileItem(
                     icon: Icons.help_outline,
@@ -177,7 +165,7 @@ class ProfilePage extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 30),
+            const SizedBox(height: 20),
 
             // --- ( ✨ 3. 移除了 _buildBusinessButton() ✨ ) ---
             // (之前在这里有一个单独的按钮)
