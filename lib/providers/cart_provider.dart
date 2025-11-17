@@ -85,36 +85,30 @@ class CartProvider with ChangeNotifier {
 
   // Adds a product to the cart
   void addItem(Product product, VendorModel vendor, int quantity) {
-    if (product.id == null) return; // Cannot add product without ID
-
-    // Check if user is trying to add from a different vendor
+    if (product.id == null) return; 
     if (_items.isNotEmpty && _items.values.first.vendorId != vendor.uid) {
-      // If so, clear the cart first
       _items.clear();
       print('Cart cleared to add items from a new vendor.');
     }
-
     if (_items.containsKey(product.id)) {
-      // If item is already in cart, update its quantity
       _items.update(
         product.id!,
         (existingItem) => CartItem(
           product: existingItem.product,
-          vendorId: existingItem.vendorId, // <--- FIX: Corrected typo
+          vendorId: existingItem.vendorId, 
           vendorName: existingItem.vendorName,
           vendorImage: existingItem.vendorImage,
           quantity: existingItem.quantity + quantity,
         ),
       );
     } else {
-      // If not in cart, add as a new item
       _items.putIfAbsent(
         product.id!,
         () => CartItem(
           product: product,
           vendorId: vendor.uid,
           vendorName: vendor.storeName,
-          vendorImage: vendor.businessPhotoUrl, // Assuming this is the right field
+          vendorImage: vendor.businessPhotoUrl,
           quantity: quantity,
         ),
       );

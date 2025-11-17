@@ -1028,7 +1028,7 @@ class _CheckoutPage extends State<CheckoutPage> {
 
     final finalTotal = getTotal();
     final finalDeliveryFee =
-        (selectedVoucher?.freeDelivery ?? false) ? 0.0 : _finalDeliveryPrice; // USE _finalDeliveryPrice
+        (selectedVoucher?.freeDelivery ?? false) ? 0.0 : _finalDeliveryPrice; 
     final totalDiscount = promoDiscount + voucherDiscount;
 
 
@@ -1041,18 +1041,17 @@ class _CheckoutPage extends State<CheckoutPage> {
       'contactName': _selectedContactName,
       'contactPhone': _selectedContactPhone,
       'deliveryOption': selectedDelivery,
-      'paymentMethod': 'QR Pay', // Set payment method here
+      'paymentMethod': 'QR Pay',
       'subtotal': subtotal,
       'discount': totalDiscount,
       'deliveryFee': finalDeliveryFee,
       'total': finalTotal,
-      // FIX: Set promoCode to null as automatic promos don't have user-entered codes
       'promoCode': null,
       'promoLabel': automaticPromo?.title, 
       'voucherCode': selectedVoucher?.code,
       'voucherLabel': selectedVoucher?.title, 
       'vendorIds': allVendorIds,
-      'status': 'Awaiting Payment Proof', // Pre-order status
+      'status': 'Awaiting Payment Proof', 
       'items': itemsData,
       'timestamp': FieldValue.serverTimestamp(),
       'vendorName': vendorName,

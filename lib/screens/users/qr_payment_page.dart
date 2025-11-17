@@ -7,14 +7,9 @@ import 'package:foodiebox/util/styles.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-// NOTE: payment_pending_page.dart is removed from imports
 import 'package:foodiebox/enums/checkout_type.dart';
 import 'package:foodiebox/screens/users/order_failure_page.dart';
-import 'package:foodiebox/screens/users/order_confirmation_page.dart';
-import 'package:foodiebox/screens/users/pickup_confirmation_page.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart'; 
-import 'package:foodiebox/repositories/order_repository.dart';
-import 'package:foodiebox/screens/users/main_page.dart'; // Assuming this is your main navigation file
+import 'package:foodiebox/screens/users/main_page.dart'; 
 
 class QrPaymentPage extends StatefulWidget {
   final Map<String, dynamic> orderData;
@@ -79,31 +74,21 @@ class _QrPaymentPageState extends State<QrPaymentPage> {
     DocumentReference? orderDocRef;
     
     try {
-      // 1. Create the order document first to get an ID
       orderDocRef = await FirebaseFirestore.instance
           .collection('orders')
           .add({
             ...widget.orderData,
-            // Status is the pending state defined by CheckoutPage
-            'paymentProofUrl': null, // Will be updated
+            'paymentProofUrl': null, 
           });
-      
       final orderId = orderDocRef.id;
-
-      // 2. Upload the payment proof using the new Order ID 
       final String downloadUrl = await _uploadProof(orderId, _paymentProofImage!);
 
-      // 3. Update the order with the payment proof URL 
       await orderDocRef.update({
         'paymentProofUrl': downloadUrl,
       });
-
-      // 4. Clear the cart
       if (mounted) {
           context.read<CartProvider>().clearCart();
       }
-
-      // 5. Navigate back to MainPage, carrying the orderId (for notification bar)
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
