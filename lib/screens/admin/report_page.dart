@@ -70,7 +70,7 @@ class _ReportPageState extends State<ReportPage> {
       int totalOrderCount = ordersSnapshot.docs.length;
       double totalRevenue = 0;
 
-      // Daily breakdown (optional, if you still want charts)
+      // Daily breakdown
       Map<String, double> dailyRevenue = {
         "Mon": 0,
         "Tue": 0,
@@ -91,12 +91,12 @@ class _ReportPageState extends State<ReportPage> {
       };
 
       for (var doc in ordersSnapshot.docs) {
-        final data = doc.data();
+        final data = doc.data() as Map<String, dynamic>;
         double total =
             (data['total'] is num) ? (data['total'] as num).toDouble() : 0;
         totalRevenue += total;
 
-        // Daily breakdown by timestamp if exists
+        // Daily breakdown by timestamp
         final ts = data['timestamp'];
         if (ts is Timestamp) {
           final date = ts.toDate();
@@ -106,7 +106,6 @@ class _ReportPageState extends State<ReportPage> {
         }
       }
 
-      // Build chart data
       revenueData =
           dailyRevenue.entries.map((e) => _ChartData(e.key, e.value)).toList();
       orderData = dailyOrders.entries
@@ -119,16 +118,23 @@ class _ReportPageState extends State<ReportPage> {
       final vendorSnapshot =
           await FirebaseFirestore.instance.collection('vendors').get();
       _totalVendors = vendorSnapshot.docs.length;
-      _approvedVendors =
-          vendorSnapshot.docs.where((v) => v['isApproved'] ?? false).length;
-      _lockedVendors =
-          vendorSnapshot.docs.where((v) => v['isLocked'] ?? false).length;
+
+      _approvedVendors = vendorSnapshot.docs.where((v) {
+        final data = v.data() as Map<String, dynamic>;
+        return data['isApproved'] ?? false;
+      }).length;
+
+      _lockedVendors = vendorSnapshot.docs.where((v) {
+        final data = v.data() as Map<String, dynamic>;
+        return data['isLocked'] ?? false;
+      }).length;
 
       double vendorRatingSum = 0;
       int vendorRatingCount = 0;
       for (var v in vendorSnapshot.docs) {
-        if (v.data().containsKey('rating') && v['rating'] is num) {
-          vendorRatingSum += (v['rating'] as num).toDouble();
+        final data = v.data() as Map<String, dynamic>;
+        if (data.containsKey('rating') && data['rating'] is num) {
+          vendorRatingSum += (data['rating'] as num).toDouble();
           vendorRatingCount++;
         }
       }
@@ -144,8 +150,9 @@ class _ReportPageState extends State<ReportPage> {
 
       double sumReviews = 0;
       for (var r in reviewSnapshot.docs) {
-        if (r.data().containsKey('rating') && r['rating'] is num) {
-          sumReviews += (r['rating'] as num).toDouble();
+        final data = r.data() as Map<String, dynamic>;
+        if (data.containsKey('rating') && data['rating'] is num) {
+          sumReviews += (data['rating'] as num).toDouble();
         }
       }
       _averageReviewRating =

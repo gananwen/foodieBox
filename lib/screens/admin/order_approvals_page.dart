@@ -488,7 +488,9 @@ class _OrderApprovalsPageState extends State<OrderApprovalsPage> {
               final total =
                   (order['total'] as num?)?.toStringAsFixed(2) ?? "0.00";
               final vendorName = order['vendorName'] ?? 'Unknown Vendor';
-              final contactName = order['contactName'] ?? 'Unknown Customer';
+              final contactName =
+                  (order.data() as Map<String, dynamic>?)?['contactName'] ??
+                      'Unknown Customer';
 
               return Card(
                 elevation: 3,
