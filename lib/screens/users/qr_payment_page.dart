@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:foodiebox/providers/cart_provider.dart';
+import 'package:foodiebox/screens/users/payment_pending_page.dart';
 import 'package:foodiebox/util/styles.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'payment_pending_page.dart'; 
 import 'package:foodiebox/enums/checkout_type.dart';
 import 'package:foodiebox/screens/users/order_failure_page.dart';
 import 'package:foodiebox/screens/users/order_confirmation_page.dart';
@@ -33,7 +33,6 @@ class _QrPaymentPageState extends State<QrPaymentPage> {
   File? _paymentProofImage;
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
-  final OrderRepository _orderRepo = OrderRepository();
 
   Future<void> _pickImage() async {
     final XFile? pickedFile =
@@ -58,72 +57,14 @@ class _QrPaymentPageState extends State<QrPaymentPage> {
       String downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
     } catch (e) {
-      print("Error uploading payment proof: $e");
+      // Log the error for debugging
+      debugPrint("Error uploading payment proof: $e"); 
       throw Exception('Failed to upload proof.');
     }
   }
 
-  // --- ( ✨ DEDUCT STOCK AND REDEEM PROMO ON CLIENT SIDE ✨ ) ---
-  Future<void> _deductStockAndRedeem(String orderId) async {
-    final items = widget.orderData['items'] as List<dynamic>;
-    
-    WriteBatch batch = FirebaseFirestore.instance.batch();
-
-    // 1. Deduct Stock
-    for (var itemData in items) {
-      final String itemVendorId = itemData['vendorId'];
-      final String itemProductId = itemData['productId'];
-      final int quantity = itemData['quantity'];
-      
-      final DocumentReference productRef = FirebaseFirestore.instance
-          .collection('vendors')
-          .doc(itemVendorId)
-          .collection('products')
-          .doc(itemProductId);
-      
-      // Decrease the quantity field
-      batch.update(productRef, {
-        'quantity': FieldValue.increment(-quantity),
-      });
-    }
-
-    // 2. Redeem Voucher (Central collection)
-    final String? voucherCode = widget.orderData['voucherCode'];
-    if (voucherCode != null && voucherCode.isNotEmpty) {
-      // Update central voucher redemption count
-      final DocumentReference voucherRef = FirebaseFirestore.instance
-          .collection('vouchers')
-          .doc(voucherCode); 
-      batch.update(voucherRef, {
-        'claimedRedemptions': FieldValue.increment(1),
-      });
-    }
-
-    // 3. Redeem Automatic Promotion (Vendor collection)
-    final String? promoLabel = widget.orderData['promoLabel'];
-    final List<dynamic> vendorIds = widget.orderData['vendorIds'] as List<dynamic>;
-    
-    if (promoLabel != null && vendorIds.isNotEmpty) {
-        // Find the promotion document by title/label
-        final promoQuerySnapshot = await FirebaseFirestore.instance
-           .collection('vendors')
-           .doc(vendorIds.first) // Assuming single vendor for simplicity
-           .collection('promotions')
-           .where('title', isEqualTo: promoLabel)
-           .limit(1)
-           .get();
-
-        if (promoQuerySnapshot.docs.isNotEmpty) {
-             batch.update(promoQuerySnapshot.docs.first.reference, {
-                'claimedRedemptions': FieldValue.increment(1),
-            });
-        }
-    }
-
-    // Commit all updates
-    await batch.commit();
-  }
-  // --- ( ✨ END DEDUCT STOCK AND REDEEM PROMO ON CLIENT SIDE ✨ ) ---
+  // --- REMOVED: _deductStockAndRedeem function --- 
+  // Admin will handle stock and redemption after approval.
 
 
   Future<void> _confirmPayment() async {
@@ -142,90 +83,73 @@ class _QrPaymentPageState extends State<QrPaymentPage> {
     
     try {
       // 1. Create the order document first to get an ID
-      // NOTE: This initial CREATE uses the customer's credentials and relies on the 
-      // secure rule: allow create: if request.auth != null;
+      // Status is Awaiting Payment Proof
       orderDocRef = await FirebaseFirestore.instance
           .collection('orders')
           .add({
             ...widget.orderData,
-            // FIX: Set status to Received for immediate success flow
-            'status': 'Received', 
+            // Status is now 'Awaiting Payment Proof' (handled by CheckoutPage passing the status)
             'paymentProofUrl': null, // Will be updated
           });
       
       final orderId = orderDocRef.id;
 
-      // 2. Upload the payment proof using the new Order ID
-      // NOTE: This relies on the Storage Rules being set to allow write for auth users in this path.
+      // 2. Upload the payment proof using the new Order ID (REQUIRES STORAGE PERMISSION)
       final String downloadUrl = await _uploadProof(orderId, _paymentProofImage!);
 
-      // 3. Update the order with the payment proof URL
-      // NOTE: This update also relies on the customer having permission to UPDATE their own order document.
+      // 3. Update the order with the payment proof URL (REQUIRES FIRESTORE UPDATE PERMISSION)
       await orderDocRef.update({
         'paymentProofUrl': downloadUrl,
       });
 
-      // 4. Perform stock deduction and redemption on the client side (INSECURE, but requested)
-      // This relies on the insecure Firestore rules for success (allow update on /vendors/{id}/products).
-      await _deductStockAndRedeem(orderId); 
+      // --- REMOVED: Stock deduction and redemption logic (Now admin responsibility) ---
 
-      // 5. Clear the cart
+      // 4. Clear the cart
       if (mounted) {
-         context.read<CartProvider>().clearCart();
+          context.read<CartProvider>().clearCart();
       }
 
-      // 6. Navigate to the confirmation page
+      // 5. Navigate to PaymentPendingPage to wait for admin approval
       if (mounted) {
-        // Since we auto-approved (status: 'Received'), we navigate directly to Confirmation
-        if (widget.orderType == CheckoutType.delivery) {
-             Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => OrderConfirmationPage(
-                    address: widget.orderData['address'],
-                    location: LatLng(widget.orderData['lat'], widget.orderData['lng']),
-                    total: widget.orderData['total'],
-                    promoLabel: widget.orderData['promoLabel'] ?? widget.orderData['voucherLabel'] ?? '',
-                    orderId: orderId,
-                  ),
-                ),
-                (route) => route.isFirst,
-              );
-        } else {
-             Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => PickupConfirmationPage(
-                    orderId: orderId,
-                    pickupId: widget.orderData['pickupId'] ?? 'N/A',
-                    vendorName: widget.orderData['vendorName'],
-                    vendorAddress: widget.orderData['vendorAddress'],
-                    total: widget.orderData['total'],
-                  ),
-                ),
-                (route) => route.isFirst,
-              );
-        }
+        final total = widget.orderData['total'];
+        final vendorName = widget.orderData['vendorName'];
+        final vendorAddress = widget.orderData['vendorAddress'] ?? widget.orderData['address']; // Use vendorAddress for pickup
+        final pickupId = widget.orderData['pickupId'];
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PaymentPendingPage(
+              orderId: orderId,
+              orderType: widget.orderType,
+              pickupId: pickupId,
+              vendorName: vendorName,
+              vendorAddress: vendorAddress,
+              total: total,
+            ),
+          ),
+          (route) => route.isFirst,
+        );
       }
 
     } catch (e) {
-      print("Failed to place order: $e");
+      debugPrint("Failed to place order: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to place order: $e'),
           backgroundColor: Colors.red,
         ),
       );
-      // Clean up the half-created order if the stock deduction failed.
+      // Clean up the half-created order if an error occurred after order creation (REQUIRES DELETE PERMISSION)
       if (orderDocRef != null) {
-          // FIX: If deduction fails, delete the order so stock is not deducted next time.
-          orderDocRef.delete().catchError((error) => print("Error deleting order: $error"));
+          // This line requires the fixed Firestore 'delete' rule
+          orderDocRef.delete().catchError((error) => debugPrint("Error deleting order: $error"));
       }
       if (mounted) {
-         Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const OrderFailurePage()),
-          );
+          Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const OrderFailurePage()),
+            );
       }
     } finally {
       if (mounted) {
@@ -250,13 +174,12 @@ class _QrPaymentPageState extends State<QrPaymentPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // FIX: Removed const keyword
+            // Title and Total amount
             Text(
               'Scan to Pay',
               style: kLabelTextStyle.copyWith(fontSize: 24), 
             ),
             const SizedBox(height: 8),
-            // FIX: Removed const keyword
             Text(
               'Please pay RM${total.toStringAsFixed(2)}',
               style: kLabelTextStyle.copyWith(
@@ -309,12 +232,12 @@ class _QrPaymentPageState extends State<QrPaymentPage> {
                       child: Text('No image selected.', style: kHintTextStyle),
                     )
                   : ClipRRect(
-                    borderRadius: BorderRadius.circular(11),
-                    child: Image.file(
-                      _paymentProofImage!,
-                      fit: BoxFit.cover,
+                      borderRadius: BorderRadius.circular(11),
+                      child: Image.file(
+                        _paymentProofImage!,
+                        fit: BoxFit.cover,
+                      ),
                     ),
-                  ),
             ),
             const SizedBox(height: 16),
 

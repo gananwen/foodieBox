@@ -38,6 +38,7 @@ class _PaymentPendingPageState extends State<PaymentPendingPage> {
   @override
   void initState() {
     super.initState();
+    // Start listening to the specific order document for real-time status updates
     _orderStream = FirebaseFirestore.instance
         .collection('orders')
         .doc(widget.orderId)
@@ -45,16 +46,22 @@ class _PaymentPendingPageState extends State<PaymentPendingPage> {
   }
 
   void _navigate(OrderModel order) {
-    if (order.status == 'Received') {
-      // ADMIN APPROVED!
+    // -----------------------------------------------------------
+    // ADMIN ACTION COMPLETE: Payment is verified or rejected
+    // -----------------------------------------------------------
+
+    if (order.status == 'Payment Verified') { 
+      // PAYMENT APPROVED: Customer is confirmed and can proceed to wait for fulfillment.
+      
+      // Determine if navigation goes to Delivery or Pickup confirmation
       if (widget.orderType == CheckoutType.delivery) {
+        // DELIVERY FLOW
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
             builder: (context) => OrderConfirmationPage(
-              address: order.address,
-              // FIX: Ensure LatLng is used correctly
-              location: LatLng(order.lat, order.lng), 
+              address: order.address ?? 'Delivery Address Not Found',
+              location: LatLng(order.lat ?? 0.0, order.lng ?? 0.0), 
               total: order.total,
               promoLabel: order.promoLabel ?? order.voucherLabel ?? '',
               orderId: order.id,
@@ -63,15 +70,16 @@ class _PaymentPendingPageState extends State<PaymentPendingPage> {
           (route) => route.isFirst,
         );
       } else {
-        // Pickup Order
+        // PICKUP FLOW
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
             builder: (context) => PickupConfirmationPage(
               orderId: order.id,
               pickupId: widget.pickupId ?? 'N/A',
-              vendorName: widget.vendorName ?? 'Store',
-              vendorAddress: widget.vendorAddress ?? 'Address',
+              vendorName: widget.vendorName ?? order.vendorName ?? 'Vendor Name Not Found',
+              // FIX: Ensure vendorAddress is non-null for the destination widget
+              vendorAddress: widget.vendorAddress ?? order.address ?? 'Pickup Address Not Found',
               total: widget.total ?? order.total,
             ),
           ),
@@ -79,12 +87,12 @@ class _PaymentPendingPageState extends State<PaymentPendingPage> {
         );
       }
     } else if (order.status == 'Rejected') {
-      // ADMIN REJECTED!
+      // PAYMENT REJECTED: Navigate to failure page
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
           builder: (context) => OrderFailurePage(
-            rejectionReason: order.adminRejectionReason,
+            rejectionReason: order.reviewText ?? 'Payment proof rejected by admin.', 
           ),
         ),
         (route) => route.isFirst,
@@ -111,19 +119,19 @@ class _PaymentPendingPageState extends State<PaymentPendingPage> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          // We have data, let's process it
+          // Convert Firestore Map to OrderModel
           final order = OrderModel.fromMap(
               snapshot.data!.data() as Map<String, dynamic>, snapshot.data!.id);
 
-          // Check if status has changed and navigate
-          if (order.status == 'Received' || order.status == 'Rejected') {
-            // Use addPostFrameCallback to navigate after build
+          // Check if status has changed away from the pending state
+          if (order.status == 'Payment Verified' || order.status == 'Rejected') {
+            // Use addPostFrameCallback to safely navigate after the current build cycle completes
             WidgetsBinding.instance.addPostFrameCallback((_) {
               _navigate(order);
             });
           }
 
-          // Show pending UI
+          // Show pending UI while waiting for Admin action
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(32.0),
@@ -132,7 +140,6 @@ class _PaymentPendingPageState extends State<PaymentPendingPage> {
                 children: [
                   const CircularProgressIndicator(color: kPrimaryActionColor),
                   const SizedBox(height: 32),
-                  // FIX: Removed const keyword
                   Text(
                     'Payment Uploaded!',
                     style: kLabelTextStyle.copyWith(fontSize: 24),
@@ -140,12 +147,12 @@ class _PaymentPendingPageState extends State<PaymentPendingPage> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Your order is pending approval from the admin. This page will update automatically.',
+                    'Your payment proof has been uploaded. It is pending verification by the Admin.',
                     style: kHintTextStyle.copyWith(fontSize: 16),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 32),
-                  const Icon(Icons.admin_panel_settings_outlined,
+                  const Icon(Icons.verified_user_outlined,
                       size: 80, color: Colors.grey),
                 ],
               ),

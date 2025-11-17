@@ -1,4 +1,3 @@
-// 路径: lib/repositories/notification_repository.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/notification_model.dart'; // 导入我们刚创建的模型
@@ -9,12 +8,10 @@ class NotificationRepository {
 
   String? get _uid => _auth.currentUser?.uid;
 
-  // --- ( ✨ 关键函数 ✨ ) ---
-  // 获取当前用户未读通知的 *数量*
+  // --- FIX: Correctly defined return type for the unread count stream ---
   Stream<int> getUnreadNotificationCountStream() {
     final uid = _uid;
     if (uid == null) {
-      // 如果未登录，返回一个 0 的流
       return Stream.value(0);
     }
 
@@ -24,7 +21,6 @@ class NotificationRepository {
         .where('isRead', isEqualTo: false) // ( ✨ 关键查询 ✨ )
         .snapshots() // 监听变化
         .map((snapshot) {
-      // 每次变化时，只返回文档的数量
       return snapshot.docs.length;
     });
   }
@@ -61,5 +57,17 @@ class NotificationRepository {
       print('Error marking as read: $e');
       rethrow;
     }
+  }
+  
+  // --- FIX: Added the missing markAllAsRead method using a batch ---
+  Future<void> markAllAsRead(List<AppNotification> notifications) async {
+    final batch = _db.batch();
+    
+    // Only update those that are not already read
+    for (var notification in notifications.where((n) => !n.isRead)) {
+      final docRef = _db.collection('notifications').doc(notification.id);
+      batch.update(docRef, {'isRead': true});
+    }
+    await batch.commit();
   }
 }
