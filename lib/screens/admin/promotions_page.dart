@@ -493,7 +493,7 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.75,
+        childAspectRatio: 0.68, // Taller card to match vouchers
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
@@ -575,77 +575,91 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
             ),
 
             // Content
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    promo['title'],
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    promo['vendor'] ?? 'Unknown Vendor',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _statusColor(status).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          status,
-                          style: TextStyle(
-                              color: _statusColor(status),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12),
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        "${promo['discountPercentage']}%",
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Action buttons
-                  if (status != 'Active')
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                constraints: const BoxConstraints(
+                  minHeight: 160, // Prevent overflow + consistent size
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Text Info
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _smallButton(
-                          text: 'Approve',
-                          color: Colors.green.shade700,
-                          onTap: () => _updateStatus(
-                              vendorId: promo['vendorId'],
-                              promoId: promo['id'],
-                              status: 'Active'),
+                        Text(
+                          promo['title'],
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
-                        const SizedBox(width: 6),
-                        _smallButton(
-                          text: 'Decline',
-                          color: Colors.red.shade700,
-                          onTap: () => _updateStatus(
-                              vendorId: promo['vendorId'],
-                              promoId: promo['id'],
-                              status: 'Declined'),
+                        const SizedBox(height: 4),
+                        Text(
+                          promo['vendor'] ?? 'Unknown Vendor',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: Colors.grey.shade700, fontSize: 13),
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Status + Discount
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _statusColor(status).withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                status,
+                                style: TextStyle(
+                                    color: _statusColor(status),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12),
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              "${promo['discountPercentage']}%",
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                ],
+
+                    // Buttons at the bottom (only if not Active)
+                    if (status != 'Active')
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          _smallButton(
+                            text: 'Approve',
+                            color: Colors.green.shade700,
+                            onTap: () => _updateStatus(
+                                vendorId: promo['vendorId'],
+                                promoId: promo['id'],
+                                status: 'Active'),
+                          ),
+                          const SizedBox(width: 6),
+                          _smallButton(
+                            text: 'Decline',
+                            color: Colors.red.shade700,
+                            onTap: () => _updateStatus(
+                                vendorId: promo['vendorId'],
+                                promoId: promo['id'],
+                                status: 'Declined'),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -749,19 +763,26 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage>
     required VoidCallback onTap,
   }) {
     return SizedBox(
-      height: 32,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
+      height: 28, // smaller height
+      child: TextButton(
+        style: TextButton.styleFrom(
           backgroundColor: color,
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(
+              horizontal: 8, vertical: 0), // tighter padding
+          minimumSize: const Size(0, 28), // shrink width
+          tapTargetSize:
+              MaterialTapTargetSize.shrinkWrap, // avoid extra padding
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(6),
+          ),
         ),
         onPressed: onTap,
-        child: Text(text,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Colors.white,
-            )),
+        child: Text(
+          text,
+          style: const TextStyle(
+              fontSize: 12, fontWeight: FontWeight.w600), // smaller font
+        ),
       ),
     );
   }

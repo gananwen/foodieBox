@@ -53,35 +53,37 @@ class _AdminHomePageState extends State<AdminHomePage> {
   // ------------------------------------------------------------
   Future<void> _fetchDashboardData() async {
     try {
+      // --------------------------
+      // 1️⃣ Vendors Collection
+      // --------------------------
       final vendorsSnapshot =
           await FirebaseFirestore.instance.collection('vendors').get();
       totalVendors = vendorsSnapshot.docs.length;
 
+      // --------------------------
+      // 2️⃣ Drivers Collection
+      // --------------------------
       final driversSnapshot =
           await FirebaseFirestore.instance.collection('drivers').get();
       totalDrivers = driversSnapshot.docs.length;
 
+      // --------------------------
+      // 3️⃣ Active Vouchers
+      // --------------------------
       final vouchersSnapshot = await FirebaseFirestore.instance
           .collection('vouchers')
           .where('active', isEqualTo: true)
           .get();
       activeVouchersCount = vouchersSnapshot.docs.length;
 
-      DateTime now = DateTime.now();
-      DateTime startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-      DateTime endOfWeek = startOfWeek.add(const Duration(days: 6)).copyWith(
-            hour: 23,
-            minute: 59,
-            second: 59,
-          );
+      // --------------------------
+      // 4️⃣ Orders Collection
+      // --------------------------
+      final ordersSnapshot =
+          await FirebaseFirestore.instance.collection('orders').get();
 
-      final ordersSnapshot = await FirebaseFirestore.instance
-          .collection('orders')
-          .where('timestamp',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
-          .where('timestamp',
-              isLessThanOrEqualTo: Timestamp.fromDate(endOfWeek))
-          .get();
+      int ordersTodayCount = 0;
+      int disputesCount = 0;
 
       Map<String, double> revenueMap = {
         "Mon": 0,
@@ -102,25 +104,30 @@ class _AdminHomePageState extends State<AdminHomePage> {
         "Sun": 0,
       };
 
-      ordersToday = 0;
-      disputes = 0;
+      DateTime now = DateTime.now();
 
       for (var doc in ordersSnapshot.docs) {
         final data = doc.data();
-        final ts = data['timestamp'] as Timestamp;
-        final date = ts.toDate();
-        final day = _getDayOfWeek(date.weekday);
-
         double total =
             (data['total'] is num) ? (data['total'] as num).toDouble() : 0;
-        revenueMap[day] = revenueMap[day]! + total;
-        orderMap[day] = orderMap[day]! + 1;
 
-        if (date.day == now.day &&
-            date.month == now.month &&
-            date.year == now.year) {
-          ordersToday++;
-          if ((data['status'] ?? '') == 'dispute') disputes++;
+        // Daily breakdown only if timestamp exists
+        if (data['timestamp'] is Timestamp) {
+          final ts = data['timestamp'] as Timestamp;
+          final date = ts.toDate();
+          final day = _getDayOfWeek(date.weekday);
+          revenueMap[day] = revenueMap[day]! + total;
+          orderMap[day] = orderMap[day]! + 1;
+
+          if (date.day == now.day &&
+              date.month == now.month &&
+              date.year == now.year) {
+            ordersTodayCount++;
+            if ((data['status'] ?? '') == 'dispute') disputesCount++;
+          }
+        } else {
+          // Orders without timestamp: still count for total today
+          ordersTodayCount++;
         }
       }
 
@@ -129,6 +136,9 @@ class _AdminHomePageState extends State<AdminHomePage> {
       weeklyOrders = orderMap.entries
           .map((e) => _ChartData(e.key, e.value.toDouble()))
           .toList();
+
+      ordersToday = ordersTodayCount;
+      disputes = disputesCount;
 
       setState(() => _isLoading = false);
     } catch (e) {

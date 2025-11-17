@@ -7,6 +7,15 @@ import '../auth/admin_login.dart';
 import 'admin_home_page.dart';
 import 'attendance_logs_page.dart';
 
+// ⭐️ Consistent Modern Color Palette ⭐️
+const Color _kPrimaryActionColor = Color(0xFF1E88E5); // Vibrant Blue
+const Color _kAppBackgroundColor =
+    Color(0xFFF5F7F9); // Light, neutral background
+const Color _kTextColor = Color(0xFF1F2937); // Dark text
+const Color _kSecondaryTextColor = Color(0xFF6B7280); // Grey hint text
+const Color _kSuccessColor = Color(0xFF4CAF50); // Green for success
+const Color _kErrorColor = Color(0xFFE53935); // Red for errors
+
 // Status colors mapping
 Map<String, Color> statusColors = {
   'Active': Colors.green,
@@ -252,7 +261,6 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
 // =================== Change Password Dialog ===================
-  // =================== Change Password Dialog (Revised) ===================
   Future<void> _changePasswordDialog() async {
     final _currentPasswordController = TextEditingController();
     final _newPasswordController = TextEditingController();
@@ -263,33 +271,29 @@ class _ProfilePageState extends State<ProfilePage> {
       context: context,
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        // Adding elevation for "general setting" look
         elevation: 16,
         child: Container(
-          // Wrap content in a container for background/padding control
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
           ),
-          child: SingleChildScrollView(
-            padding: EdgeInsets.only(
-              // Adjust padding to only handle the keyboard inset dynamically
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: Form(
-              key: _formKey,
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
                     'Change Password',
                     style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1F2937)),
+                        color: _kTextColor),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
+
+                  // Text Fields using theme color
                   TextFormField(
                     controller: _currentPasswordController,
                     obscureText: true,
@@ -298,7 +302,13 @@ class _ProfilePageState extends State<ProfilePage> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      prefixIcon: const Icon(Icons.lock_outline),
+                      prefixIcon: const Icon(Icons.lock_outline,
+                          color: _kSecondaryTextColor),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                            color: _kPrimaryActionColor, width: 2.0),
+                      ),
                     ),
                     validator: (val) => val == null || val.isEmpty
                         ? 'Enter current password'
@@ -313,7 +323,13 @@ class _ProfilePageState extends State<ProfilePage> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      prefixIcon: const Icon(Icons.lock),
+                      prefixIcon:
+                          const Icon(Icons.lock, color: _kSecondaryTextColor),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                            color: _kPrimaryActionColor, width: 2.0),
+                      ),
                     ),
                     validator: (val) => val == null || val.length < 6
                         ? 'Password must be at least 6 characters'
@@ -328,75 +344,89 @@ class _ProfilePageState extends State<ProfilePage> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      prefixIcon: const Icon(Icons.lock),
+                      prefixIcon:
+                          const Icon(Icons.lock, color: _kSecondaryTextColor),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                            color: _kPrimaryActionColor, width: 2.0),
+                      ),
                     ),
                     validator: (val) => val != _newPasswordController.text
                         ? 'Passwords do not match'
                         : null,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
+
+                  // 🚨 FIX: Using Expanded/Flexible within the Row 🚨
                   Row(
-                    // CHANGE: Align buttons to the right
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.grey.shade700,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      // Cancel Button
+                      Flexible(
+                        child: TextButton(
+                          style: TextButton.styleFrom(
+                            foregroundColor: _kSecondaryTextColor,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
                           ),
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('CANCEL'),
                         ),
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel'),
                       ),
-                      const SizedBox(width: 12), // Add space between buttons
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.shade600,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      const SizedBox(width: 12),
+                      // Change Password Button
+                      Flexible(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _kPrimaryActionColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
                           ),
-                        ),
-                        onPressed: () async {
-                          if (!_formKey.currentState!.validate()) return;
+                          // Logic remains untouched
+                          onPressed: () async {
+                            if (!_formKey.currentState!.validate()) return;
+                            final user = _auth.currentUser;
+                            if (user == null) return;
 
-                          final user = _auth.currentUser;
-                          if (user == null) return;
-
-                          final cred = EmailAuthProvider.credential(
-                            email: user.email!,
-                            password: _currentPasswordController.text,
-                          );
-
-                          try {
-                            await user.reauthenticateWithCredential(cred);
-                            await user
-                                .updatePassword(_newPasswordController.text);
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Password updated successfully!'),
-                                backgroundColor: Colors.green,
-                              ),
+                            final cred = EmailAuthProvider.credential(
+                              email: user.email!,
+                              password: _currentPasswordController.text,
                             );
-                            Navigator.pop(context);
-                          } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        },
-                        child: const Text(
-                          'Change Password',
-                          style: TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.w600),
+
+                            try {
+                              await user.reauthenticateWithCredential(cred);
+                              await user
+                                  .updatePassword(_newPasswordController.text);
+
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content:
+                                        Text('Password updated successfully!'),
+                                    backgroundColor: _kSuccessColor),
+                              );
+                              Navigator.pop(context);
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error: $e'),
+                                  backgroundColor: _kErrorColor,
+                                ),
+                              );
+                            }
+                          },
+                          child: const Text(
+                            'CHANGE PASSWORD',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                            textAlign: TextAlign
+                                .center, // Added alignment for potential wrapping
+                          ),
                         ),
                       ),
                     ],
