@@ -438,7 +438,6 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
     final double total = getTotal();
     final double totalDiscount = promoDiscount + voucherDiscount;
 
-    // This is the data we will pass to the QR payment page
     final orderData = {
       'userId': _user!.uid,
       'orderType': 'Pickup',
@@ -447,20 +446,18 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
       'vendorName': vendorName,
       'vendorAddress': vendorAddress,
       'vendorType': vendorType,
-      'paymentMethod': 'QR Pay', // Set payment method here
+      'paymentMethod': 'QR Pay', 
       'subtotal': subtotal,
       'discount': totalDiscount,
       'total': total,
       'vendorIds': [vendorId],
-      'promoCode': null, // FIX: Use null here as automaticPromo does not have a code field
+      'promoCode': null, 
       'promoLabel': automaticPromo?.title, 
       'voucherCode': selectedVoucher?.code,
       'voucherLabel': selectedVoucher?.title, 
       'items': itemsData,
-      
-      // --- ( ✨ THIS IS THE ADDED LINE ✨ ) ---
-      'status': 'Awaiting Payment Proof', // Pre-order status
-      // --- ( ✨ END OF ADDED LINE ✨ ) ---
+    
+      'status': 'Awaiting Payment Proof',
 
       'timestamp': FieldValue.serverTimestamp(),
       'pickupDay': cart.selectedPickupDay,
@@ -468,7 +465,6 @@ class _PickupPaymentPageState extends State<PickupPaymentPage> {
       'hasBeenReviewed': false, 
     };
 
-    // --- Navigate to QR Payment Page ---
     if (mounted) {
       Navigator.push(
         context,

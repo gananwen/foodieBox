@@ -142,26 +142,21 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
           if (!orderSnapshot.hasData || orderSnapshot.data?.data() == null) {
             return const Center(child: CircularProgressIndicator());
           }
-
           final order = OrderModel.fromMap(
               orderSnapshot.data!.data() as Map<String, dynamic>,
               orderSnapshot.data!.id);
-
-          // This page is now valid for Pickup orders too, just won't show a map.
           final bool isDelivery = order.orderType == 'Delivery';
 
           if (isDelivery && order.vendorIds.isEmpty) {
             return const Center(child: Text('Order has no vendor.'));
           }
 
-          // Fetch vendor info only if it's a delivery
           if (isDelivery && _vendorFuture == null) {
             _vendorFuture = _fetchVendor(order.vendorIds.first);
             _vendorLatLngFuture = _vendorFuture!
                 .then((vendor) => _getVendorLatLng(vendor.storeAddress));
           }
 
-          // --- REAL-TIME STATUS LOGIC ---
           final int currentStep =
               _getStepFromStatus(order.status, order.orderType);
           
@@ -170,12 +165,10 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
 
           if ((order.status == 'Delivered' || order.status == 'Picked Up') && isDelivery) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              // Use demo driver for now, replace with 'order.driverId' when ready
               _navigateToRatingPage(fixedDriver, order.id);
             });
           }
-          
-          // Handle payment rejection
+
           if (order.status.toLowerCase() == 'rejected' || order.status.toLowerCase() == 'cancelled') {
              // Navigate to Order Failure Page
              WidgetsBinding.instance.addPostFrameCallback((_) {

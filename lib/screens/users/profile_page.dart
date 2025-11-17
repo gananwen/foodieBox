@@ -55,7 +55,6 @@ class ProfilePage extends StatelessWidget {
                         .doc(userId)
                         .snapshots(),
                     builder: (context, snapshot) {
-                      // ... (StreamBuilder 逻辑不变) ...
                       if (!snapshot.hasData || snapshot.data?.data() == null) {
                         return const Center(child: CircularProgressIndicator());
                       }

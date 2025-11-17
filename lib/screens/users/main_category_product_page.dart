@@ -25,21 +25,18 @@ class MainCategoryProductPage extends StatelessWidget {
 
   // Function to fetch all products across all vendors for a specific category
   Future<List<VendorProductsBundle>> _fetchCategorizedProducts() async {
-    // 1. Fetch all products matching the category using a Collection Group Query
-    // NOTE: This assumes you have a Firestore Index for 'products' collectionGroup 
-    // filtered by 'category' and 'quantity'.
+
     final productsSnapshot = await FirebaseFirestore.instance
         .collectionGroup('products')
         .where('category', isEqualTo: categoryName)
-        .where('quantity', isGreaterThan: 0) // Only show available products
+        .where('quantity', isGreaterThan: 0) 
         .get();
 
-    // Group products by their vendorId (which is the parent document ID)
     Map<String, List<Product>> groupedProducts = {};
     Set<String> vendorIds = {};
 
     for (var doc in productsSnapshot.docs) {
-      // The parent document path is 'vendors/{vendorId}/products/{productId}'
+
       final vendorId = doc.reference.parent.parent!.id; 
       final product = Product.fromMap(doc.data(), doc.id);
       
@@ -55,9 +52,8 @@ class MainCategoryProductPage extends StatelessWidget {
       return [];
     }
 
-    // 2. Fetch vendor details for all unique vendor IDs found
     List<VendorModel> vendors = [];
-    // Firestore's `whereIn` is limited to 10 items. We iterate over the set to be safe.
+
     for (String id in vendorIds) {
       try {
         final vendorDoc = await FirebaseFirestore.instance.collection('vendors').doc(id).get();
@@ -68,8 +64,7 @@ class MainCategoryProductPage extends StatelessWidget {
         print('Error fetching vendor $id: $e');
       }
     }
-    
-    // 3. Combine vendors and their products into the final list
+
     return vendors.map((vendor) {
       return VendorProductsBundle(
         vendor: vendor,
