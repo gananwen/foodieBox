@@ -52,24 +52,19 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Calculate prices based on quantity
     double currentPrice = widget.product.discountedPrice * _quantity;
     double originalPrice = widget.product.originalPrice * _quantity;
 
-    // --- ( ✨ NEW: Get cart and stock info ✨ ) ---
     final cart = context.watch<CartProvider>();
     final cartQuantity = cart.getQuantityInCart(widget.product.id!);
     final availableStock = widget.product.quantity;
     final bool isOutOfStock = availableStock <= 0;
     
-    // Ensure _quantity doesn't start higher than stock if stock is 0
     if (isOutOfStock && _quantity > 0) {
       _quantity = 0;
     } else if (_quantity == 0 && !isOutOfStock) {
       _quantity = 1;
     }
-    // --- ( ✨ END NEW ✨ ) ---
-
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -84,7 +79,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           IconButton(
             icon: const Icon(Icons.share_outlined, color: kTextColor),
             onPressed: () {
-              // TODO: Handle share action
             },
           ),
         ],
@@ -95,12 +89,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- Product Image ---
               Container(
                 height: 250,
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: kCardColor, // Or Colors.grey[200]
+                  color: kCardColor, 
                   borderRadius: BorderRadius.circular(16),
                   image: DecorationImage(
                     image: NetworkImage(widget.product.imageUrl),
@@ -115,7 +108,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               ),
               const SizedBox(height: 20),
 
-              // --- Title and Favorite ---
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -130,7 +122,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     icon: const Icon(Icons.favorite_border,
                         color: kTextColor, size: 28),
                     onPressed: () {
-                      // TODO: Handle favorite action
                     },
                   ),
                 ],
@@ -141,7 +132,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               ),
               const SizedBox(height: 20),
 
-              // --- Quantity and Price ---
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -306,15 +296,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
         child: ElevatedButton(
-          // --- ( ✨ MODIFICATION: Add to cart logic with stock check ✨ ) ---
           onPressed: isOutOfStock
-              ? null // Disable button if out of stock
+              ? null 
               : () {
-                  // 1. Get the cart provider (read only)
                   final cart = context.read<CartProvider>();
 
-                  // 2. Check if adding this quantity exceeds total stock
-                  //    (Check against quantity to add + quantity already in cart)
                   if (_quantity + cartQuantity > availableStock) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(

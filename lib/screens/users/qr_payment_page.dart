@@ -53,7 +53,7 @@ class _QrPaymentPageState extends State<QrPaymentPage> {
       String downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
     } catch (e) {
-      // Log the error for debugging
+
       debugPrint("Error uploading payment proof: $e"); 
       throw Exception('Failed to upload proof.');
     }
@@ -97,22 +97,16 @@ class _QrPaymentPageState extends State<QrPaymentPage> {
             backgroundColor: Colors.blueGrey,
           ),
         );
-        
-        // --- CRITICAL CHANGE: Navigate to Orders Page (index 3) ---
-        // This directs the user to see the status in the 'Ongoing' list immediately.
+
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
-            // We navigate to MainPage and expect the BasePage to handle the tab switch
+
             builder: (context) => const MainPage(), 
           ),
           (route) => route.isFirst,
         );
-        
-        // Note: You may need to manually trigger tab 3 selection on the main page.
-        // For now, navigating to MainPage is the safest way to pop back.
-        // The user will check the Orders tab (index 3).
-        // ------------------------------------------------------------------
+
       }
 
     } catch (e) {
@@ -123,7 +117,7 @@ class _QrPaymentPageState extends State<QrPaymentPage> {
           backgroundColor: Colors.red,
         ),
       );
-      // Clean up the half-created order if an error occurred after order creation 
+
       if (orderDocRef != null) {
           orderDocRef.delete().catchError((error) => debugPrint("Error deleting order: $error"));
       }

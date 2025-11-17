@@ -277,14 +277,11 @@ class OrderHistoryDetailsPage extends StatelessWidget {
 
   // --- ( ✨ NEW WIDGET - This contains the new logic ✨ ) ---
   Widget _buildReviewSection(BuildContext context, OrderModel order) {
-    // Don't show review button for cancelled orders
-    // Use .toLowerCase() for safety
+
     if (order.status.toLowerCase() == 'cancelled') {
       return const SizedBox.shrink();
     }
 
-    // Check if the order has been reviewed
-    // We check for 'true' explicitly. If it's null (old order), we show the button.
     if (order.hasBeenReviewed == true && order.rating != null) {
       // Show the review that was left
       return Container(

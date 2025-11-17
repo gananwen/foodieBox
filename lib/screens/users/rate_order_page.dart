@@ -16,20 +16,20 @@ class RateOrderPage extends StatefulWidget {
 
 class _RateOrderPageState extends State<RateOrderPage> {
   final ReviewRepository _reviewRepo = ReviewRepository();
-  final _reviewTextController = TextEditingController();
+  final TextEditingController _reviewTextController = TextEditingController();
   double _rating = 0;
   bool _isLoading = false;
 
-  void _submitReview() async {
+  Future<void> _submitReview() async {
     final user = FirebaseAuth.instance.currentUser;
+
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You must be logged in to leave a review.')),
       );
-      return;final review = ReviewModel(
-  id: '', // Will be set by Firebase
-  orderId: widget.order.id,
+      return;
     }
+
     if (_rating == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a star rating.')),
@@ -40,8 +40,8 @@ class _RateOrderPageState extends State<RateOrderPage> {
     setState(() => _isLoading = true);
 
     try {
-      // Assuming only one vendor ID per order for reviews
-      final vendorId = widget.order.vendorIds.first; 
+      // Only one vendor per order is assumed
+      final vendorId = widget.order.vendorIds.first;
 
       final review = ReviewModel(
         id: '', // Will be set by Firebase
@@ -56,7 +56,6 @@ class _RateOrderPageState extends State<RateOrderPage> {
       await _reviewRepo.addReviewAndUpdateVendor(review);
 
       if (mounted) {
-        // Show a success dialog
         await showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -70,20 +69,17 @@ class _RateOrderPageState extends State<RateOrderPage> {
             ],
           ),
         );
-        // Pop the review page itself
-        Navigator.pop(context); 
+
+        Navigator.pop(context); // Close the review page
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          // Show the specific error message
           SnackBar(content: Text('Failed to submit review: ${e.toString()}')),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -103,10 +99,10 @@ class _RateOrderPageState extends State<RateOrderPage> {
         elevation: 1,
         iconTheme: const IconThemeData(color: kTextColor),
       ),
-      // Use a bottom navigation bar for the button
-      // This keeps the button visible even when typing
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(20).copyWith(bottom: MediaQuery.of(context).padding.bottom + 20),
+        padding: const EdgeInsets.all(20).copyWith(
+          bottom: MediaQuery.of(context).padding.bottom + 20,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -114,14 +110,14 @@ class _RateOrderPageState extends State<RateOrderPage> {
               color: Colors.grey.withOpacity(0.1),
               spreadRadius: 1,
               blurRadius: 10,
-              offset: const Offset(0, -5), // changes position of shadow
+              offset: const Offset(0, -5),
             ),
           ],
         ),
         child: ElevatedButton(
           onPressed: _isLoading ? null : _submitReview,
           style: ElevatedButton.styleFrom(
-            backgroundColor: kPrimaryActionColor, // Use your app's theme color
+            backgroundColor: kPrimaryActionColor,
             foregroundColor: kTextColor,
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
@@ -141,8 +137,7 @@ class _RateOrderPageState extends State<RateOrderPage> {
                 )
               : const Text(
                   'Submit Review',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
         ),
       ),
@@ -177,7 +172,7 @@ class _RateOrderPageState extends State<RateOrderPage> {
                   icon: Icon(
                     index < _rating ? Icons.star_rounded : Icons.star_border_rounded,
                     color: Colors.amber,
-                    size: 48, // Made stars bigger
+                    size: 48,
                   ),
                   onPressed: () {
                     setState(() {
@@ -202,7 +197,7 @@ class _RateOrderPageState extends State<RateOrderPage> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _reviewTextController,
-              maxLines: 7, // Made it taller
+              maxLines: 7,
               maxLength: 2000,
               decoration: InputDecoration(
                 hintText: 'Your review helps other users find the best food...',
@@ -223,7 +218,7 @@ class _RateOrderPageState extends State<RateOrderPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 40), // Added space for the bottom button
+            const SizedBox(height: 40),
           ],
         ),
       ),

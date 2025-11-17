@@ -277,9 +277,7 @@ class _CheckoutPage extends State<CheckoutPage> {
     setState(() => _isLoadingVouchers = true);
 
     final vouchers = await _voucherRepo.fetchAllActiveVouchers();
-    
-    // --- NEW: Get all vendor types from cart ---
-    // Note: 'Blind Box' (with space) comes from product.dart
+
     final cartVendorTypes = widget.items
         .map((item) => item.product.productType == 'Blind Box' ? 'BlindBox' : 'Grocery')
         .toSet()
