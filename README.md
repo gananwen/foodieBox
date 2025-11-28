@@ -1,16 +1,61 @@
-# foodiebox
+FoodieBox
 
-A new Flutter project.
+FoodieBox is a mobile food ordering application built with Flutter, aimed at reducing food waste by allowing users to purchase leftover restaurant meals and near-expiry grocery items at discounted prices. The app includes features for both users and vendors, providing a smooth ordering experience and efficient backend support.
 
-## Getting Started
+Features
 
-This project is a starting point for a Flutter application.
+User-side:
 
-A few resources to get you started if this is your first Flutter project:
+Browse and filter vendors and products
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+View item details and availability
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Cart management and order validation
+
+Delivery address selection with Google Maps
+
+Smooth and responsive UI
+
+Vendor-side: (overview)
+
+Manage listings of leftover meals and near-expiry grocery items
+
+Track orders and availability (backend integration)
+
+Backend & Data:
+
+User authentication and account management (Firebase Auth)
+
+Real-time data storage and updates (Firestore)
+
+Order processing and validation logic
+
+Tech Stack
+
+Flutter · Dart
+
+Firebase Authentication
+
+Firestore
+
+Google Maps API
+
+Getting Started
+
+Clone the repository:
+
+git clone https://github.com/yourusername/FoodieBox.git
+
+
+Install dependencies:
+
+flutter pub get
+
+
+Run the app:
+
+flutter run
+
+Screenshots / Demo
+
+Add screenshots or GIFs here to showcase the app interface and features.
